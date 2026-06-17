@@ -191,7 +191,13 @@ app.post('/api/generate-report', async (req, res) => {
                 `).join('')}
             </table>
             <p>Atentamente,<br>Punto Propiedades</p>
-          `
+          `,
+          attachments: [
+            {
+              filename: `Reporte-Gastos-${propertyName.replace(/\s+/g, '_')}.pdf`,
+              content: pdfData
+            }
+          ]
         });
         res.json({ success: true });
     } catch (e: any) {
@@ -200,15 +206,15 @@ app.post('/api/generate-report', async (req, res) => {
     }
   });
 
-  doc.fontSize(20).fillColor('navy').text(`Reporte de Gastos: ${propertyName}`, { align: 'center' });
+  doc.fontSize(20).fillColor('#DC2626').text(`Reporte de Gastos: ${propertyName}`, { align: 'center' });
   doc.moveDown();
   doc.fontSize(12).fillColor('black').text(`Emitido el: ${new Date().toLocaleDateString()}`);
   doc.moveDown();
 
   // Draw table header
   const tableTop = doc.y;
-  doc.fontSize(10).fillColor('gray').rect(50, tableTop, 500, 20).fill('#f0f0f0');
-  doc.fillColor('black').text('Tipo de Gasto', 60, tableTop + 5);
+  doc.fontSize(10).rect(50, tableTop, 500, 20).fill('#000000');
+  doc.fillColor('#FFFFFF').text('Tipo de Gasto', 60, tableTop + 5);
   doc.text('Fecha', 250, tableTop + 5);
   doc.text('Monto', 450, tableTop + 5, { align: 'right' });
   
@@ -228,7 +234,7 @@ app.post('/api/generate-report', async (req, res) => {
 
   // Add list of expense files
   doc.moveDown(2);
-  doc.fontSize(14).fillColor('navy').text('Detalle de Documentos de Soporte:', { underline: true });
+  doc.fontSize(14).fillColor('#DC2626').text('Detalle de Documentos de Soporte:', { underline: true });
   doc.moveDown(0.5);
   expenses.forEach((e: any) => {
     if (e.boleta) {
