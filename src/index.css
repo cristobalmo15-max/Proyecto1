@@ -5,18 +5,19 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 
-  --color-bg: #F8F9FA;
+  --color-bg: #FAFAFA; /* Soft warm white */
   --color-card: #FFFFFF;
-  --color-primary: #1E293B; /* Slate 800 */
-  --color-accent: #3B82F6; /* Blue 500 */
-  --color-ink: #1E293B;
-  --color-muted: #64748B;
-  --color-border: #E2E8F0;
+  --color-primary: #000000; /* Pure Black */
+  --color-accent: #DC2626; /* Red 600 */
+  --color-ink: #111111;
+  --color-muted: #6B7280;
+  --color-border: #E5E7EB;
   --color-warning: #F59E0B;
   --color-danger: #EF4444;
   
-  --shadow-premium: 0 10px 30px -10px rgba(0, 0, 0, 0.05);
-  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.03);
+  --shadow-premium: 0 20px 40px -15px rgba(0, 0, 0, 0.05);
+  --shadow-premium-hover: 0 30px 60px -15px rgba(0, 0, 0, 0.1);
+  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.02);
 }
 
 @layer base {
@@ -46,5 +47,26 @@
 }
 
 .glass-morphism {
-  @apply bg-white/70 backdrop-blur-xl border border-white/20 shadow-glass;
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.04);
+}
+
+.gradient-sidebar {
+  background: linear-gradient(185deg, #1F2937 0%, #000000 100%);
+}
+
+.glow-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glow-hover:hover {
+  box-shadow: 0 12px 24px -8px rgba(220, 38, 38, 0.3);
+  transform: translateY(-2px);
+}
+
+.smooth-transition {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }

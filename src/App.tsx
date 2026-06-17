@@ -550,7 +550,8 @@ export default function App() {
     file: null as File | null
   });
 
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
+  const geminiApiKey = process.env.GEMINI_API_KEY || '';
+  const ai = geminiApiKey ? new GoogleGenAI({ apiKey: geminiApiKey }) : null;
 
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => {
@@ -944,6 +945,10 @@ export default function App() {
   };
 
   const processContractWithGemini = async (file: File) => {
+    if (!ai) {
+      showToast('Error: La API Key de Gemini no está configurada en este entorno.', 'error');
+      throw new Error('Gemini API Key is not configured');
+    }
     const reader = new FileReader();
     return new Promise<any>((resolve, reject) => {
       reader.onload = async (e) => {
@@ -1661,7 +1666,7 @@ export default function App() {
               ) : (
                 <button 
                   onClick={handleLogin}
-                  className="bg-primary hover:bg-blue-700 text-white px-6 py-2.5 rounded-full font-bold text-sm transition-all shadow-lg shadow-primary/20"
+                  className="bg-primary hover:bg-red-700 text-white px-6 py-2.5 rounded-full font-bold text-sm transition-all shadow-lg shadow-primary/20"
                 >
                   Ingresar / Registrarse
                 </button>
@@ -1673,11 +1678,11 @@ export default function App() {
         {/* Hero Section - Split Layout (Recipe 11) */}
         <section className="pt-32 pb-24 max-w-7xl mx-auto px-8 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
-            <div className="inline-flex items-center gap-2 bg-blue-50 text-primary px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest">
+            <div className="inline-flex items-center gap-2 bg-red-50 text-primary px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest">
               <Zap className="w-3 h-3" /> Ingeniería Inmobiliaria v15.0
             </div>
             <h1 className="text-[clamp(3rem,8vw,5.5rem)] font-black tracking-tight leading-[0.88] uppercase">
-              Gestión <br /> <span className="text-primary">Inteligente.</span>
+              <span className="text-accent">G</span>estión <br /> <span className="text-primary">Inteligente.</span>
             </h1>
             <p className="text-xl text-muted leading-relaxed max-w-lg font-medium">
               La plataforma definitiva para administradores de propiedades. Automatización total con IA, liquidaciones en tiempo real y seguridad bancaria.
@@ -1761,7 +1766,7 @@ export default function App() {
                       <p className="text-[8px] font-black text-muted uppercase tracking-widest mb-1">Propiedades</p>
                       <p className="text-xl font-black text-ink">24</p>
                     </div>
-                    <div className="p-4 bg-blue-50 rounded-2xl border border-primary/10">
+                    <div className="p-4 bg-red-50 rounded-2xl border border-primary/10">
                       <p className="text-[8px] font-black text-primary uppercase tracking-widest mb-1">Recaudación</p>
                       <p className="text-xl font-black text-primary">$12.5M</p>
                     </div>
@@ -1951,7 +1956,7 @@ export default function App() {
       <aside className={`bg-white transition-all duration-500 ease-in-out flex flex-col z-40 relative border-r border-border/50 shadow-sm ${sidebarOpen ? 'w-[260px]' : 'w-[80px]'}`}>
         <div className={`py-6 mb-4 flex items-center transition-all duration-500 ${sidebarOpen ? 'px-6 justify-between' : 'px-4 justify-center gap-3'}`}>
           <div className={`flex items-center gap-3 transition-all duration-500 ${!sidebarOpen && 'scale-105'}`}>
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0 shadow-lg shadow-primary/20">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-red-600 to-red-500 flex items-center justify-center shrink-0 shadow-lg shadow-accent/20">
                <span className="text-white font-bold text-sm">P</span>
             </div>
             {sidebarOpen && (
@@ -1983,10 +1988,10 @@ export default function App() {
             <button
               key={item.id}
               onClick={() => setActiveModule(item.id as any)}
-              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-full font-bold text-[11px] tracking-wider transition-all duration-300 relative group overflow-hidden ${
+              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-full font-bold text-[11px] tracking-wider relative group overflow-hidden smooth-transition ${
                 activeModule === item.id 
-                  ? 'bg-primary text-white shadow-md' 
-                  : 'text-muted hover:text-ink hover:bg-gray-50'
+                  ? 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-premium shadow-accent/20 scale-[1.02] glow-hover' 
+                  : 'text-muted hover:text-primary hover:bg-slate-50 hover:translate-x-1'
               }`}
             >
               <div className="relative z-10 shrink-0">
@@ -2028,7 +2033,7 @@ export default function App() {
         {activeModule !== 'properties' && activeModule !== 'ai' && activeModule !== 'reports' && (
           <header className={`flex justify-between items-center ${activeModule === 'settings' || activeModule === 'support' || activeModule === 'admin' ? 'mb-4' : 'mb-8'}`}>
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-primary text-white rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20">
+              <div className="w-12 h-12 bg-gradient-to-tr from-red-600 to-red-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-accent/20">
                 <Building2 className="w-6 h-6" />
               </div>
               <div>
@@ -2052,7 +2057,7 @@ export default function App() {
               {activeModule !== 'settings' && (
                 <button 
                   onClick={() => setIsAdding(true)}
-                  className="bg-primary hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold text-xs transition-all flex items-center gap-2 shadow-lg shadow-primary/20 hover:-translate-y-0.5 active:translate-y-0"
+                  className="bg-primary hover:bg-red-700 text-white px-6 py-3 rounded-xl font-bold text-xs transition-all flex items-center gap-2 shadow-lg shadow-primary/20 hover:-translate-y-0.5 active:translate-y-0"
                 >
                   <Plus className="w-4 h-4" /> Nueva Propiedad
                 </button>
@@ -2264,7 +2269,7 @@ export default function App() {
                   </button>
                   <button 
                     onClick={() => { setFormData({}); setIsAdding(true); }}
-                    className="w-10 h-10 bg-primary text-white rounded-xl hover:bg-blue-600 transition-all shadow-md flex items-center justify-center shrink-0"
+                    className="w-10 h-10 bg-primary text-white rounded-xl hover:bg-red-600 transition-all shadow-md flex items-center justify-center shrink-0"
                   >
                     <Plus className="w-5 h-5" />
                   </button>
@@ -2294,8 +2299,8 @@ export default function App() {
                       onClick={() => { setSelectedProp(p); setActiveTab('legal'); }} 
                       className={`p-4 rounded-2xl cursor-pointer transition-all duration-200 border group/item ${
                          selectedProp?.id === p.id 
-                           ? 'bg-blue-50/50 border-blue-200 shadow-sm ring-1 ring-blue-200' 
-                           : 'bg-white border-border/60 hover:border-blue-300 hover:shadow-sm'
+                           ? 'bg-red-50/30 border-red-200/50 shadow-sm ring-1 ring-red-100' 
+                           : 'bg-white border-border/60 hover:border-red-200 hover:shadow-sm'
                       }`}
                     >
                       <div className="text-[7px] text-slate-400 font-bold uppercase mb-1">Contrato</div>
@@ -2303,7 +2308,7 @@ export default function App() {
                           <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                               <div className="text-[10px] font-black text-slate-700 uppercase tracking-tight truncate" title={p.dueno || 'Sin Dueño'}>{p.dueno || 'Sin Dueño'}</div>
                               <div className="text-[9px] text-slate-400 font-bold uppercase italic">vs</div>
-                              <div className="text-[10px] font-black text-blue-700 uppercase tracking-tight truncate" title={p.arrendatario || 'Sin Inquilino'}>{p.arrendatario || 'Sin Inquilino'}</div>
+                              <div className="text-[10px] font-black text-red-700 uppercase tracking-tight truncate" title={p.arrendatario || 'Sin Inquilino'}>{p.arrendatario || 'Sin Inquilino'}</div>
                           </div>
                       
                           <button
@@ -2370,8 +2375,8 @@ export default function App() {
                           
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2 mb-1">
-                              <div className="px-2 py-0.5 text-[8px] font-black uppercase tracking-widest bg-blue-50 text-blue-600 rounded-full border border-blue-100 flex items-center gap-1 shadow-sm font-mono">
-                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                              <div className="px-2 py-0.5 text-[8px] font-black uppercase tracking-widest bg-red-50 text-red-600 rounded-full border border-red-100 flex items-center gap-1 shadow-sm font-mono">
+                                <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                                 {isExpired(selectedProp.termino) ? 'VENCIDA' : 'ACTIVA'}
                               </div>
                               <span className="text-[8px] font-mono font-medium text-ink/20 uppercase tracking-widest">REF: {selectedProp.id}</span>
@@ -2404,30 +2409,30 @@ export default function App() {
                       </div>
                       
                       <div className="flex flex-wrap items-center gap-3">
-                        <div className="flex flex-wrap items-center gap-3 bg-blue-50/40 p-2 lg:px-4 lg:py-2 rounded-[16px] border border-blue-100/50 shadow-sm flex-1 lg:flex-none">
+                        <div className="flex flex-wrap items-center gap-3 bg-red-50/40 p-2 lg:px-4 lg:py-2 rounded-[16px] border border-red-100/50 shadow-sm flex-1 lg:flex-none">
                            <div className="flex items-center gap-4">
-                             <div className="w-8 h-8 bg-white rounded-lg shadow-sm border border-blue-100/50 flex items-center justify-center">
-                               <CalendarDays className="w-4 h-4 text-blue-500" />
+                             <div className="w-8 h-8 bg-white rounded-lg shadow-sm border border-red-100/50 flex items-center justify-center">
+                               <CalendarDays className="w-4 h-4 text-red-600" />
                              </div>
                              <div className="flex items-center gap-6">
                                <div className="text-center sm:text-left">
-                                 <span className="text-[7px] font-black uppercase tracking-[0.15em] text-blue-600/50 block mb-0.5 leading-none">Inicio Contrato</span>
+                                 <span className="text-[7px] font-black uppercase tracking-[0.15em] text-red-600/50 block mb-0.5 leading-none">Inicio Contrato</span>
                                  <span className="text-[11px] font-black text-ink tracking-tight leading-none">{selectedProp.f_ini || 'N/A'}</span>
                                </div>
-                               <div className="w-px h-6 bg-blue-100/50" />
+                               <div className="w-px h-6 bg-red-100/30" />
                                <div className="text-center sm:text-left">
-                                 <span className="text-[7px] font-black uppercase tracking-[0.15em] text-blue-600/50 block mb-0.5 leading-none">Vencimiento</span>
+                                 <span className="text-[7px] font-black uppercase tracking-[0.15em] text-red-600/50 block mb-0.5 leading-none">Vencimiento</span>
                                  <span className="text-[11px] font-black text-ink tracking-tight leading-none">{selectedProp.termino || 'Indef'}</span>
                                </div>
                              </div>
                            </div>
                            
-                           <div className="hidden sm:block w-px h-6 bg-blue-100/50 mx-1.5" />
+                           <div className="hidden sm:block w-px h-6 bg-red-100/30 mx-1.5" />
                            
                            <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
                              <div className="flex flex-col items-center">
-                               <span className="text-[6px] font-bold text-blue-600/40 uppercase tracking-widest mb-0.5 leading-none">Plazo</span>
-                               <span className="text-[8px] font-black text-blue-700 bg-white px-1.5 py-0.5 rounded border border-blue-50 shadow-sm leading-none">{selectedProp.duracion || '12M'}</span>
+                               <span className="text-[6px] font-bold text-red-600/40 uppercase tracking-widest mb-0.5 leading-none">Plazo</span>
+                               <span className="text-[8px] font-black text-red-700 bg-white px-1.5 py-0.5 rounded border border-red-50 shadow-sm leading-none">{selectedProp.duracion || '12M'}</span>
                              </div>
                              <button onClick={renewContract} className="bg-ink text-white px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center gap-1.5 shadow-sm active:scale-95">
                                <RefreshCw className="w-3 h-3" /> Renovar
@@ -2823,7 +2828,7 @@ export default function App() {
                                       <tr key={`expense-${selectedProp.id || 'current'}-${idx}`} className="hover:bg-gray-50/80 transition-all group duration-300">
                                         <td className="p-4 pl-6">
                                           <div className="flex items-center gap-3">
-                                             <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                             <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
                                              <span className="font-bold text-xs text-ink">{exp.tipo}</span>
                                           </div>
                                         </td>
@@ -2962,7 +2967,7 @@ export default function App() {
                     </p>
                   </div>
                   <div className="flex gap-3">
-                    <button onClick={bulkSync} disabled={loading} className="h-12 px-6 bg-primary text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-2">
+                    <button onClick={bulkSync} disabled={loading} className="h-12 px-6 bg-primary text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-700 transition-all flex items-center gap-2">
                       <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Sincronizar Todo
                     </button>
                     <button className="h-12 px-6 bg-white border border-border rounded-xl text-xs font-bold uppercase tracking-widest text-muted hover:bg-gray-50 transition-all flex items-center gap-2">
@@ -2975,16 +2980,16 @@ export default function App() {
                    <div className="lg:col-span-4 space-y-6">
                     <div className="bg-white p-8 rounded-3xl border border-border shadow-sm flex flex-col pt-10">
                       <div className="mb-6 text-center">
-                         <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-blue-100 shadow-sm">
+                         <div className="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-red-100 shadow-sm">
                            <Upload className="w-8 h-8" />
                          </div>
                          <h4 className="text-lg font-black text-ink mb-1 uppercase tracking-tight">Carga de Documentos</h4>
                          <p className="text-xs text-muted font-medium">Sube los contratos para iniciar la auditoría IA.</p>
                       </div>
                       <div className="space-y-4 max-w-sm mx-auto w-full pb-2">
-                        <label className="flex items-center justify-between w-full bg-bg border border-border rounded-2xl p-6 cursor-pointer hover:bg-gray-50 hover:border-blue-200 hover:shadow-sm transition-all group">
+                        <label className="flex items-center justify-between w-full bg-bg border border-border rounded-2xl p-6 cursor-pointer hover:bg-gray-50 hover:border-red-200/50 hover:shadow-sm transition-all group">
                           <div className="flex items-center gap-4">
-                             <div className="w-10 h-10 bg-white rounded-xl shadow-sm border border-border/50 flex items-center justify-center group-hover:text-blue-600 transition-colors">
+                             <div className="w-10 h-10 bg-white rounded-xl shadow-sm border border-border/50 flex items-center justify-center group-hover:text-red-600 transition-colors">
                                <FileText className="w-5 h-5" />
                              </div>
                              <div className="text-left">
@@ -2992,27 +2997,27 @@ export default function App() {
                                <p className="text-[10px] text-muted mt-0.5">Archivo PDF (Máx 10MB)</p>
                              </div>
                           </div>
-                          <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm border border-border/50 group-hover:bg-blue-50 group-hover:border-blue-100 transition-colors">
-                            <Plus className="w-4 h-4 text-ink group-hover:text-blue-600 transition-colors" />
+                          <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm border border-border/50 group-hover:bg-red-50 group-hover:border-red-100 transition-colors">
+                            <Plus className="w-4 h-4 text-ink group-hover:text-red-600 transition-colors" />
                           </div>
                           <input type="file" accept="application/pdf" className="hidden" onChange={handleFileChange} />
                         </label>
                         
-                        <label className="flex items-center justify-between w-full bg-white border border-border rounded-2xl p-6 cursor-pointer hover:bg-gray-50 hover:border-blue-200 hover:shadow-sm transition-all group relative overflow-hidden">
+                        <label className="flex items-center justify-between w-full bg-white border border-border rounded-2xl p-6 cursor-pointer hover:bg-gray-50 hover:border-red-200/50 hover:shadow-sm transition-all group relative overflow-hidden">
                           <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:scale-110 transition-transform">
                              <Zap className="w-16 h-16" />
                           </div>
                           <div className="flex items-center gap-4 relative z-10">
-                             <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl shadow-sm border border-blue-100 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                             <div className="w-10 h-10 bg-red-50 text-red-600 rounded-xl shadow-sm border border-red-100 flex items-center justify-center group-hover:bg-red-100 transition-colors">
                                <FileSearch className="w-5 h-5" />
                              </div>
                              <div className="text-left">
-                               <p className="text-sm font-bold text-ink group-hover:text-blue-700 transition-colors">Procesamiento Masivo Lote</p>
+                               <p className="text-sm font-bold text-ink group-hover:text-red-700 transition-colors">Procesamiento Masivo Lote</p>
                                <p className="text-[10px] text-muted mt-0.5">Sube múltiples PDFs a la vez</p>
                              </div>
                           </div>
-                           <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shadow-sm border border-blue-100 group-hover:bg-blue-600 group-hover:border-transparent transition-colors relative z-10">
-                            <Plus className="w-4 h-4 text-blue-600 group-hover:text-white transition-colors" />
+                           <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center shadow-sm border border-red-100 group-hover:bg-red-600 group-hover:border-transparent transition-colors relative z-10">
+                            <Plus className="w-4 h-4 text-red-600 group-hover:text-white transition-colors" />
                           </div>
                           <input type="file" accept="application/pdf" multiple className="hidden" onChange={handleBulkFileChange} />
                         </label>
@@ -3226,7 +3231,7 @@ export default function App() {
                    <button className="h-12 px-6 bg-white border border-border rounded-xl text-xs font-bold uppercase tracking-widest text-ink hover:bg-gray-50 transition-all flex items-center gap-3 shadow-sm">
                       <Download className="w-4 h-4 text-muted" /> Exportar Q2
                    </button>
-                   <button onClick={fetchProperties} className="h-12 w-12 bg-primary text-white rounded-xl shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center">
+                   <button onClick={fetchProperties} className="h-12 w-12 bg-primary text-white rounded-xl shadow-lg hover:bg-red-700 transition-all flex items-center justify-center">
                       <RefreshCw className="w-4 h-4" />
                    </button>
                 </div>
@@ -3402,7 +3407,7 @@ export default function App() {
                         }}
                         className="flex-1 py-3 px-4 rounded-xl border border-border bg-gray-50/50 hover:bg-white text-xs font-black flex items-center justify-center gap-2 transition-all hover:border-accent"
                       >
-                        <span className="w-2 h-2 rounded-full bg-blue-500" />
+                        <span className="w-2 h-2 rounded-full bg-red-500" />
                         Outlook SMTP
                       </button>
                     </div>
@@ -3439,12 +3444,12 @@ export default function App() {
 
                       {/* Explicit interactive tips */}
                       {appSettings.smtpUser?.includes('@gmail.com') ? (
-                        <div className="p-4 bg-blue-50/40 rounded-2xl border border-blue-100 flex gap-3">
-                          <span className="w-8 h-8 rounded-full bg-blue-500/15 flex items-center justify-center shrink-0">
-                            <Lock className="w-4 h-4 text-blue-600" />
+                        <div className="p-4 bg-red-50/40 rounded-2xl border border-red-100 flex gap-3">
+                          <span className="w-8 h-8 rounded-full bg-red-500/15 flex items-center justify-center shrink-0">
+                            <Lock className="w-4 h-4 text-red-600" />
                           </span>
                           <div>
-                            <p className="text-xs font-bold text-blue-800 uppercase tracking-tight mb-0.5">¿Cómo conseguir la contraseña en Gmail?</p>
+                            <p className="text-xs font-bold text-red-800 uppercase tracking-tight mb-0.5">¿Cómo conseguir la contraseña en Gmail?</p>
                             <p className="text-[11px] text-muted font-medium leading-relaxed">
                               Por seguridad, Google te pide crear una contraseña especial para aplicaciones de terceros:
                             </p>
@@ -3463,12 +3468,12 @@ export default function App() {
                           </div>
                         </div>
                       ) : (appSettings.smtpUser?.includes('@outlook.com') || appSettings.smtpUser?.includes('@hotmail.com')) ? (
-                        <div className="p-4 bg-blue-50/40 rounded-2xl border border-blue-100 flex gap-3">
-                          <span className="w-8 h-8 rounded-full bg-blue-500/15 flex items-center justify-center shrink-0">
-                            <Lock className="w-4 h-4 text-blue-600" />
+                        <div className="p-4 bg-red-50/40 rounded-2xl border border-red-100 flex gap-3">
+                          <span className="w-8 h-8 rounded-full bg-red-500/15 flex items-center justify-center shrink-0">
+                            <Lock className="w-4 h-4 text-red-600" />
                           </span>
                           <div>
-                            <p className="text-xs font-bold text-blue-800 uppercase tracking-tight mb-0.5">¿Configuración en cuentas Microsoft?</p>
+                            <p className="text-xs font-bold text-red-800 uppercase tracking-tight mb-0.5">¿Configuración en cuentas Microsoft?</p>
                             <p className="text-[11px] text-muted font-medium leading-relaxed">
                               Microsoft requiere generar una contraseña exclusiva si tienes habilitada la autenticación en dos factores en tu cuenta Outlook/Hotmail.
                             </p>
@@ -3736,7 +3741,7 @@ export default function App() {
                               Este error indica que Outlook ha bloqueado temporalmente los accesos automatizados SMTP para tu cuenta por seguridad. Sigue estos pasos:
                             </p>
                             <ol className="list-decimal pl-4.5 space-y-1.5 text-slate-600 font-semibold leading-normal">
-                              <li>Inicia sesión de forma manual en <a href="https://login.microsoftonline.com" target="_blank" rel="noopener noreferrer" className="underline font-bold text-blue-600 hover:text-blue-800">Microsoft Portal</a> para confirmar si te pide cambio de contraseña o verificación adicional de identidad.</li>
+                              <li>Inicia sesión de forma manual en <a href="https://login.microsoftonline.com" target="_blank" rel="noopener noreferrer" className="underline font-bold text-red-600 hover:text-red-800">Microsoft Portal</a> para confirmar si te pide cambio de contraseña o verificación adicional de identidad.</li>
                               <li>Solicita al administrador de TI/Soporte Técnico de tu empresa que habilite expresamente el check de **SMTP Autenticado** en los atributos de tu usuario de correo dentro del **Centro de Administración de Microsoft 365**.</li>
                               <li>Si usas autenticación multifactor (MFA), crea y utiliza una **Contraseña de Aplicación** ("App Password") en vez de tu clave habitual.</li>
                             </ol>
@@ -4386,7 +4391,7 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
 
                                 <div className="flex flex-col items-end gap-1 shrink-0">
                                   <span className={`text-[8px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider ${
-                                    ticket.estado === 'Respondido' ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-accent'
+                                    ticket.estado === 'Respondido' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-accent'
                                   }`}>
                                     ● {ticket.estado}
                                   </span>
@@ -4411,9 +4416,9 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
                                   {/* Responses list */}
                                   {ticket.respuestas?.map((resp: any, rIdx: number) => (
                                     <div key={rIdx} className="flex items-start justify-end gap-3">
-                                      <div className="bg-blue-50 p-3 rounded-2xl border border-blue-100 max-w-[85%] text-right shrink-1">
+                                      <div className="bg-red-50 p-3 rounded-2xl border border-red-100 max-w-[85%] text-right shrink-1">
                                         <p className="text-[9px] font-mono font-black uppercase text-accent tracking-widest mb-1">{resp.remitente}</p>
-                                        <p className="text-xs font-medium text-blue-900 leading-relaxed font-sans text-left">{resp.mensaje}</p>
+                                        <p className="text-xs font-medium text-red-900 leading-relaxed font-sans text-left">{resp.mensaje}</p>
                                         <span className="text-[8px] text-accent/40 font-mono tracking-widest uppercase block mt-1 text-right">{new Date(resp.fecha).toLocaleTimeString()}</span>
                                       </div>
                                       <div className="w-7 h-7 bg-accent text-white font-black text-[9px] rounded-full flex items-center justify-center shrink-0">
@@ -4849,7 +4854,7 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
                         setLoading(false);
                       }
                     }}
-                    className={`flex-[2] bg-primary text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-xl shadow-primary/20 ${loading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
+                    className={`flex-[2] bg-primary text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-xl shadow-primary/20 ${loading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-600'}`}
                   >
                     {loading ? 'Procesando...' : 'Sincronizar Esta Unidad'}
                   </button>
@@ -5315,7 +5320,7 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
                     ) : (
                       <svg viewBox="0 0 24 24" className="w-12 h-12"><path fill="#f35325" d="M1 1h10v10H1z"/><path fill="#81bc06" d="M13 1h10v10H13z"/><path fill="#05a6f0" d="M1 13h10v10H1z"/><path fill="#ffba08" d="M13 13h10v10H13z"/></svg>
                     )}
-                    <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center border-4 border-white">
+                    <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-red-600 rounded-full flex items-center justify-center border-4 border-white">
                       <Lock className="w-3 h-3 text-white" />
                     </div>
                   </div>
@@ -5343,7 +5348,7 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
                   <div className="flex flex-col gap-4">
                     <button 
                       onClick={finalizeConnection}
-                      className="w-full bg-primary text-white py-5 rounded-[24px] font-black text-xs tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-primary/20 active:scale-[0.98]"
+                      className="w-full bg-primary text-white py-5 rounded-[24px] font-black text-xs tracking-widest hover:bg-red-700 transition-all shadow-xl shadow-primary/20 active:scale-[0.98]"
                     >
                       CONCEDER PERMISOS Y VINCULAR
                     </button>
