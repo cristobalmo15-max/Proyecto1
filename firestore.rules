@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      // Check for email. If not in token, check if it's the right user.
+      return isAuthenticated() && (request.auth.token.email == 'cristobalmo15@gmail.com' || request.auth.token.email == 'cristobalmo15@gmail.com');
+    }
+    
+    function isDocOwner() {
+      return isAuthenticated() && (request.auth.uid == resource.data.ownerUid || isAdmin());
+    }
+
+    function isValidProperty(data) {
+      return data.direccion is string && data.direccion.size() > 0 &&
+             (data.ownerUid == request.auth.uid || isAdmin());
+    }
+
+    function isValidExpense(data) {
+      return data.propertyId is string &&
+             data.monto is number &&
+             (data.ownerUid == request.auth.uid || isAdmin());
+    }
+
+    match /properties/{propertyId} {
+      allow read: if isAuthenticated() && (resource.data.ownerUid == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidProperty(request.resource.data);
+      allow update: if isAuthenticated() && isDocOwner() && isValidProperty(request.resource.data);
+      allow delete: if isAuthenticated() && (isDocOwner() || isAdmin());
+    }
+
+    match /expenses/{expenseId} {
+      allow read: if isAuthenticated() && (resource.data.ownerUid == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidExpense(request.resource.data);
+      allow update: if isAuthenticated() && isDocOwner() && isValidExpense(request.resource.data);
+      allow delete: if isAuthenticated() && isDocOwner();
+    }
+
+    match /settings/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+  }
+}

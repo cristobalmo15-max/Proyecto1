@@ -1,0 +1,37 @@
+203:                  key={option}
+1584:                      key={`skeleton-dot-${i}`} 
+1721:                    <div key={`line-1721-${i}`} className={`p-2 rounded-lg ${i === 0 ? 'bg-primary text-white' : 'text-muted'}`}>
+1759:                        <div key={`recent-activity-${i}-${item.dir}`} className="flex justify-between items-center p-3 bg-white border border-border/50 rounded-xl shadow-sm">
+1855:                  <div key={`line-1855-${i}`} className="bg-white/5 p-8 rounded-[32px] border border-white/10 hover:bg-white/10 transition-all group">
+1885:              <div key={`line-1885-${i}`} className="grid grid-cols-4 p-8 border-b border-border hover:bg-gray-50 transition-all items-center">
+1966:              key={item.id}
+2069:                        key={`dashboard-prop-${p.id || 'virtual'}-${i}`} 
+2217:                                <button key={p.id} className="w-full text-left px-4 py-2 hover:bg-primary/5 text-[11px] font-bold text-ink" onClick={() => { setSelectedProp(p); setPropSearch(''); }}>
+2223:                                <div key={p.id + '-participants'} className="w-full text-left px-4 py-2 hover:bg-primary/5 text-[11px] font-bold text-ink">
+2271:                      key={`prop-list-item-${p.id || 'virtual'}-${i}`} 
+2439:                              key={tab.id}
+2491:                                        <p key={i} className={`font-extrabold text-ink leading-tight uppercase truncate ${
+2506:                                              <span key={idx} className="text-[10px] font-bold text-ink tracking-tight block truncate" title={rut}>
+2523:                                              <span key={idx} className="text-[10px] font-bold text-ink tracking-tight block truncate" title={tel}>
+2540:                                              <span key={idx} className="text-[10px] font-bold text-ink hover:text-primary transition-colors cursor-pointer block truncate lowercase selection:bg-accent/20" title={email}>
+2586:                                        <p key={i} className={`font-extrabold text-ink leading-tight uppercase truncate ${
+2601:                                              <span key={idx} className="text-[10px] font-bold text-ink tracking-tight block truncate" title={rut}>
+2618:                                              <span key={idx} className="text-[10px] font-bold text-ink tracking-tight block truncate" title={tel}>
+2635:                                              <span key={idx} className="text-[10px] font-bold text-ink hover:text-primary transition-colors cursor-pointer block truncate lowercase selection:bg-accent/20" title={email}>
+2810:                                      <tr key={`expense-${selectedProp.id || 'current'}-${idx}`} className="hover:bg-gray-50/80 transition-all group duration-300">
+3052:                              key={`bulk-${i}-${d.dir || 'virtual'}`} 
+3237:                        <div key={`report-month-bar-${i}`} className="flex-1 group/bar relative flex flex-col items-center h-full justify-end">
+3288:                  <div key={`stat-card-reports-${i}`} className="bg-white p-12 rounded-[56px] border border-border/5 shadow-premium flex flex-col items-center text-center group hover:-translate-y-2 transition-all duration-500">
+3325:                  key={s.step}
+3627:                              key={item.tag}
+3653:                              <option key={`${p.id}-${i}`} value={p.id}>{p.direccion || 'Sin dirección'}</option>
+3894:                    key={tab.id}
+3923:                        key={meet.type}
+3955:                            <span key={d} className="text-[10px] text-muted uppercase font-black py-1">{d}</span>
+3974:                                  key={`line-3052-${i}`}
+4006:                              key={hour}
+4134:                        <div key={meet.id} className="p-5 rounded-2xl border border-border bg-gray-50/30 hover:bg-white hover:shadow-md transition-all space-y-3 relative group">
+4355:                            <div key={ticket.id} className="border border-border rounded-2xl overflow-hidden transition-all bg-gray-50/25 hover:bg-white hover:border-accent">
+4400:                                    <div key={rIdx} className="flex items-start justify-end gap-3">
+4514:                    <div key={`line-4513-${i}`} className="p-5 rounded-2xl bg-gray-50/50 border border-border/80 flex flex-col gap-2">
+5317:                      <div key={`permission-item-${i}`} className="flex items-center gap-4 py-1">

@@ -1,0 +1,51 @@
+{
+  "entities": {
+    "Property": {
+      "title": "Property",
+      "description": "A property managed in the system",
+      "type": "object",
+      "properties": {
+        "direccion": { "type": "string" },
+        "valor": { "type": "number" },
+        "termino": { "type": "string", "format": "date-time" },
+        "dueno": { "type": "string" },
+        "rutDue": { "type": "string" },
+        "telD": { "type": "string" },
+        "mailD": { "type": "string" },
+        "arrendatario": { "type": "string" },
+        "rutArr": { "type": "string" },
+        "telA": { "type": "string" },
+        "mailA": { "type": "string" },
+        "aval": { "type": "string" },
+        "ownerUid": { "type": "string" }
+      },
+      "required": ["direccion", "valor", "termino", "ownerUid"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "An expense related to a property",
+      "type": "object",
+      "properties": {
+        "propertyId": { "type": "string" },
+        "tipo": { "type": "string" },
+        "monto": { "type": "number" },
+        "mes": { "type": "string" },
+        "boleta": { "type": "string" },
+        "link": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "ownerUid": { "type": "string" }
+      },
+      "required": ["propertyId", "tipo", "monto", "mes", "ownerUid"]
+    }
+  },
+  "firestore": {
+    "/properties/{propertyId}": {
+      "schema": "Property",
+      "description": "Collection of properties"
+    },
+    "/expenses/{expenseId}": {
+      "schema": "Expense",
+      "description": "Collection of expenses"
+    }
+  }
+}
