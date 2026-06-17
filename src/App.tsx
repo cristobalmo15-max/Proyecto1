@@ -550,7 +550,8 @@ export default function App() {
     file: null as File | null
   });
 
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
+  const geminiApiKey = process.env.GEMINI_API_KEY || '';
+  const ai = geminiApiKey ? new GoogleGenAI({ apiKey: geminiApiKey }) : null;
 
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => {
@@ -944,6 +945,10 @@ export default function App() {
   };
 
   const processContractWithGemini = async (file: File) => {
+    if (!ai) {
+      showToast('Error: La API Key de Gemini no está configurada en este entorno.', 'error');
+      throw new Error('Gemini API Key is not configured');
+    }
     const reader = new FileReader();
     return new Promise<any>((resolve, reject) => {
       reader.onload = async (e) => {
