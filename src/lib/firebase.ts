@@ -38,15 +38,14 @@ const actionCodeSettings = {
 };
 
 
-// Variable para cachear el token en memoria con respaldo en sessionStorage
-let cachedAccessToken: string | null = typeof window !== 'undefined' ? sessionStorage.getItem('google_access_token') : null;
+// Variable para cachear el token en memoria
+let cachedAccessToken: string | null = null;
 
 export const loginWithGoogle = async () => {
     const result = await signInWithPopup(auth, googleProvider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     if (credential?.accessToken) {
         cachedAccessToken = credential.accessToken;
-        sessionStorage.setItem('google_access_token', credential.accessToken);
     }
     return result;
 };
@@ -54,9 +53,6 @@ export const loginWithGoogle = async () => {
 export const getAccessToken = () => cachedAccessToken;
 export const logout = () => {
     cachedAccessToken = null;
-    if (typeof window !== 'undefined') {
-        sessionStorage.removeItem('google_access_token');
-    }
     return signOut(auth);
 };
 
