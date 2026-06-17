@@ -1677,7 +1677,7 @@ export default function App() {
               <Zap className="w-3 h-3" /> Ingeniería Inmobiliaria v15.0
             </div>
             <h1 className="text-[clamp(3rem,8vw,5.5rem)] font-black tracking-tight leading-[0.88] uppercase">
-              Gestión <br /> <span className="text-primary">Inteligente.</span>
+              <span className="text-accent">G</span>estión <br /> <span className="text-primary">Inteligente.</span>
             </h1>
             <p className="text-xl text-muted leading-relaxed max-w-lg font-medium">
               La plataforma definitiva para administradores de propiedades. Automatización total con IA, liquidaciones en tiempo real y seguridad bancaria.
