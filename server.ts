@@ -10,21 +10,28 @@ import { google } from 'googleapis';
 import PDFDocument from 'pdfkit';
 
 // Load Firebase config for server-side
-const firebaseConfigFile = path.join(process.cwd(), 'firebase-applet-config.json');
-const firebaseConfig = JSON.parse(fs.readFileSync(firebaseConfigFile, 'utf-8'));
+let firebaseConfig: any = {};
+let bucket: any = null;
+
+try {
+  const firebaseConfigFile = path.join(process.cwd(), 'firebase-applet-config.json');
+  firebaseConfig = JSON.parse(fs.readFileSync(firebaseConfigFile, 'utf-8'));
+} catch (err) {
+  console.warn('[Firebase] Could not load firebase-applet-config.json:', err);
+}
 
 // Initialize Firebase Admin
 if (!admin.apps.length) {
   try {
     admin.initializeApp();
     console.log('[Firebase] Admin initialized successfully');
+    if (firebaseConfig.storageBucket) {
+      bucket = admin.storage().bucket(firebaseConfig.storageBucket);
+    }
   } catch (err) {
     console.error('[Firebase] Error initializing Admin SDK:', err);
   }
 }
-
-// Global bucket reference
-let bucket = admin.storage().bucket(firebaseConfig.storageBucket);
 
 // SMTP Transporter
 const transporter = nodemailer.createTransport({
