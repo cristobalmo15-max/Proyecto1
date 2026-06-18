@@ -2034,7 +2034,7 @@ export default function App() {
       })
       .filter(Boolean)
   ))
-  .sort((a, b) => b!.localeCompare(a!));
+  .sort((a, b) => String(b!).localeCompare(String(a!)));
 
   const filteredSidebarProps = filterProperties(properties, propSearch)
     .filter(p => !onlyFlagged || !!p.flagged)
@@ -3379,7 +3379,7 @@ export default function App() {
               })
               .filter(Boolean)
           ))
-          .sort((a, b) => b!.localeCompare(a!));
+          .sort((a, b) => String(b!).localeCompare(String(a!)));
 
           const propertiesWithExpenses = properties
             .filter(p => p.f_ini && p.expenses && p.expenses.length > 0)
