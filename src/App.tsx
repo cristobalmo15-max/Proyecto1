@@ -1964,8 +1964,8 @@ export default function App() {
   const availableYears = Array.from(new Set(
     properties
       .map(p => {
-        if (!p.inicio) return null;
-        const parts = p.inicio.split('-');
+        if (!p.f_ini) return null;
+        const parts = p.f_ini.split('-');
         return parts[0];
       })
       .filter(Boolean)
@@ -1976,8 +1976,8 @@ export default function App() {
     .filter(p => !onlyFlagged || !!p.flagged)
     .filter(p => {
       if (selectedYearFilter === 'all') return true;
-      if (!p.inicio) return false;
-      return p.inicio.startsWith(selectedYearFilter);
+      if (!p.f_ini) return false;
+      return p.f_ini.startsWith(selectedYearFilter);
     });
   
   return (
@@ -2337,8 +2337,8 @@ export default function App() {
                     .sort((a, b) => {
                       if (sortType === 'name-asc') return (a.direccion || '').localeCompare(b.direccion || '');
                       if (sortType === 'name-desc') return (b.direccion || '').localeCompare(a.direccion || '');
-                      const dateA = a.inicio ? new Date(a.inicio).getTime() : 0;
-                      const dateB = b.inicio ? new Date(b.inicio).getTime() : 0;
+                      const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
+                      const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
                       return dateB - dateA;
                     })
                     .map((p, i) => (
@@ -2353,14 +2353,14 @@ export default function App() {
                     >
                       <div className="flex justify-between items-center mb-1">
                         <span className="text-[7px] text-slate-400 font-bold uppercase">Contrato</span>
-                        {p.inicio && (
+                        {p.f_ini && (
                           <span className="text-[8px] font-black bg-red-600 text-white px-1.5 py-0.5 rounded font-mono shadow-sm">
                             {(() => {
-                              const parts = p.inicio.split('-');
+                              const parts = p.f_ini.split('-');
                               if (parts.length >= 2) {
                                 return `${parts[0]}-${parts[1]}`;
                               }
-                              return p.inicio;
+                              return p.f_ini;
                             })()}
                           </span>
                         )}
@@ -2973,7 +2973,7 @@ export default function App() {
                                 <div className="flex md:flex-col items-center md:items-end gap-6 md:gap-5 md:border-l border-border/50 md:pl-8 pt-6 md:pt-0 border-t md:border-t-0 w-full md:w-auto mt-2 md:mt-0">
                                    <div className="text-center md:text-right flex-1 md:flex-none">
                                       <p className="text-[9px] font-bold text-muted uppercase tracking-widest mb-1.5">Inicio Vigencia</p>
-                                      <p className="text-sm font-bold text-ink tracking-tight">{selectedProp.inicio || 'No registrado'}</p>
+                                      <p className="text-sm font-bold text-ink tracking-tight">{selectedProp.f_ini || 'No registrado'}</p>
                                    </div>
                                    <div className="text-center md:text-right flex-1 md:flex-none">
                                       <p className="text-[9px] font-bold text-muted uppercase tracking-widest mb-1.5">Estado Operativo</p>
@@ -3284,8 +3284,8 @@ export default function App() {
           const reportsAvailableYears = Array.from(new Set(
             properties
               .map(p => {
-                if (!p.inicio) return null;
-                const parts = p.inicio.split('-');
+                if (!p.f_ini) return null;
+                const parts = p.f_ini.split('-');
                 return parts[0];
               })
               .filter(Boolean)
@@ -3293,14 +3293,14 @@ export default function App() {
           .sort((a, b) => b!.localeCompare(a!));
 
           const propertiesWithExpenses = properties
-            .filter(p => p.inicio && p.expenses && p.expenses.length > 0)
+            .filter(p => p.f_ini && p.expenses && p.expenses.length > 0)
             .filter(p => {
               if (selectedReportsYear === 'all') return true;
-              return p.inicio!.startsWith(selectedReportsYear);
+              return p.f_ini!.startsWith(selectedReportsYear);
             })
             .sort((a, b) => {
-              const dateA = a.inicio ? new Date(a.inicio).getTime() : 0;
-              const dateB = b.inicio ? new Date(b.inicio).getTime() : 0;
+              const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
+              const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
               return dateB - dateA;
             });
 
@@ -3420,16 +3420,16 @@ export default function App() {
                             >
                               <div className="flex justify-between items-center w-full mb-1">
                                 <span className={`text-[7px] font-bold uppercase ${isSel ? 'text-white/50' : 'text-slate-400'}`}>Contrato</span>
-                                {p.inicio && (
+                                {p.f_ini && (
                                   <span className={`text-[8px] font-black px-1.5 py-0.5 rounded font-mono shadow-sm ${
                                     isSel ? 'bg-white/20 text-white' : 'bg-red-600 text-white'
                                   }`}>
                                     {(() => {
-                                      const parts = p.inicio.split('-');
+                                      const parts = p.f_ini.split('-');
                                       if (parts.length >= 2) {
                                         return `${parts[0]}-${parts[1]}`;
                                       }
-                                      return p.inicio;
+                                      return p.f_ini;
                                     })()}
                                   </span>
                                 )}
