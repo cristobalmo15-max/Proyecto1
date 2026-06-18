@@ -546,6 +546,26 @@ export default function App() {
 
   // New states for interactive Support and Correo settings
   const [supportTab, setSupportTab] = useState<'tickets' | 'faq'>('tickets');
+  const [clientSearchQuery, setClientSearchQuery] = useState('');
+  const [selectedClientEmail, setSelectedClientEmail] = useState('');
+  const [selectedClientName, setSelectedClientName] = useState('');
+  const [manualGuestEmail, setManualGuestEmail] = useState('');
+  const [manualGuestName, setManualGuestName] = useState('');
+  const [isManualGuest, setIsManualGuest] = useState(false);
+  const [smtpHost, setSmtpHost] = useState('');
+  const [smtpPort, setSmtpPort] = useState('587');
+  const [smtpUser, setSmtpUser] = useState('');
+  const [smtpPass, setSmtpPass] = useState('');
+  const [testEmailDest, setTestEmailDest] = useState('');
+
+  useEffect(() => {
+    if (appSettings) {
+      setSmtpHost(appSettings.smtpHost || '');
+      setSmtpPort(appSettings.smtpPort || '587');
+      setSmtpUser(appSettings.smtpUser || '');
+      setSmtpPass(appSettings.smtpPass || '');
+    }
+  }, [appSettings.smtpHost, appSettings.smtpPort, appSettings.smtpUser, appSettings.smtpPass]);
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketCategory, setTicketCategory] = useState('Lector IA');
   const [ticketPriority, setTicketPriority] = useState('Alta');
@@ -557,12 +577,6 @@ export default function App() {
   const [meetingTime, setMeetingTime] = useState('');
   const [meetingReason, setMeetingReason] = useState('');
   const [linkSent, setLinkSent] = useState(false);
-  const [clientSearchQuery, setClientSearchQuery] = useState('');
-  const [selectedClientEmail, setSelectedClientEmail] = useState('');
-  const [selectedClientName, setSelectedClientName] = useState('');
-  const [manualGuestEmail, setManualGuestEmail] = useState('');
-  const [manualGuestName, setManualGuestName] = useState('');
-  const [isManualGuest, setIsManualGuest] = useState(false);
 
   const [correoStep, setCorreoStep] = useState<number>(1);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -2117,7 +2131,7 @@ export default function App() {
                   {activeModule === 'reports' && 'Reportes Mensuales'}
                   {activeModule === 'support' && 'Mesa de Soporte'}
                   {activeModule === 'meetings' && 'Reuniones & Calendario'}
-                  {activeModule === 'settings' && 'Correo'}
+                  {activeModule === 'settings' && 'Configuración de Correo'}
                   {activeModule === 'admin' && 'Administración Master'}
                 </h2>
                 <div className="flex items-center gap-2 mt-1.5">
@@ -3858,514 +3872,164 @@ export default function App() {
 
         {activeModule === 'settings' && (
           <div className="max-w-7xl mx-auto py-2 animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
-            {/* Context Heading */}
+            {/* Header / Intro Card */}
             <div className="mb-4 bg-white p-6 rounded-[28px] border border-border shadow-sm">
               <h3 className="text-lg font-bold text-ink flex items-center gap-2">
                 <span className="p-1.5 bg-accent/10 text-accent rounded-lg flex items-center justify-center">
                   <Mail className="w-5 h-5" />
                 </span>
-                Centro de Alertas de Vencimiento para el Administrador
+                Configuración del Correo Emisor (SMTP)
               </h3>
               <p className="text-xs text-muted font-semibold mt-1 max-w-3xl leading-relaxed">
-                ¿Para qué es este correo? Este sistema **no envía correos directos a tus dueños ni arrendatarios** para evitar roces o malentendidos. En su lugar, es un **asistente automático para TI (el Administrador)**. Al conectar tu cuenta, te despachará avisos directos a tu propio correo (personal o ejecutivo) informándote con nombre y dirección qué contratos están por expirar.
+                Define las credenciales del servidor SMTP desde el cual se enviarán los reportes mensuales de gastos y avisos de reuniones de forma directa y personalizada a tus dueños o arrendatarios.
               </p>
             </div>
 
-            {/* Steps Stepper Indicator */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-              {[
-                { step: 1, label: '1. SMTP Remitente', desc: 'De dónde se envía' },
-                { step: 2, label: '2. Correo de Destino', desc: 'Dónde lo recibes' },
-                { step: 3, label: '3. Formato del Aviso', desc: 'Personalizar texto' },
-                { step: 4, label: '4. Envío de Prueba', desc: 'Enviar alerta ya' }
-              ].map((s) => (
-                <button
-                  key={s.step}
-                  onClick={() => setCorreoStep(s.step)}
-                  className={`p-3.5 rounded-2xl border text-left transition-all duration-300 relative ${
-                    correoStep === s.step
-                      ? 'bg-primary text-white border-primary shadow-md scale-[1.01]'
-                      : 'bg-white text-ink border-border hover:bg-gray-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className={`w-4.5 h-4.5 rounded-full flex items-center justify-center text-[10px] font-black ${
-                      correoStep === s.step ? 'bg-white text-primary' : 'bg-gray-100 text-muted'
-                    }`}>
-                      {s.step}
-                    </span>
-                    <span className="text-[10px] font-bold uppercase tracking-wide truncate">{s.label}</span>
-                  </div>
-                  <p className={`text-[8.5px] font-medium mt-1 truncate ${
-                    correoStep === s.step ? 'text-white/80' : 'text-muted'
-                  }`}>
-                    {s.desc}
-                  </p>
-                </button>
-              ))}
-            </div>
-
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              {/* Stepper Content Panel */}
-              <div className="lg:col-span-7 bg-white p-6 rounded-[28px] border border-border shadow-sm space-y-5">
-                {correoStep === 1 && (
-                  <div className="space-y-4 animate-in fade-in duration-300">
+              {/* Left Column: Form Settings */}
+              <div className="lg:col-span-7 bg-white p-6 md:p-8 rounded-[28px] border border-border shadow-sm space-y-5">
+                <div>
+                  <h4 className="text-xs font-black uppercase text-primary mb-1 tracking-wider">Credenciales SMTP</h4>
+                  <p className="text-[10px] text-muted font-bold leading-tight">Introduce los datos de tu cuenta de correo corporativa o personal.</p>
+                </div>
+
+                <div className="space-y-4 font-medium text-xs">
+                  <div>
+                    <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Host del Servidor SMTP</label>
+                    <input
+                      type="text"
+                      placeholder="Ej: smtp.gmail.com o smtp.office365.com"
+                      value={smtpHost}
+                      onChange={(e) => setSmtpHost(e.target.value)}
+                      className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <h4 className="text-xs font-black uppercase text-primary mb-1">Paso 1: Configurar Correo Remitente (SMTP)</h4>
-                      <p className="text-[10px] text-muted font-bold leading-tight">Elige el correo de origen mediante el cual la plataforma despachará los correos informativos.</p>
-                    </div>
-
-                    <div className="flex gap-2 pb-1">
-                      <button
-                        onClick={() => {
-                          setAppSettings({
-                            ...appSettings,
-                            smtpHost: 'smtp.gmail.com',
-                            smtpPort: '587'
-                          });
-                          showToast('Configurado para Gmail automáticamente');
-                        }}
-                        className="flex-1 py-2.5 px-4 rounded-xl border border-border bg-gray-50/50 hover:bg-white text-[10px] font-black flex items-center justify-center gap-2 transition-all hover:border-accent"
-                      >
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                        Gmail SMTP
-                      </button>
-                      <button
-                        onClick={() => {
-                          setAppSettings({
-                            ...appSettings,
-                            smtpHost: 'smtp.office365.com',
-                            smtpPort: '587'
-                          });
-                          showToast('Configurado para Outlook automáticamente');
-                        }}
-                        className="flex-1 py-2.5 px-4 rounded-xl border border-border bg-gray-50/50 hover:bg-white text-[10px] font-black flex items-center justify-center gap-2 transition-all hover:border-accent"
-                      >
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                        Outlook SMTP
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="sm:col-span-2">
-                        <label className="text-[9px] font-black text-muted uppercase tracking-wider block mb-1">Servidor (Host)</label>
-                        <input
-                          type="text"
-                          placeholder="smtp.gmail.com"
-                          value={appSettings.smtpHost || ''}
-                          onChange={(e) => setAppSettings({ ...appSettings, smtpHost: e.target.value })}
-                          className="w-full bg-gray-50 border border-border rounded-xl p-2.5 text-xs font-semibold outline-none focus:bg-white focus:border-accent font-mono"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[9px] font-black text-muted uppercase tracking-wider block mb-1">Puerto</label>
-                        <input
-                          type="number"
-                          placeholder="587"
-                          value={appSettings.smtpPort || ''}
-                          onChange={(e) => setAppSettings({ ...appSettings, smtpPort: e.target.value })}
-                          onKeyDown={(e) => { if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault(); }}
-                          className="w-full bg-gray-50 border border-border rounded-xl p-2.5 text-xs font-semibold outline-none focus:bg-white focus:border-accent font-mono"
-                        />
-                      </div>
+                      <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Puerto SMTP</label>
+                      <input
+                        type="text"
+                        placeholder="Ej: 587 o 465"
+                        value={smtpPort}
+                        onChange={(e) => setSmtpPort(e.target.value)}
+                        className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all"
+                      />
                     </div>
 
                     <div>
-                      <label className="text-[9px] font-black text-muted uppercase tracking-wider block mb-1">Usuario (Remitente)</label>
+                      <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Usuario / Correo Electrónico</label>
                       <input
                         type="email"
-                        placeholder="ejemplo@correo.com"
-                        value={appSettings.smtpUser || ''}
-                        onChange={(e) => setAppSettings({ ...appSettings, smtpUser: e.target.value })}
-                        className="w-full bg-gray-50 border border-border rounded-xl p-2.5 text-xs font-semibold outline-none focus:bg-white focus:border-accent font-mono"
+                        placeholder="Ej: contacto@tudominio.com"
+                        value={smtpUser}
+                        onChange={(e) => setSmtpUser(e.target.value)}
+                        className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all"
                       />
                     </div>
-
-                    <div>
-                      <label className="text-[9px] font-black text-muted uppercase tracking-wider block mb-1">Contraseña Especial de Aplicación</label>
-                      <input
-                        type="password"
-                        placeholder="••••••••••••••••"
-                        value={appSettings.smtpPass || ''}
-                        onChange={(e) => setAppSettings({ ...appSettings, smtpPass: e.target.value })}
-                        className="w-full bg-gray-50 border border-border rounded-xl p-2.5 text-xs font-semibold outline-none focus:bg-white focus:border-accent font-mono"
-                      />
-                    </div>
-
-                    <div className="pt-2 flex justify-end">
-                      <button
-                        onClick={async () => {
-                          if (!appSettings.smtpHost || !appSettings.smtpPort || !appSettings.smtpUser || !appSettings.smtpPass) {
-                            showToast('Complete todos los campos SMTP', 'error');
-                            return;
-                          }
-                          try {
-                            setLoading(true);
-                            await updateAppSettings(appSettings);
-                            setCorreoStep(2);
-                          } catch (err: any) {
-                            showToast('Error: ' + err.message, 'error');
-                          } finally {
-                            setLoading(false);
-                          }
-                        }}
-                        className="bg-primary hover:bg-red-700 text-white font-black uppercase text-[10px] tracking-widest py-3 px-6 rounded-xl transition-all shadow-md"
-                      >
-                        Guardar & Continuar Paso 2
-                      </button>
-                    </div>
                   </div>
-                )}
 
-                {correoStep === 2 && (
-                  <div className="space-y-4 animate-in fade-in duration-300">
-                    <div>
-                      <h4 className="text-xs font-black uppercase text-primary mb-1">Paso 2: Correo Destinatario (A dónde te llegará)</h4>
-                      <p className="text-[10px] text-muted font-bold leading-tight">Digita la dirección de correo personal o ejecutiva a la que quieres que te lleguen las alertas de vencimiento.</p>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="p-4 bg-gray-50 rounded-2xl border border-border">
-                        <label className="text-[9px] font-black text-muted uppercase tracking-wider block mb-1.5">Tu Correo donde Recibirás las Alertas (Ejecutivo / Personal)</label>
-                        <input
-                          type="email"
-                          placeholder="tu-correo-personal-o-de-trabajo@ejemplo.com"
-                          value={appSettings.reportEmail || ''}
-                          onChange={(e) => setAppSettings({ ...appSettings, reportEmail: e.target.value })}
-                          className="w-full bg-white border border-border rounded-xl p-2.5 text-xs font-semibold outline-none focus:border-accent font-mono"
-                        />
-                        <p className="text-[10.5px] text-muted font-bold mt-2 leading-relaxed">
-                          📌 ¡Toda la información clave a tu bandeja! Cuando un contrato esté por expirar, te notificaremos aquí con el listado detallando dirección de la casa, nombre del dueño y arrendatario involucrado.
-                        </p>
-                      </div>
-
-                      <div className="p-4 bg-gray-50 rounded-2xl border border-border space-y-2">
-                        <label className="text-[9px] font-black text-muted uppercase tracking-wider block mb-1">Frecuencia de las Alertas del Administrador</label>
-                        
-                        <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-border">
-                          <input type="checkbox" defaultChecked disabled className="w-3.5 h-3.5 text-accent border-border rounded focus:ring-accent" />
-                          <label className="text-xs font-bold text-ink cursor-pointer select-none">
-                            Enviar reporte de contratos que vencen <span className="text-accent italic">dentro de los próximos 30 días</span>.
-                          </label>
-                        </div>
-
-                        <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-border">
-                          <input type="checkbox" defaultChecked disabled className="w-3.5 h-3.5 text-accent border-border rounded focus:ring-accent" />
-                          <label className="text-xs font-bold text-ink cursor-pointer select-none">
-                            Enviar auditoría de contratos <span className="text-danger italic">ya vencidos sin renovar</span>.
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-2 flex justify-between">
-                      <button
-                        onClick={() => setCorreoStep(1)}
-                        className="border border-border bg-white text-muted hover:text-ink font-black uppercase text-[10px] tracking-widest py-3 px-5 rounded-xl transition-all"
-                      >
-                        Atrás
-                      </button>
-                      <button
-                        onClick={async () => {
-                          if (!appSettings.reportEmail) {
-                            showToast('Debe configurar el correo de destino', 'error');
-                            return;
-                          }
-                          try {
-                            setLoading(true);
-                            await updateAppSettings(appSettings);
-                            setCorreoStep(3);
-                          } catch (err: any) {
-                            showToast('Error: ' + err.message, 'error');
-                          } finally {
-                            setLoading(false);
-                          }
-                        }}
-                        className="bg-primary hover:bg-red-700 text-white font-black uppercase text-[10px] tracking-widest py-3 px-6 rounded-xl transition-all shadow-md"
-                      >
-                        Guardar & Continuar Paso 3
-                      </button>
-                    </div>
+                  <div>
+                    <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Contraseña o Clave de Aplicación</label>
+                    <input
+                      type="password"
+                      placeholder="••••••••••••••••"
+                      value={smtpPass}
+                      onChange={(e) => setSmtpPass(e.target.value)}
+                      className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all font-mono"
+                    />
                   </div>
-                )}
 
-                {correoStep === 3 && (
-                  <div className="space-y-4 animate-in fade-in duration-300 w-full">
-                    <div>
-                      <h4 className="text-xs font-black uppercase text-primary mb-1">Paso 3: Redacción del Mensaje de Alerta</h4>
-                      <p className="text-[10px] text-muted font-bold leading-tight">Configura la estructura. Usa variables dinámicas para plasmar los datos de propiedad, dueño y arrendatario automáticamente.</p>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-[9px] font-black text-muted uppercase tracking-wider mb-1 block">Asunto de la Notificación</label>
-                        <input
-                          type="text"
-                          placeholder="[Alerta Vencimiento] Propiedad: {DIRECCION} - Dueño: {DUENO}"
-                          value={appSettings.emailSubject || ''}
-                          onChange={(e) => setAppSettings({ ...appSettings, emailSubject: e.target.value })}
-                          className="w-full bg-gray-50 border border-border rounded-xl p-2.5 text-xs font-bold outline-none focus:border-accent"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-[9px] font-black text-muted uppercase tracking-wider mb-1 block">Plantilla del Mensaje de Alerta</label>
-                        <textarea
-                          rows={6}
-                          placeholder={`Hola,\n\nLe recordamos que el arriendo de {DIRECCION} vencerá pronto...`}
-                          value={appSettings.emailTemplate || ''}
-                          onChange={(e) => setAppSettings({ ...appSettings, emailTemplate: e.target.value })}
-                          className="w-full bg-gray-50 border border-border rounded-xl p-2.5 text-xs font-medium outline-none focus:border-accent font-sans leading-relaxed text-ink h-36"
-                        />
-                      </div>
-
-                      {/* Dynamic variables list helper */}
-                      <div className="p-3 bg-gray-50 rounded-2xl border border-dashed border-border">
-                        <p className="text-[8.5px] font-black text-muted uppercase tracking-wider mb-2">Variables Especiales Disponibles (Haz Clic para Añadir)</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {[
-                            { tag: '{DIRECCION}', desc: 'Ubicación / Dirección de la casa' },
-                            { tag: '{DUENO}', desc: 'Nombre del Dueño/Propietario' },
-                            { tag: '{INQUILINO}', desc: 'Nombre del Arrendatario' },
-                            { tag: '{FECHA_VENCIMIENTO}', desc: 'Día exacto del vencimiento' },
-                            { tag: '{VALOR}', desc: 'Monto de renta mensual' }
-                          ].map((item) => (
-                            <button
-                              key={item.tag}
-                              type="button"
-                              onClick={() => {
-                                const currentText = appSettings.emailTemplate || '';
-                                setAppSettings({ ...appSettings, emailTemplate: currentText + ' ' + item.tag });
-                              }}
-                              className="text-[9px] font-black bg-white hover:bg-slate-100 border border-border px-2.5 py-1 rounded-lg text-ink uppercase tracking-tight transition-all"
-                              title={item.desc}
-                            >
-                              {item.tag}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {properties.length > 0 && (
-                        <div className="p-3 bg-gray-50 rounded-2xl border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 overflow-hidden">
-                          <label className="text-[10px] font-black text-muted uppercase shrink-0">Simular Vista Previa con:</label>
-                          <select
-                            value={previewPropId}
-                            onChange={(e) => setPreviewPropId(e.target.value)}
-                            className="w-full sm:w-auto max-w-full bg-white border border-border text-xs rounded-xl p-1.5 font-bold outline-none min-w-0 flex-1 truncate"
-                          >
-                            <option value="">-- Elige una propiedad --</option>
-                            {properties.map((p, i) => (
-                              <option key={`${p.id}-${i}`} value={p.id}>{p.direccion || 'Sin dirección'}</option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="pt-2 flex justify-between">
-                      <button
-                        onClick={() => setCorreoStep(2)}
-                        className="border border-border bg-white text-muted hover:text-ink font-black uppercase text-[10px] tracking-widest py-3 px-5 rounded-xl transition-all"
-                      >
-                        Atrás
-                      </button>
-                      <button
-                        onClick={async () => {
-                          try {
-                            setLoading(true);
-                            await updateAppSettings(appSettings);
-                            setCorreoStep(4);
-                          } catch (err: any) {
-                            showToast('Error: ' + err.message, 'error');
-                          } finally {
-                            setLoading(false);
-                          }
-                        }}
-                        className="bg-primary hover:bg-red-700 text-white font-black uppercase text-[10px] tracking-widest py-3 px-6 rounded-xl transition-all shadow-md"
-                      >
-                        Guardar & Continuar Paso 4
-                      </button>
-                    </div>
+                  <div className="pt-4 border-t border-border">
+                    <button
+                      onClick={async () => {
+                        const updatedSettings = {
+                          ...appSettings,
+                          smtpHost,
+                          smtpPort,
+                          smtpUser,
+                          smtpPass
+                        };
+                        setAppSettings(updatedSettings);
+                        await updateAppSettings(updatedSettings);
+                      }}
+                      className="w-full bg-primary hover:bg-black text-white font-black uppercase text-[10px] tracking-widest py-4 rounded-xl transition-all shadow-md active:scale-[0.98] cursor-pointer"
+                    >
+                      Guardar Configuración de Correo
+                    </button>
                   </div>
-                )}
-
-                {correoStep === 4 && (
-                  <div className="space-y-4 animate-in fade-in duration-300">
-                    <div>
-                      <h4 className="text-xs font-black uppercase text-primary mb-1">Paso 4: Probar Despacho de la Alerta</h4>
-                      <p className="text-[10px] text-muted font-bold leading-tight">Garantiza los flujos enviándote una alerta-informe de prueba a tu dirección de destino de inmediato.</p>
-                    </div>
-
-                    <div className="p-4 bg-gray-50 rounded-[20px] border border-border/60 flex items-center gap-4">
-                      <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center text-accent">
-                        <Send className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[8px] font-black uppercase tracking-wider text-muted font-mono">Bandeja de Entrada</p>
-                        <p className="text-xs font-extrabold text-ink leading-tight truncate">Enviar reporte unificado a mi correo</p>
-                        <p className="text-[9px] text-muted font-bold truncate">Destino: {appSettings.reportEmail || 'Sin configurar'}</p>
-                      </div>
-                      <button
-                        onClick={async () => {
-                          if (!appSettings.reportEmail) {
-                            showToast('Configura el correo destinatario primero', 'error');
-                            return;
-                          }
-                          setLoading(true);
-                          try {
-                            await sendTestReport();
-                          } catch (err: any) {
-                            showToast('Error al enviar prueba: ' + err.message, 'error');
-                          } finally {
-                            setLoading(false);
-                          }
-                        }}
-                        className="bg-accent hover:bg-red-700 text-white font-black uppercase text-[9px] tracking-widest py-2.5 px-4 rounded-xl transition-all hover:scale-105 shrink-0"
-                      >
-                        Enviar Ahora
-                      </button>
-                    </div>
-
-                    {smtpError && (
-                      <div className="p-4 bg-red-50 text-red-950 border border-red-200 rounded-[20px] text-xs space-y-3 animate-in fade-in duration-300">
-                        <div className="flex items-start gap-3">
-                          <span className="text-red-600 text-lg">⚠️</span>
-                          <div className="space-y-1">
-                            <p className="font-black uppercase tracking-wider text-red-800 text-[9px]">Error al Despachar Alerta</p>
-                            <p className="font-bold text-[10.5px] leading-relaxed">{smtpError}</p>
-                          </div>
-                        </div>
-                        {smtpError.toLowerCase().includes('535') ? (
-                          <div className="bg-white p-4 rounded-2xl space-y-2 text-[10.5px] border border-red-200/50 leading-relaxed font-semibold">
-                            <p className="font-extrabold text-red-800 uppercase tracking-wide text-[9px]">💡 Soluciones comunes para Error 535 / Autenticación:</p>
-                            <ul className="list-disc pl-4.5 space-y-1 text-slate-600">
-                              <li>**Si es Gmail:** Tu contraseña normal está bloqueada por Google. Activa la verificación en 2 pasos de tu cuenta Google y genera una **Contraseña de Aplicación**. Configura esa clave especial en el Paso 1.</li>
-                              <li>**Si es Outlook/Office 365:** El protocolo de autenticación básica SMTP suele estar inactivo por defecto bajo las políticas modernizadas de Microsoft. Pídele al administrador de TI de tu correo activar **"SMTP Autenticado"** para tu casilla.</li>
-                            </ul>
-                          </div>
-                        ) : null}
-                      </div>
-                    )}
-
-                    <div className="p-4 bg-gray-50 rounded-[20px] border border-border/60 flex items-center gap-4">
-                      <div className="w-10 h-10 bg-green-500/10 rounded-xl flex items-center justify-center text-green-600">
-                        <CheckCircle2 className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[8px] font-black uppercase tracking-wider text-muted font-mono">Frecuencia Automática</p>
-                        <p className="text-[11px] font-black text-ink leading-tight">El sistema vigila y notifica en segundo plano</p>
-                      </div>
-                      <span className="text-[8px] text-green-600 font-extrabold bg-green-50 px-2 py-0.5 rounded">VIGILANDO</span>
-                    </div>
-
-                    <div className="pt-4 border-t border-border flex justify-between items-center">
-                      <button
-                        onClick={() => setCorreoStep(3)}
-                        className="border border-border bg-white text-muted hover:text-ink font-black uppercase text-[10px] tracking-widest py-3 px-5 rounded-xl transition-all"
-                      >
-                        Atrás
-                      </button>
-                      
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-green-500 animate-ping" />
-                        <p className="text-[8.5px] font-black uppercase tracking-wider text-green-600">Servidor Automatizado Activo</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                </div>
               </div>
 
-              {/* Live Preview Panel */}
-              <div className="lg:col-span-5 space-y-4">
-                <div className="text-center">
-                  <span className="text-[8.5px] font-black text-muted uppercase tracking-[0.2em] bg-gray-100 px-3 py-1 rounded-full border border-border">VISTA PREVIA EN TU CORREO</span>
+              {/* Right Column: Connection Test */}
+              <div className="lg:col-span-5 bg-white p-6 md:p-8 rounded-[28px] border border-border shadow-sm space-y-5">
+                <div>
+                  <h4 className="text-xs font-black uppercase text-primary mb-1 tracking-wider">Prueba de Conexión</h4>
+                  <p className="text-[10px] text-muted font-bold leading-tight">Verifica si tus credenciales SMTP son válidas realizando un envío de prueba.</p>
                 </div>
 
-                <div className="relative bg-gradient-to-br from-gray-700 to-slate-900 p-5 rounded-[24px] shadow-lg text-white overflow-hidden">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-3xl -translate-y-6 translate-x-6" />
-                  
-                  {/* Mockup Top Header */}
-                  <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
-                      <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
-                      <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
-                    </div>
-                    <span className="text-[9px] font-mono text-white/50 tracking-widest uppercase">CORREO ADMINISTRADOR</span>
+                <div className="space-y-4 font-medium text-xs">
+                  <div>
+                    <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Enviar Correo de Prueba a:</label>
+                    <input
+                      type="email"
+                      placeholder="ejemplo@correo.com"
+                      value={testEmailDest}
+                      onChange={(e) => setTestEmailDest(e.target.value)}
+                      className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all"
+                    />
                   </div>
 
-                  {/* Envelope Header fields */}
-                  <div className="space-y-1.5 border-b border-white/10 pb-3 mb-3 text-[10px] font-mono">
-                    <p className="text-white/45 truncate"><span className="text-white/60 font-bold uppercase">De:</span> <span className="text-white font-semibold">{appSettings.smtpUser || 'remitente@correo.com'}</span></p>
-                    <p className="text-white/45 truncate"><span className="text-white/60 font-bold uppercase">Para:</span> <span className="text-white font-semibold">{appSettings.reportEmail || 'destinatario@correo.com'}</span></p>
-                    <p className="text-white/45 truncate"><span className="text-white/60 font-bold uppercase">Asunto:</span> <span className="text-white font-semibold">
-                      {
-                        (() => {
-                          const target = properties.find(p => p.id === previewPropId) || properties[0] || {
-                            direccion: 'Av. Vitacura 2930, Depto 1402',
-                            dueno: 'Juan Carlos Pérez',
-                            arrendatario: 'Valentina Martínez',
-                            valor: 850000,
-                            termino: '2026-06-30'
-                          };
-                          const rawSubject = appSettings.emailSubject || '[Alerta Vencimiento] Propiedad: {DIRECCION} - Dueño: {DUENO}';
-                          return rawSubject
-                            .replace(/{INQUILINO}/g, target.arrendatario || 'Valentina Martínez')
-                            .replace(/{DIRECCION}/g, target.direccion || 'Av. Vitacura 2930, Depto 1402')
-                            .replace(/{DUENO}/g, target.dueno || 'Juan Carlos Pérez')
-                            .replace(/{VALOR}/g, `$${(Number(target.valor) || 850000).toLocaleString('cl-CL')}`)
-                            .replace(/{FECHA_VENCIMIENTO}/g, target.termino || '2026-06-30');
-                        })()
+                  <button
+                    onClick={async () => {
+                      if (!testEmailDest) {
+                        showToast('Ingresa un correo de destino para la prueba', 'error');
+                        return;
                       }
-                    </span></p>
-                  </div>
-
-                  {/* Letter Content Simulation */}
-                  <div className="bg-white text-ink p-4 rounded-xl min-h-[200px] shadow-inner font-sans text-[11px] leading-relaxed select-none overflow-y-auto max-h-[260px] border border-gray-100">
-                    <div className="flex justify-between items-center mb-3 border-b border-gray-100 pb-1.5">
-                      <span className="text-[8px] font-black text-accent bg-accent/10 px-2 py-0.5 rounded uppercase">Para el Administrador</span>
-                      <span className="text-[8px] font-mono text-muted">Aviso Interno #PP-2026</span>
-                    </div>
-
-                    <div className="whitespace-pre-wrap font-medium text-slate-800">
-                      {
-                        (() => {
-                          const target = properties.find(p => p.id === previewPropId) || properties[0] || {
-                            direccion: 'Av. Vitacura 2930, Depto 1402',
-                            dueno: 'Juan Carlos Pérez',
-                            arrendatario: 'Valentina Martínez',
-                            valor: 850000,
-                            termino: '2026-06-30'
-                          };
-                          const rawTemplate = appSettings.emailTemplate || `Hola,\n\nTe notificamos que el contrato de arriendo para la propiedad en {DIRECCION} está próximo a vencer.\n\nDetalles de la Gestión:\n🏠 Dirección de Propiedad: {DIRECCION}\n👤 Nombre del Dueño: {DUENO}\n🔑 Nombre del Arrendatario: {INQUILINO}\n📅 Fecha del Vencimiento: {FECHA_VENCIMIENTO}\n💵 Renta de Arriendo Mensual: {VALOR}`;
-
-                          return rawTemplate
-                            .replace(/{INQUILINO}/g, target.arrendatario || 'Valentina Martínez')
-                            .replace(/{DIRECCION}/g, target.direccion || 'Av. Vitacura 2930, Depto 1402')
-                            .replace(/{DUENO}/g, target.dueno || 'Juan Carlos Pérez')
-                            .replace(/{VALOR}/g, `$${(Number(target.valor) || 850000).toLocaleString('cl-CL')}`)
-                            .replace(/{FECHA_VENCIMIENTO}/g, target.termino || '2026-06-30');
-                        })()
+                      setLoading(true);
+                      setLoadingStatus('Enviando correo de prueba...');
+                      try {
+                        const res = await fetch('/api/send-report', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            to: testEmailDest,
+                            subject: 'Punto Propiedades - Prueba de Correo SMTP',
+                            body: '¡Éxito! Tu configuración de servidor de correo en Punto Propiedades funciona correctamente.',
+                            smtpConfig: {
+                              host: smtpHost,
+                              port: smtpPort,
+                              user: smtpUser,
+                              pass: smtpPass
+                            }
+                          })
+                        });
+                        const data = await res.json();
+                        if (res.ok && data.success) {
+                          showToast('Correo de prueba enviado con éxito', 'success');
+                        } else {
+                          showToast('Error al enviar: ' + (data.details || data.error || 'error desconocido'), 'error');
+                        }
+                      } catch (err) {
+                        console.error(err);
+                        showToast('Error de red al enviar correo de prueba', 'error');
+                      } finally {
+                        setLoading(false);
                       }
-                    </div>
+                    }}
+                    className="w-full border border-border hover:border-accent hover:text-accent font-black uppercase text-[10px] tracking-widest py-4 rounded-xl transition-all active:scale-[0.98] cursor-pointer"
+                  >
+                    ✓ Enviar Correo de Prueba
+                  </button>
 
-                    <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center text-[8.5px] text-muted font-bold tracking-tight">
-                      <p>PuntoPropiedades • Panel Administrativo</p>
-                      <p className="text-[10px]">🔒 SSL</p>
-                    </div>
+                  <div className="p-4 bg-slate-50 border border-border rounded-2xl text-[10px] text-muted leading-relaxed font-semibold">
+                    <p className="font-black text-ink uppercase mb-1">💡 Consejos de Conexión:</p>
+                    <ul className="list-disc pl-4 space-y-1">
+                      <li><strong>Gmail:</strong> Requiere habilitar la verificación en dos pasos y generar una <em>Contraseña de Aplicación</em>.</li>
+                      <li><strong>Office 365 / Outlook:</strong> Requiere verificar si tu tenant permite la autenticación SMTP básica.</li>
+                      <li><strong>Puerto 587:</strong> Recomendado para conexiones STARTTLS estándar.</li>
+                    </ul>
                   </div>
-                </div>
-
-                {/* Automation Summary Card */}
-                <div className="bg-gradient-to-tr from-gray-50 to-gray-100 p-4 rounded-2xl border border-border shadow-sm space-y-2">
-                  <h4 className="text-[9px] font-black text-ink uppercase tracking-wider flex items-center gap-1.5">
-                    <ShieldCheck className="w-3.5 h-3.5 text-accent" />
-                    Auditoría de Envíos Segura
-                  </h4>
-                  <p className="text-[10px] text-muted font-medium leading-relaxed">
-                    Las conexiones SMTP son almacenadas de forma segura. Las transmisiones usan cifrado SSL/TLS, imposibilitando fugas.
-                  </p>
                 </div>
               </div>
             </div>
@@ -4420,6 +4084,9 @@ export default function App() {
             </div>
 
             {/* TAB CONTAINER 1: MEETINGS SCHEDULE */}
+            
+
+            {/* TAB CONTAINER 2: INCIDENT TICKETS */}
             {supportTab === 'tickets' && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-in fade-in duration-300">
                 {/* Send a dynamic ticket */}
@@ -4713,6 +4380,67 @@ export default function App() {
                                   </div>
                                 </div>
                               )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* TAB CONTAINER 3: FAQ KNOWLEDGE BASE */}
+            {supportTab === 'faq' && (
+              <div className="max-w-4xl mx-auto bg-white p-6 md:p-8 rounded-[28px] border border-border/10 shadow-md space-y-6 animate-in fade-in duration-300">
+                <div className="text-center space-y-2">
+                  <h3 className="text-lg font-black uppercase text-primary tracking-wider">Centro de Respuestas Rápidas</h3>
+                  <p className="text-xs text-muted font-bold">Obtén soluciones inmediatas y óptimas de manera directa sobre procesos críticos.</p>
+                </div>
+
+                <div className="space-y-4 font-semibold text-xs">
+                  {[
+                    {
+                      q: '¿Cómo funciona la sincronización automática de arriendos por correo?',
+                      a: 'Consiste en habilitar un canal SMTP seguro de escucha bidireccional. Cada vez que recibas un correo con boletas, contratos o liquidaciones de arriendo en tu remitente SMTP, PuntoPropiedades lee el cuerpo del archivo usando el extractor del módulo Procesador IA y lo sincroniza de manera automática sin necesidad de intervención manual.',
+                      cat: 'Correo'
+                    },
+                    {
+                      q: '¿Qué es un archivo o huella dactilar de un contrato?',
+                      a: 'Es un identificador único SHA-256 (hash) calculado sobre tus PDFs. Evita completamente que subas o sincronices contratos duplicados por accidente. Si un archivo fue subido en el pasado, el importador masivo lo omitirá de inmediato para proteger la integridad y limpieza de tus números globales.',
+                      cat: 'Lector IA'
+                    },
+                    {
+                      q: '¿Cómo puedo agendar asesorías de integración masiva?',
+                      a: 'A través de la sección "Asesoría & Reuniones" de este módulo. Contamos con ingenieros dedicados dispuestos a capacitarte, estructurar tu SMTP corporativo de dominio propio, o recibir lotes de arriendos en Excel para dejarlos completamente cargados en tu cuenta.',
+                      cat: 'General'
+                    },
+                    {
+                      q: '¿Los datos extraídos son editables?',
+                      a: 'Sí, absolutamente. Una vez procesados por la inteligencia artificial, se genera una tarjeta borrador que te permite revisar, validar ruts exentos y corregir cualquier parámetro de fecha u obligación antes de confirmarlo permanentemente en el listado activo.',
+                      cat: 'Lector IA'
+                    }
+                  ].map((faq, i) => (
+                    <div key={`faq-item-${i}`} className="p-6 rounded-[24px] bg-gray-50/30 border border-border/60 hover:bg-white hover:shadow-xs transition-all flex flex-col gap-3">
+                      <div className="flex justify-between items-start gap-3 flex-wrap">
+                        <span className="text-[9px] font-mono tracking-widest font-black uppercase text-accent bg-accent/10 px-3 py-1 rounded-full shrink-0">
+                          {faq.cat}
+                        </span>
+                        <h4 className="text-xs font-black text-ink uppercase leading-snug tracking-tight flex-1">
+                          {faq.q}
+                        </h4>
+                      </div>
+                      <p className="text-[11px] text-muted font-semibold leading-relaxed mt-1 font-sans">
+                        {faq.a}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {activeModule === 'meetings' && (
           <div className="max-w-7xl mx-auto py-2 animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
             {/* Header: Compacto */}
@@ -4740,6 +4468,7 @@ export default function App() {
                   </div>
                 </div>
                 <button
+                  type="button"
                   onClick={loginWithGoogle}
                   className="bg-amber-600 hover:bg-amber-700 text-white font-black uppercase text-[10px] tracking-widest py-3 px-6 rounded-xl transition-all shadow-md shrink-0 active:scale-95 cursor-pointer"
                 >
@@ -4802,7 +4531,6 @@ export default function App() {
 
                     {/* Client search list */}
                     {(() => {
-                      // Extract unique clients
                       const clientsList = [];
                       const seenEmails = new Set();
 
@@ -4811,14 +4539,14 @@ export default function App() {
                           const email = p.mailD.trim().toLowerCase();
                           if (!seenEmails.has(email)) {
                             seenEmails.add(email);
-                            clientsList.push({ name: p.dueno, email: p.mailD.trim(), role: 'Propietario', phone: p.telD || '' });
+                            clientsList.push({ name: p.dueno, email: p.mailD.trim(), role: 'Propietario' });
                           }
                         }
                         if (p.arrendatario && p.mailA && p.mailA.trim()) {
                           const email = p.mailA.trim().toLowerCase();
                           if (!seenEmails.has(email)) {
                             seenEmails.add(email);
-                            clientsList.push({ name: p.arrendatario, email: p.mailA.trim(), role: 'Arrendatario', phone: p.telA || '' });
+                            clientsList.push({ name: p.arrendatario, email: p.mailA.trim(), role: 'Arrendatario' });
                           }
                         }
                       });
@@ -5131,66 +4859,6 @@ export default function App() {
           </div>
         )}
     
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-            )}
-
-            {/* TAB CONTAINER 3: FAQ KNOWLEDGE BASE */}
-            {supportTab === 'faq' && (
-              <div className="max-w-4xl mx-auto bg-white p-6 md:p-8 rounded-[28px] border border-border/10 shadow-md space-y-6 animate-in fade-in duration-300">
-                <div className="text-center space-y-2">
-                  <h3 className="text-lg font-black uppercase text-primary tracking-wider">Centro de Respuestas Rápidas</h3>
-                  <p className="text-xs text-muted font-bold">Obtén soluciones inmediatas y óptimas de manera directa sobre procesos críticos.</p>
-                </div>
-
-                <div className="space-y-4 font-semibold text-xs">
-                  {[
-                    {
-                      q: '¿Cómo funciona la sincronización automática de arriendos por correo?',
-                      a: 'Consiste en habilitar un canal SMTP seguro de escucha bidireccional. Cada vez que recibas un correo con boletas, contratos o liquidaciones de arriendo en tu remitente SMTP, PuntoPropiedades lee el cuerpo del archivo usando el extractor del módulo Procesador IA y lo sincroniza de manera automática sin necesidad de intervención manual.',
-                      cat: 'Correo'
-                    },
-                    {
-                      q: '¿Qué es un archivo o huella dactilar de un contrato?',
-                      a: 'Es un identificador único SHA-256 (hash) calculado sobre tus PDFs. Evita completamente que subas o sincronices contratos duplicados por accidente. Si un archivo fue subido en el pasado, el importador masivo lo omitirá de inmediato para proteger la integridad y limpieza de tus números globales.',
-                      cat: 'Lector IA'
-                    },
-                    {
-                      q: '¿Cómo puedo agendar asesorías de integración masiva?',
-                      a: 'A través de la sección "Asesoría & Reuniones" de este módulo. Contamos con ingenieros dedicados dispuestos a capacitarte, estructurar tu SMTP corporativo de dominio propio, o recibir lotes de arriendos en Excel para dejarlos completamente cargados en tu cuenta.',
-                      cat: 'General'
-                    },
-                    {
-                      q: '¿Los datos extraídos son editables?',
-                      a: 'Sí, absolutamente. Una vez procesados por la inteligencia artificial, se genera una tarjeta borrador que te permite revisar, validar ruts exentos y corregir cualquier parámetro de fecha u obligación antes de confirmarlo permanentemente en el listado activo.',
-                      cat: 'Lector IA'
-                    }
-                  ].map((faq, i) => (
-                    <div key={`faq-item-${i}`} className="p-6 rounded-[24px] bg-gray-50/30 border border-border/60 hover:bg-white hover:shadow-xs transition-all flex flex-col gap-3">
-                      <div className="flex justify-between items-start gap-3 flex-wrap">
-                        <span className="text-[9px] font-mono tracking-widest font-black uppercase text-accent bg-accent/10 px-3 py-1 rounded-full shrink-0">
-                          {faq.cat}
-                        </span>
-                        <h4 className="text-xs font-black text-ink uppercase leading-snug tracking-tight flex-1">
-                          {faq.q}
-                        </h4>
-                      </div>
-                      <p className="text-[11px] text-muted font-semibold leading-relaxed mt-1 font-sans">
-                        {faq.a}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
         </main>
 
