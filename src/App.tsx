@@ -3501,7 +3501,7 @@ export default function App() {
                             <button
                               key={p.id}
                               onClick={() => setSelectedReportPropId(p.id!)}
-                              className={`p-4 rounded-2xl flex flex-col items-start gap-2 text-left transition-all duration-300 relative border overflow-hidden smooth-transition ${
+                              className={`p-4 rounded-2xl flex flex-col items-start gap-2 text-left transition-all duration-300 relative border smooth-transition ${
                                 isSel 
                                   ? 'bg-gradient-to-tr from-primary to-slate-900 border-primary shadow-lg shadow-primary/20 scale-[1.02] transform' 
                                   : 'bg-bg border-transparent hover:border-border hover:bg-gray-50'
@@ -3540,13 +3540,12 @@ export default function App() {
                                 {p.direccion}
                               </p>
                               
-                              <div className={`w-full mt-2 pt-2 border-t ${isSel ? 'border-white/10' : 'border-border/60'}`}>
-                                 <div className="flex justify-between w-full items-end mb-2">
-                                    <p className={`text-[9px] uppercase tracking-widest font-bold mb-0.5 min-w-0 truncate pr-2 ${isSel ? 'text-white/40' : 'text-muted/50'}`}>Gastos Anuales ({reportYear})</p>
-                                    <p className={`text-sm font-black tracking-tight shrink-0 whitespace-nowrap ${isSel ? 'text-accent' : 'text-primary'}`}>
-                                      {formatCurrency(propYearTotal)}
-                                    </p>
-                                 </div>
+                               <div className={`w-full mt-2 pt-2 border-t ${isSel ? 'border-white/10' : 'border-border/60'}`}>
+                                 <p className={`text-[9px] uppercase tracking-widest font-bold mb-1 ${isSel ? 'text-white/40' : 'text-muted/50'}`}>Gastos Anuales ({reportYear})</p>
+                                 <p className={`text-base font-black tracking-tight w-full ${isSel ? 'text-accent' : 'text-primary'}`}>
+                                   {formatCurrency(propYearTotal)}
+                                 </p>
+                               </div>
                                  <div className="flex gap-1 flex-wrap">
                                     {Object.entries(propYearCats).sort((a,b)=>b[1]-a[1]).slice(0, 3).map(([cat, val]) => (
                                       <span key={cat} className={`text-[8px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 uppercase tracking-widest ${isSel ? 'bg-white/10 text-white/80' : 'bg-gray-100 text-muted'}`}>
