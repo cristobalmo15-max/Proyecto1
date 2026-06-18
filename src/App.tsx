@@ -130,13 +130,13 @@ const MONTHS_WITH_YEAR = [
 ].reverse(); // from newest to oldest
 
 const EXPENSE_CATEGORIES_COLORS: Record<string, string> = {
-  'ARRIENDO': 'bg-blue-500',
-  'LUZ': 'bg-yellow-400',
-  'AGUA': 'bg-cyan-500',
-  'GAS': 'bg-orange-500',
-  'GASTOS COMUNES': 'bg-purple-500',
-  'MANTENCION': 'bg-emerald-500',
-  'OTROS': 'bg-gray-400'
+  'ARRIENDO': 'bg-red-600',
+  'LUZ': 'bg-zinc-800',
+  'AGUA': 'bg-zinc-500',
+  'GAS': 'bg-zinc-400',
+  'GASTOS COMUNES': 'bg-stone-900',
+  'MANTENCION': 'bg-red-800',
+  'OTROS': 'bg-zinc-600'
 };
 const getCategoryColor = (cat: string) => EXPENSE_CATEGORIES_COLORS[cat?.toUpperCase()] || 'bg-primary';
 
@@ -395,6 +395,7 @@ export default function App() {
   const [selectedProp, setSelectedProp] = useState<Property | null>(null);
   const [selectedReportPropId, setSelectedReportPropId] = useState<string | null>(null);
   const [selectedReportMonth, setSelectedReportMonth] = useState<string>(MONTHS_WITH_YEAR[0]);
+  const [reportsTab, setReportsTab] = useState<'details' | 'preview'>('details');
   const [isAdding, setIsAdding] = useState(false);
   const [isBulk, setIsBulk] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -3274,6 +3275,23 @@ export default function App() {
           const monthExpenses = selectedProp ? (selectedProp.expenses?.filter(e => isMatchingMonth(e.mes, selectedReportMonth)) || []) : [];
           const totalMonthExp = monthExpenses.reduce((sum, e) => sum + (parseFloat(e.monto.replace(/[^\d.-]/g, '')) || 0), 0);
           
+          const txCount = monthExpenses.length;
+          
+          const monthCatTotals: Record<string, number> = {};
+          monthExpenses.forEach(e => {
+            const val = parseFloat(e.monto.replace(/[^\d.-]/g, '')) || 0;
+            monthCatTotals[e.tipo] = (monthCatTotals[e.tipo] || 0) + val;
+          });
+          
+          let highestCatName = '-';
+          let highestCatVal = 0;
+          Object.entries(monthCatTotals).forEach(([cat, val]) => {
+            if (val > highestCatVal) {
+              highestCatVal = val;
+              highestCatName = cat;
+            }
+          });
+          
           return (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-6 duration-700 max-w-7xl mx-auto py-4">
               <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 mb-4">
@@ -3333,8 +3351,8 @@ export default function App() {
                                  <div className="flex gap-1 flex-wrap">
                                     {Object.entries(propYearCats).sort((a,b)=>b[1]-a[1]).slice(0, 3).map(([cat, val]) => (
                                       <span key={cat} className={`text-[8px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 uppercase tracking-widest ${isSel ? 'bg-white/10 text-white/80' : 'bg-gray-100 text-muted'}`}>
-                                         <div className={`w-1 h-1 rounded-full ${getCategoryColor(cat)}`} />
-                                         {cat} {/* {formatCurrency(val)} - omitted not to clutter too much */}
+                                         <div className={`w-1.5 h-1.5 rounded-full ${getCategoryColor(cat)}`} />
+                                         {cat}
                                       </span>
                                     ))}
                                     {Object.entries(propYearCats).length > 3 && (
@@ -3365,8 +3383,8 @@ export default function App() {
                   ) : (
                     <div className="bg-white rounded-3xl border border-border shadow-sm p-8 flex flex-col animate-in fade-in zoom-in-95 duration-500">
                       
-                      {/* Header without selector */}
-                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 pb-8 border-b border-border/60">
+                      {/* Header & Navigation Tabs */}
+                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 pb-6 border-b border-border/60">
                         <div>
                           <h2 className="text-2xl font-black text-ink uppercase tracking-tight mb-1">{selectedProp.direccion}</h2>
                           <div className="flex items-center gap-3">
@@ -3376,12 +3394,35 @@ export default function App() {
                             <span className="text-[10px] text-muted font-mono">{selectedProp.mailD || 'Sin email'}</span>
                           </div>
                         </div>
+                        
+                        {/* Tab Switcher */}
+                        <div className="flex bg-gray-100 p-1 rounded-xl border border-border mt-4 md:mt-0">
+                          <button
+                            onClick={() => setReportsTab('details')}
+                            className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${
+                              reportsTab === 'details'
+                                ? 'bg-white text-primary shadow-sm'
+                                : 'text-muted hover:text-ink'
+                            }`}
+                          >
+                            Detalle de Gastos
+                          </button>
+                          <button
+                            onClick={() => setReportsTab('preview')}
+                            className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${
+                              reportsTab === 'preview'
+                                ? 'bg-white text-primary shadow-sm'
+                                : 'text-muted hover:text-ink'
+                            }`}
+                          >
+                            Previsualizar Informe
+                          </button>
+                        </div>
                       </div>
 
-                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
-                        
-                        {/* Columna Izquierda (Historial Anual) */}
-                        <div className="flex flex-col">
+                      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+                        {/* Subcolumna Izquierda: Historial Anual (común para ambas vistas) */}
+                        <div className="xl:col-span-5 flex flex-col">
                            <h4 className="text-[10px] font-bold text-muted uppercase tracking-widest mb-6 border-b border-border/60 pb-2">
                              Historial Anual de Gastos {new Date().getFullYear()}
                            </h4>
@@ -3407,11 +3448,11 @@ export default function App() {
                                         isSel ? 'bg-gray-50 border-border shadow-sm ring-1 ring-border relative z-10' : 'bg-transparent border-transparent hover:bg-gray-50/50'
                                       }`}
                                    >
-                                     <div className={`w-20 lg:w-28 font-bold text-[10px] lg:text-xs uppercase tracking-widest shrink-0 ${isSel ? 'text-ink' : 'text-muted'}`}>
+                                     <div className={`w-16 font-bold text-[10px] uppercase tracking-widest shrink-0 ${isSel ? 'text-ink' : 'text-muted'}`}>
                                        {m.split(' ')[0]}
                                      </div>
                                      
-                                     <div className="flex-1 px-4 flex items-center h-2.5">
+                                     <div className="flex-1 px-3 flex items-center h-2">
                                         {mTotal > 0 ? (
                                           <div className="w-full h-full bg-gray-100 rounded-full overflow-hidden flex shadow-inner">
                                              {Object.entries(catTotals).map(([cat, val], i) => (
@@ -3428,7 +3469,7 @@ export default function App() {
                                         )}
                                      </div>
 
-                                     <div className={`w-20 lg:w-24 text-right font-black text-[10px] lg:text-xs tracking-tight shrink-0 ${mTotal > 0 ? 'text-ink' : 'text-muted/40'}`}>
+                                     <div className={`w-16 text-right font-black text-[10px] tracking-tight shrink-0 ${mTotal > 0 ? 'text-ink' : 'text-muted/40'}`}>
                                         {mTotal > 0 ? formatCurrency(mTotal) : '-'}
                                      </div>
                                    </button>
@@ -3437,70 +3478,196 @@ export default function App() {
                            </div>
                         </div>
 
-                        {/* Columna Derecha: Detalle del mes seleccionado */}
-                        <div className="flex flex-col bg-bg/50 p-6 rounded-3xl border border-border/80 relative">
-                           <div className="mb-6 flex justify-between items-end">
-                              <div>
-                                <h4 className="text-[10px] font-bold text-accent uppercase tracking-widest mb-1">Detalle del Mes</h4>
-                                <h3 className="text-xl font-black text-ink uppercase tracking-tight">{selectedReportMonth}</h3>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-[9px] font-bold text-muted uppercase tracking-widest mb-1">Total</p>
-                                <p className="text-2xl font-black text-ink tracking-tight leading-none">{formatCurrency(totalMonthExp)}</p>
-                              </div>
-                           </div>
-                           
-                           <div className="flex-1 overflow-y-auto mb-6 custom-scrollbar max-h-[300px]">
-                              {monthExpenses.length === 0 ? (
-                                 <div className="flex flex-col items-center justify-center text-center py-12 text-muted/50">
-                                   <FileText className="w-8 h-8 mb-3 opacity-20" />
-                                   <p className="text-[10px] font-bold uppercase tracking-widest">No hay registros</p>
+                        {/* Subcolumna Derecha: Detalle de Gastos o Previsualización */}
+                        <div className="xl:col-span-7 flex flex-col">
+                          {reportsTab === 'details' ? (
+                            <div className="flex flex-col bg-bg/50 p-6 rounded-3xl border border-border/80 relative h-full">
+                               <div className="mb-6 flex justify-between items-end">
+                                  <div>
+                                     <h4 className="text-[10px] font-bold text-accent uppercase tracking-widest mb-1">Detalle del Mes</h4>
+                                     <h3 className="text-xl font-black text-ink uppercase tracking-tight">{selectedReportMonth}</h3>
+                                  </div>
+                                  <div className="text-right">
+                                     <p className="text-[9px] font-bold text-muted uppercase tracking-widest mb-1">Total</p>
+                                     <p className="text-2xl font-black text-ink tracking-tight leading-none">{formatCurrency(totalMonthExp)}</p>
+                                  </div>
+                               </div>
+
+                               {/* High-level Metric Cards */}
+                               <div className="grid grid-cols-3 gap-3 mb-6">
+                                 <div className="bg-white p-3 rounded-2xl border border-border shadow-sm">
+                                   <p className="text-[8px] font-bold text-muted uppercase tracking-wider mb-1">Total Gastado</p>
+                                   <p className="text-xs font-black text-ink tracking-tight">{formatCurrency(totalMonthExp)}</p>
                                  </div>
-                              ) : (
-                                 <div className="space-y-3 pr-2">
-                                    <p className="text-[9px] font-black uppercase text-muted tracking-widest mb-2 border-b border-border/50 pb-2">Transacciones Registradas</p>
-                                    {monthExpenses.map((exp, idx) => (
-                                      <div key={idx} className="bg-white px-4 py-3 rounded-2xl border border-border flex flex-col gap-2 shadow-sm relative overflow-hidden group">
-                                        <div className={`absolute top-0 left-0 w-1 h-full ${getCategoryColor(exp.tipo)}`} />
-                                        <div className="flex justify-between items-start">
-                                           <div className="flex flex-col">
-                                              <span className="text-[10px] font-black uppercase text-ink tracking-tight mb-0.5">{exp.tipo}</span>
-                                              <span className="text-[8px] font-bold text-muted uppercase font-mono tracking-widest">Boleta/Folio: {exp.boleta || 'S/N'}</span>
+                                 <div className="bg-white p-3 rounded-2xl border border-border shadow-sm">
+                                   <p className="text-[8px] font-bold text-muted uppercase tracking-wider mb-1">Transacciones</p>
+                                   <p className="text-xs font-black text-ink tracking-tight">{txCount} reg.</p>
+                                 </div>
+                                 <div className="bg-white p-3 rounded-2xl border border-border shadow-sm">
+                                   <p className="text-[8px] font-bold text-muted uppercase tracking-wider mb-1">Mayor Gasto</p>
+                                   <p className="text-[9px] font-black text-primary truncate tracking-tight uppercase" title={highestCatName}>
+                                     {highestCatName !== '-' ? `${highestCatName}: ${formatCurrency(highestCatVal)}` : '-'}
+                                   </p>
+                                 </div>
+                                </div>
+
+                               {/* Category Graph / Progress Bars */}
+                               {monthExpenses.length > 0 && (
+                                 <div className="mb-6 bg-white p-4 rounded-2xl border border-border shadow-sm">
+                                   <p className="text-[9px] font-black uppercase text-muted tracking-widest mb-3 border-b border-border/50 pb-2">Distribución de Gastos</p>
+                                   <div className="space-y-3">
+                                     {Object.entries(monthCatTotals).sort((a,b)=>b[1]-a[1]).map(([cat, val]) => {
+                                       const pct = totalMonthExp > 0 ? (val / totalMonthExp) * 100 : 0;
+                                       return (
+                                         <div key={cat} className="space-y-1">
+                                           <div className="flex justify-between text-[9px] font-bold text-ink uppercase tracking-wider">
+                                             <span className="flex items-center gap-1.5">
+                                               <div className={`w-1.5 h-1.5 rounded-full ${getCategoryColor(cat)}`} />
+                                               {cat}
+                                             </span>
+                                             <span>{formatCurrency(val)} ({pct.toFixed(0)}%)</span>
                                            </div>
-                                           <span className="text-xs font-black text-primary bg-primary/5 px-2 py-1 rounded-md">{exp.monto}</span>
-                                        </div>
-                                        {exp.link && (
-                                          <div className="pt-2 mt-1 border-t border-dashed border-border/60">
-                                            <a href={exp.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-accent hover:text-red-700 transition-colors">
-                                              <FileText className="w-3 h-3" /> Ver Adjunto PDF
-                                            </a>
-                                          </div>
-                                        )}
-                                      </div>
-                                    ))}
+                                           <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                             <div className={`h-full ${getCategoryColor(cat)}`} style={{ width: `${pct}%` }} />
+                                           </div>
+                                         </div>
+                                       );
+                                     })}
+                                   </div>
                                  </div>
-                              )}
-                           </div>
+                               )}
+                               
+                               <div className="flex-1 overflow-y-auto mb-6 custom-scrollbar max-h-[300px]">
+                                  {monthExpenses.length === 0 ? (
+                                     <div className="flex flex-col items-center justify-center text-center py-12 text-muted/50">
+                                       <FileText className="w-8 h-8 mb-3 opacity-20" />
+                                       <p className="text-[10px] font-bold uppercase tracking-widest">No hay registros</p>
+                                     </div>
+                                  ) : (
+                                     <div className="space-y-3 pr-2">
+                                        <p className="text-[9px] font-black uppercase text-muted tracking-widest mb-2 border-b border-border/50 pb-2">Transacciones Registradas</p>
+                                        {monthExpenses.map((exp, idx) => (
+                                          <div key={idx} className="bg-white px-4 py-3 rounded-2xl border border-border flex flex-col gap-2 shadow-sm relative overflow-hidden group">
+                                            <div className={`absolute top-0 left-0 w-1 h-full ${getCategoryColor(exp.tipo)}`} />
+                                            <div className="flex justify-between items-start">
+                                               <div className="flex flex-col">
+                                                  <span className="text-[10px] font-black uppercase text-ink tracking-tight mb-0.5">{exp.tipo}</span>
+                                                  <span className="text-[8px] font-bold text-muted uppercase font-mono tracking-widest">Boleta/Folio: {exp.boleta || 'S/N'}</span>
+                                               </div>
+                                               <span className="text-xs font-black text-primary bg-primary/5 px-2 py-1 rounded-md">{exp.monto}</span>
+                                            </div>
+                                            {exp.link && (
+                                              <div className="pt-2 mt-1 border-t border-dashed border-border/60">
+                                                <a href={exp.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-accent hover:text-red-700 transition-colors">
+                                                  <FileText className="w-3 h-3" /> Ver Adjunto PDF
+                                                </a>
+                                              </div>
+                                            )}
+                                          </div>
+                                        ))}
+                                     </div>
+                                  )}
+                               </div>
 
-                           {/* Email Section inside the month detail */}
-                           <div className="mt-auto pt-6 border-t border-border/60">
-                              <p className="text-[9px] font-black text-muted uppercase tracking-widest mb-3">Acciones Opcionales</p>
-                              <button 
-                                 onClick={() => sendReport(selectedProp, selectedReportMonth)}
-                                 disabled={loading || monthExpenses.length === 0}
-                                 className={`w-full py-4 rounded-xl font-black uppercase text-[10px] tracking-[0.2em] smooth-transition flex items-center justify-center gap-2 ${
-                                   loading || monthExpenses.length === 0 
-                                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none border border-transparent' 
-                                     : 'bg-gradient-to-r from-primary to-slate-900 border border-primary text-white hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-0.5 glow-hover'
-                                 }`}
-                               >
-                                 <Mail className={`w-4 h-4 ${loading ? 'animate-pulse' : ''}`} /> 
-                                 {loading ? 'Enviando Reporte...' : 'Enviar Reporte al Propietario'}
-                               </button>
-                           </div>
+                               {/* Email Section inside the month detail */}
+                               <div className="mt-auto pt-6 border-t border-border/60">
+                                  <p className="text-[9px] font-black text-muted uppercase tracking-widest mb-3">Acciones Rápidas</p>
+                                  <button 
+                                     onClick={() => sendReport(selectedProp, selectedReportMonth)}
+                                     disabled={loading || monthExpenses.length === 0}
+                                     className={`w-full py-4 rounded-xl font-black uppercase text-[10px] tracking-[0.2em] smooth-transition flex items-center justify-center gap-2 ${
+                                       loading || monthExpenses.length === 0 
+                                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none border border-transparent' 
+                                         : 'bg-gradient-to-r from-primary to-slate-900 border border-primary text-white hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-0.5 glow-hover'
+                                     }`}
+                                   >
+                                     <Mail className={`w-4 h-4 ${loading ? 'animate-pulse' : ''}`} /> 
+                                     {loading ? 'Enviando Reporte...' : 'Enviar Reporte al Propietario'}
+                                   </button>
+                               </div>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col bg-stone-50 p-6 rounded-3xl border border-stone-200 shadow-inner relative font-sans text-stone-800 h-full">
+                              {/* Email Client Header */}
+                              <div className="border-b border-stone-200 pb-4 mb-4 text-[10px] font-semibold text-stone-500 space-y-1">
+                                <div><span className="font-bold uppercase tracking-wider text-stone-400">De:</span> Punto Propiedades &lt;contacto@puntopropiedades.cl&gt;</div>
+                                <div><span className="font-bold uppercase tracking-wider text-stone-400">Para:</span> {selectedProp.dueno || 'Sin Dueño'} &lt;{selectedProp.mailD || 'sin-correo@correo.com'}&gt;</div>
+                                <div><span className="font-bold uppercase tracking-wider text-stone-400">Asunto:</span> <span className="text-stone-800 font-bold">Informe de Gastos - {selectedReportMonth} - {selectedProp.direccion}</span></div>
+                              </div>
+                              
+                              {/* Email Body Preview Container */}
+                              <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm flex flex-col gap-4 min-h-[300px] text-xs leading-relaxed text-stone-700 max-h-[400px] overflow-y-auto custom-scrollbar">
+                                {/* Brand Header */}
+                                <div className="flex justify-between items-center border-b border-stone-100 pb-4 mb-2">
+                                  <span className="font-black tracking-wider text-primary text-sm uppercase">PUNTO PROPIEDADES</span>
+                                  <span className="text-[9px] font-bold text-stone-400 uppercase tracking-widest">{selectedReportMonth}</span>
+                                </div>
+                                
+                                <p>Estimado(a) <strong>{selectedProp.dueno || 'Propietario'}</strong>,</p>
+                                
+                                <p>Junto con saludarle de parte de Punto Propiedades, a continuación se detalla el desglose consolidado de los gastos operacionales registrados para su propiedad ubicada en <strong>{selectedProp.direccion}</strong> correspondientes al mes de <strong>{selectedReportMonth}</strong>:</p>
+                                
+                                {/* Table Mockup */}
+                                {monthExpenses.length === 0 ? (
+                                  <p className="text-center py-6 text-stone-400 italic">No se registran gastos para este período.</p>
+                                ) : (
+                                  <div className="border border-stone-100 rounded-xl overflow-hidden my-2 shadow-sm">
+                                    <table className="w-full text-left border-collapse text-[10px]">
+                                      <thead>
+                                        <tr className="bg-stone-50 text-stone-500 font-black uppercase tracking-wider border-b border-stone-100">
+                                          <th className="p-3">Categoría</th>
+                                          <th className="p-3">Boleta/Folio</th>
+                                          <th className="p-3 text-right">Monto</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {monthExpenses.map((exp, idx) => (
+                                          <tr key={idx} className="border-b border-stone-50 hover:bg-stone-50/50">
+                                            <td className="p-3 font-bold uppercase tracking-tight">{exp.tipo}</td>
+                                            <td className="p-3 text-stone-500 font-mono">{exp.boleta || 'S/N'}</td>
+                                            <td className="p-3 text-right font-black text-stone-900">{exp.monto}</td>
+                                          </tr>
+                                        ))}
+                                        <tr className="bg-stone-50 font-black text-stone-900 border-t border-stone-100">
+                                          <td colSpan={2} className="p-3 text-right uppercase tracking-wider text-[9px] text-stone-500">Monto Total Operacional</td>
+                                          <td className="p-3 text-right text-xs text-primary">{formatCurrency(totalMonthExp)}</td>
+                                        </tr>
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                                
+                                <p className="mt-2">Quedamos atentos a cualquier duda o comentario que pueda tener respecto a este informe.</p>
+                                
+                                <div className="border-t border-stone-100 pt-4 mt-2 text-[9px] text-stone-400">
+                                  <p className="font-bold text-stone-600">Atentamente,</p>
+                                  <p className="font-bold text-primary uppercase">Administración Punto Propiedades</p>
+                                </div>
+                              </div>
 
+                              {/* Send Email Action Trigger */}
+                              <div className="mt-6 pt-4 border-t border-stone-200 flex flex-col gap-2">
+                                <button 
+                                   onClick={() => sendReport(selectedProp, selectedReportMonth)}
+                                   disabled={loading || monthExpenses.length === 0}
+                                   className={`w-full py-3.5 rounded-xl font-black uppercase text-[10px] tracking-[0.2em] smooth-transition flex items-center justify-center gap-2 ${
+                                     loading || monthExpenses.length === 0 
+                                       ? 'bg-stone-200 text-stone-400 cursor-not-allowed border border-transparent' 
+                                       : 'bg-primary border border-primary text-white hover:bg-red-700 hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-0.5'
+                                   }`}
+                                 >
+                                   <Send className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> 
+                                   {loading ? 'Enviando Reporte...' : 'Enviar Reporte por Correo'}
+                                 </button>
+                                 {monthExpenses.length === 0 && (
+                                   <p className="text-[9px] text-center text-red-500 font-bold uppercase tracking-widest mt-1">
+                                     * Agregue gastos a esta propiedad en este mes antes de enviar el reporte.
+                                   </p>
+                                 )}
+                              </div>
+                            </div>
+                          )}
                         </div>
-
                       </div>
 
                     </div>
