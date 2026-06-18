@@ -201,9 +201,9 @@ const CustomSelect = ({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-white border border-border/60 rounded-xl px-4 py-3 text-[11px] font-bold outline-none flex items-center justify-between hover:border-primary/50 hover:bg-white transition-all text-ink shadow-sm group"
+        className="w-full bg-white border border-border/60 rounded-xl px-3 py-3 text-[11px] font-bold outline-none flex items-center justify-between hover:border-primary/50 hover:bg-white transition-all text-ink shadow-sm group"
       >
-        <span className="uppercase truncate pr-2 tracking-tight">{value || placeholder}</span>
+        <span className="uppercase truncate pr-1 tracking-tight">{value || placeholder}</span>
         <ChevronDown className={`w-3.5 h-3.5 text-muted transition-transform duration-500 shrink-0 group-hover:text-primary ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
@@ -396,6 +396,8 @@ export default function App() {
   const [selectedReportPropId, setSelectedReportPropId] = useState<string | null>(null);
   const [selectedReportMonth, setSelectedReportMonth] = useState<string>(MONTHS_WITH_YEAR[0]);
   const [reportsTab, setReportsTab] = useState<'details' | 'preview'>('details');
+  const [selectedYearFilter, setSelectedYearFilter] = useState<string>('all');
+  const [selectedReportsYear, setSelectedReportsYear] = useState<string>('all');
   const [isAdding, setIsAdding] = useState(false);
   const [isBulk, setIsBulk] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -1959,7 +1961,24 @@ export default function App() {
     return 0;
   });
 
-  const filteredSidebarProps = filterProperties(properties, propSearch).filter(p => !onlyFlagged || !!p.flagged);
+  const availableYears = Array.from(new Set(
+    properties
+      .map(p => {
+        if (!p.inicio) return null;
+        const parts = p.inicio.split('-');
+        return parts[0];
+      })
+      .filter(Boolean)
+  ))
+  .sort((a, b) => b!.localeCompare(a!));
+
+  const filteredSidebarProps = filterProperties(properties, propSearch)
+    .filter(p => !onlyFlagged || !!p.flagged)
+    .filter(p => {
+      if (selectedYearFilter === 'all') return true;
+      if (!p.inicio) return false;
+      return p.inicio.startsWith(selectedYearFilter);
+    });
   
   return (
     <div className="flex h-screen bg-[#faf9f6]/40 text-[#1a1a1a] overflow-hidden selection:bg-primary/20">
@@ -1991,7 +2010,7 @@ export default function App() {
             { id: 'dashboard', icon: <LayoutDashboard className="w-4 h-4" />, label: 'Panel de Control' },
             { id: 'properties', icon: <Building2 className="w-4 h-4" />, label: 'Propiedades Activas' },
             { id: 'ai', icon: <Zap className="w-4 h-4" />, label: 'Procesador IA' },
-            { id: 'reports', icon: <PieChart className="w-4 h-4" />, label: 'Reportes Globales' },
+            { id: 'reports', icon: <PieChart className="w-4 h-4" />, label: 'Reportes Mensuales' },
             { id: 'support', icon: <Calendar className="w-4 h-4" />, label: 'Soporte y Reuniones' },
             { id: 'email', icon: <Mail className="w-4 h-4" />, label: 'Correo' },
             ...(isAdmin ? [{ id: 'admin', icon: <ShieldCheck className="w-4 h-4" />, label: 'Admin Master' }] : [])
@@ -2052,7 +2071,7 @@ export default function App() {
                   {activeModule === 'dashboard' && 'Panel de Control'}
                   {/* {activeModule === 'email' && 'Centro de Comunicaciones'} */}
                   {activeModule === 'ai' && 'Motor de Inteligencia'}
-                  {activeModule === 'reports' && 'Analítica de Gestión'}
+                  {activeModule === 'reports' && 'Reportes Mensuales'}
                   {activeModule === 'support' && 'Soporte y Agenda'}
                   {activeModule === 'settings' && 'Correo'}
                   {activeModule === 'admin' && 'Administración Master'}
@@ -2267,6 +2286,22 @@ export default function App() {
                          </div>
                     )}
                   </div>
+                  {/* Year Filter Dropdown */}
+                  <select
+                    value={selectedYearFilter}
+                    onChange={(e) => setSelectedYearFilter(e.target.value)}
+                    className={`h-10 px-2 rounded-xl border bg-white text-[10px] font-black uppercase tracking-wider outline-none cursor-pointer transition-all shrink-0 ${
+                      selectedYearFilter !== 'all' 
+                        ? 'border-primary text-primary bg-red-50/30' 
+                        : 'border-border/70 text-muted hover:border-primary'
+                    }`}
+                  >
+                    <option value="all">Año: Todos</option>
+                    {availableYears.map(yr => (
+                      <option key={yr} value={yr}>{yr}</option>
+                    ))}
+                  </select>
+
                   <button 
                     onClick={() => setOnlyFlagged(!onlyFlagged)}
                     className={`w-10 h-10 rounded-xl transition-all border flex items-center justify-center shrink-0 ${
@@ -2302,7 +2337,9 @@ export default function App() {
                     .sort((a, b) => {
                       if (sortType === 'name-asc') return (a.direccion || '').localeCompare(b.direccion || '');
                       if (sortType === 'name-desc') return (b.direccion || '').localeCompare(a.direccion || '');
-                      return 0;
+                      const dateA = a.inicio ? new Date(a.inicio).getTime() : 0;
+                      const dateB = b.inicio ? new Date(b.inicio).getTime() : 0;
+                      return dateB - dateA;
                     })
                     .map((p, i) => (
                       <div 
@@ -2314,7 +2351,20 @@ export default function App() {
                            : 'bg-white border-border/60 hover:border-red-200 hover:shadow-sm'
                       }`}
                     >
-                      <div className="text-[7px] text-slate-400 font-bold uppercase mb-1">Contrato</div>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-[7px] text-slate-400 font-bold uppercase">Contrato</span>
+                        {p.inicio && (
+                          <span className="text-[8px] font-black bg-red-600 text-white px-1.5 py-0.5 rounded font-mono shadow-sm">
+                            {(() => {
+                              const parts = p.inicio.split('-');
+                              if (parts.length >= 2) {
+                                return `${parts[0]}-${parts[1]}`;
+                              }
+                              return p.inicio;
+                            })()}
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-start justify-between gap-3 mb-2">
                           <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                               <div className="text-[10px] font-black text-slate-700 uppercase tracking-tight truncate" title={p.dueno || 'Sin Dueño'}>{p.dueno || 'Sin Dueño'}</div>
@@ -2734,7 +2784,7 @@ export default function App() {
                                          options={EXPENSE_TYPES}
                                        />
                                      </div>
-                                     <div className="md:col-span-2">
+                                     <div className="md:col-span-3">
                                        <CustomSelect 
                                          label="Mes Fiscal"
                                          value={expenseForm.mes}
@@ -2751,13 +2801,14 @@ export default function App() {
                                             type="number" 
                                             value={expenseForm.monto}
                                             onChange={(e) => setExpenseForm({...expenseForm, monto: e.target.value})}
+                                            onKeyDown={(e) => { if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault(); }}
                                             className="w-full bg-transparent text-base font-black outline-none text-ink placeholder:text-muted/50"
                                             placeholder="0"
                                           />
                                         </div>
                                       </div>
                                     </div>
-                                    <div className="md:col-span-3">
+                                    <div className="md:col-span-2">
                                       <div className="bg-gray-50 border border-border/50 rounded-xl px-3 py-1.5 focus-within:border-ink/20 focus-within:ring-2 ring-ink/5 transition-all shadow-sm group">
                                         <label className="text-[9px] font-bold text-muted group-hover:text-ink uppercase mb-1 block tracking-widest transition-colors">Comprobante</label>
                                         <div className="flex items-center gap-2">
@@ -3230,7 +3281,29 @@ export default function App() {
         )}
 
         {activeModule === 'reports' && (() => {
-          const propertiesWithExpenses = properties.filter(p => p.expenses && p.expenses.length > 0);
+          const reportsAvailableYears = Array.from(new Set(
+            properties
+              .map(p => {
+                if (!p.inicio) return null;
+                const parts = p.inicio.split('-');
+                return parts[0];
+              })
+              .filter(Boolean)
+          ))
+          .sort((a, b) => b!.localeCompare(a!));
+
+          const propertiesWithExpenses = properties
+            .filter(p => p.inicio && p.expenses && p.expenses.length > 0)
+            .filter(p => {
+              if (selectedReportsYear === 'all') return true;
+              return p.inicio!.startsWith(selectedReportsYear);
+            })
+            .sort((a, b) => {
+              const dateA = a.inicio ? new Date(a.inicio).getTime() : 0;
+              const dateB = b.inicio ? new Date(b.inicio).getTime() : 0;
+              return dateB - dateA;
+            });
+
           const selectedProp = properties.find(p => p.id === selectedReportPropId) || null;
           
           const isMatchingMonth = (eMes: string, targetMonth: string) => {
@@ -3308,9 +3381,20 @@ export default function App() {
                 {/* LEFT COLUMN: Property List */}
                 <div className="lg:col-span-4 flex flex-col gap-4">
                   <div className="bg-white p-6 rounded-3xl border border-border shadow-sm flex flex-col min-h-[500px]">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-[10px] font-bold text-muted uppercase tracking-widest">Propiedades Activas</h3>
-                      <span className="text-[10px] font-bold bg-gray-100 text-ink px-2 py-1 rounded-full">{propertiesWithExpenses.length}</span>
+                    <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
+                      <h3 className="text-[10px] font-bold text-muted uppercase tracking-widest">Registro de Gastos</h3>
+                      
+                      {/* Year Filter Dropdown select */}
+                      <select
+                        value={selectedReportsYear}
+                        onChange={(e) => setSelectedReportsYear(e.target.value)}
+                        className="bg-gray-50 border border-border text-[9px] font-black uppercase tracking-wider rounded-lg p-1 outline-none text-ink cursor-pointer shrink-0"
+                      >
+                        <option value="all">Año: Todos</option>
+                        {reportsAvailableYears.map(yr => (
+                          <option key={yr} value={yr}>{yr}</option>
+                        ))}
+                      </select>
                     </div>
                     
                     <div className="flex flex-col gap-3 overflow-y-auto pr-2 custom-scrollbar flex-1 max-h-[600px]">
@@ -3334,11 +3418,37 @@ export default function App() {
                                   : 'bg-bg border-transparent hover:border-border hover:bg-gray-50'
                               }`}
                             >
-                              <p className={`text-xs font-black uppercase tracking-tight truncate w-full ${isSel ? 'text-white' : 'text-ink'}`}>
+                              <div className="flex justify-between items-center w-full mb-1">
+                                <span className={`text-[7px] font-bold uppercase ${isSel ? 'text-white/50' : 'text-slate-400'}`}>Contrato</span>
+                                {p.inicio && (
+                                  <span className={`text-[8px] font-black px-1.5 py-0.5 rounded font-mono shadow-sm ${
+                                    isSel ? 'bg-white/20 text-white' : 'bg-red-600 text-white'
+                                  }`}>
+                                    {(() => {
+                                      const parts = p.inicio.split('-');
+                                      if (parts.length >= 2) {
+                                        return `${parts[0]}-${parts[1]}`;
+                                      }
+                                      return p.inicio;
+                                    })()}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <div className="flex items-start justify-between gap-3 mb-1 w-full text-left font-sans">
+                                <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                                  <div className={`text-[10px] font-black uppercase tracking-tight truncate ${isSel ? 'text-white' : 'text-slate-700'}`} title={p.dueno || 'Sin Dueño'}>
+                                    {p.dueno || 'Sin Dueño'}
+                                  </div>
+                                  <div className={`text-[9px] font-bold uppercase italic ${isSel ? 'text-white/40' : 'text-slate-400'}`}>vs</div>
+                                  <div className={`text-[10px] font-black uppercase tracking-tight truncate ${isSel ? 'text-accent' : 'text-red-700'}`} title={p.arrendatario || 'Sin Inquilino'}>
+                                    {p.arrendatario || 'Sin Inquilino'}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <p className={`text-[9px] font-semibold truncate w-full uppercase tracking-tight ${isSel ? 'text-white/80' : 'text-ink/70'} mb-2 text-left`}>
                                 {p.direccion}
-                              </p>
-                              <p className={`text-[10px] font-medium truncate w-full uppercase tracking-wider ${isSel ? 'text-white/60' : 'text-muted'}`}>
-                                {p.dueno || 'Sin Dueño'}
                               </p>
                               
                               <div className={`w-full mt-2 pt-2 border-t ${isSel ? 'border-white/10' : 'border-border/60'}`}>
