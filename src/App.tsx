@@ -59,7 +59,8 @@ import {
   Lock,
   UserCheck,
   FlaskConical,
-  Flag
+  Flag,
+  TrendingUp
 } from 'lucide-react';
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { ReportModal } from './components/ReportModal';
@@ -122,6 +123,23 @@ interface Property {
 }
 
 // --- Constants ---
+const getCurrentYear = new Date().getFullYear();
+const MONTHS_WITH_YEAR = [
+  ...[ 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre' ].map(m => `${m} ${getCurrentYear - 1}`),
+  ...[ 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre' ].map(m => `${m} ${getCurrentYear}`)
+].reverse(); // from newest to oldest
+
+const EXPENSE_CATEGORIES_COLORS: Record<string, string> = {
+  'ARRIENDO': 'bg-blue-500',
+  'LUZ': 'bg-yellow-400',
+  'AGUA': 'bg-cyan-500',
+  'GAS': 'bg-orange-500',
+  'GASTOS COMUNES': 'bg-purple-500',
+  'MANTENCION': 'bg-emerald-500',
+  'OTROS': 'bg-gray-400'
+};
+const getCategoryColor = (cat: string) => EXPENSE_CATEGORIES_COLORS[cat?.toUpperCase()] || 'bg-primary';
+
 const MONTHS = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
@@ -375,6 +393,8 @@ export default function App() {
   });
   const [expenseSearch, setExpenseSearch] = useState('');
   const [selectedProp, setSelectedProp] = useState<Property | null>(null);
+  const [selectedReportPropId, setSelectedReportPropId] = useState<string | null>(null);
+  const [selectedReportMonth, setSelectedReportMonth] = useState<string>(MONTHS_WITH_YEAR[0]);
   const [isAdding, setIsAdding] = useState(false);
   const [isBulk, setIsBulk] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -544,7 +564,7 @@ export default function App() {
   // Expense form
   const [expenseForm, setExpenseForm] = useState({
     tipo: 'ARRIENDO',
-    mes: MONTHS[new Date().getMonth()],
+    mes: MONTHS_WITH_YEAR[0],
     monto: '',
     boleta: '',
     file: null as File | null
@@ -1304,21 +1324,7 @@ export default function App() {
     try {
       let fileUrl = '#';
       if (expenseForm.file) {
-        const formData = new FormData();
-        formData.append('file', expenseForm.file);
-        
-        const response = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData
-        });
-        
-        if (!response.ok) {
-            const errText = await response.text();
-            console.error('Upload failed with:', errText);
-            throw new Error(`Failed to upload file: ${errText || response.statusText}`);
-        }
-        const data = await response.json();
-        fileUrl = data.url;
+        fileUrl = await uploadFileToStorage(expenseForm.file, 'expenses');
       }
 
       const newExpense = {
@@ -1396,25 +1402,27 @@ export default function App() {
     }
   };
 
-  const sendReport = async (mes: string) => {
-    if (!selectedProp) return;
-    const mesExpenses = selectedProp.expenses.filter(e => e.mes === mes);
+  const sendReport = async (prop: Property, mes: string) => {
+    if (!prop) return;
+    const isMatchingMonth = (eMes: string, targetMonth: string) => eMes === targetMonth || (eMes && !eMes.includes(' ') && `${eMes} ${new Date().getFullYear()}` === targetMonth);
+    const mesExpenses = prop.expenses?.filter(e => isMatchingMonth(e.mes, mes)) || [];
     if (mesExpenses.length === 0) {
       showToast('No hay gastos para este mes', 'error');
       return;
     }
 
-    const body = `Estimado(a) ${selectedProp.dueno}:\n\nAdjunto resumen de gastos para ${selectedProp.direccion} (${mes}):\n\n` +
+    const body = `Estimado(a) ${prop.dueno}:\n\nAdjunto resumen de gastos para ${prop.direccion} (${mes}):\n\n` +
       mesExpenses.map(e => `- ${e.tipo}: $${e.monto} (Bol/Rol: ${e.boleta || 'S/N'})`).join('\n') +
       `\n\nAtentamente,\nPUNTO PROPIEDADES`;
 
+    setLoading(true);
     try {
       const res = await fetch('/api/send-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          to: selectedProp.mailD,
-          subject: `Informe de Gastos - ${mes} - ${selectedProp.direccion}`,
+          to: prop.mailD,
+          subject: `Informe de Gastos - ${mes} - ${prop.direccion}`,
           body,
           smtpConfig: {
             host: appSettings.smtpHost,
@@ -1433,6 +1441,8 @@ export default function App() {
       }
     } catch (e) {
       showToast('Error al enviar informe', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -2728,7 +2738,7 @@ export default function App() {
                                          label="Mes Fiscal"
                                          value={expenseForm.mes}
                                          onChange={(val) => setExpenseForm({...expenseForm, mes: val})}
-                                         options={MONTHS}
+                                         options={MONTHS_WITH_YEAR}
                                        />
                                      </div>
                                      <div className="md:col-span-2">
@@ -3218,103 +3228,289 @@ export default function App() {
           </div>
         )}
 
-        {activeModule === 'reports' && (
-          <div className="space-y-12 animate-in fade-in slide-in-from-bottom-6 duration-700 max-w-7xl mx-auto py-8">
-                  <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8">
+        {activeModule === 'reports' && (() => {
+          const propertiesWithExpenses = properties.filter(p => p.expenses && p.expenses.length > 0);
+          const selectedProp = properties.find(p => p.id === selectedReportPropId) || null;
+          
+          const isMatchingMonth = (eMes: string, targetMonth: string) => {
+            const normE = (eMes || '').trim().toLowerCase();
+            const normT = (targetMonth || '').trim().toLowerCase();
+            return normE === normT || (!normE.includes(' ') && `${normE} ${new Date().getFullYear()}` === normT);
+          };
+          
+          const getMonthTotal = (prop: Property, month: string) => {
+            if (!prop.expenses) return 0;
+            return prop.expenses.filter(e => isMatchingMonth(e.mes, month)).reduce((sum, e) => {
+              const val = parseFloat(e.monto.replace(/[^\d.-]/g, '')) || 0;
+              return sum + val;
+            }, 0);
+          };
+
+          const getYearTotal = (prop: Property, year: string) => {
+            if (!prop.expenses) return 0;
+            return prop.expenses.filter(e => {
+              const eMes = (e.mes || '').toLowerCase();
+              return eMes.includes(year) || (!eMes.includes(' ') && year === new Date().getFullYear().toString());
+            }).reduce((sum, e) => sum + (parseFloat(e.monto.replace(/[^\d.-]/g, '')) || 0), 0);
+          };
+
+          const getYearCategories = (prop: Property, year: string) => {
+            const catTotals: Record<string, number> = {};
+            if (!prop.expenses) return catTotals;
+            prop.expenses.filter(e => {
+              const eMes = (e.mes || '').toLowerCase();
+              return eMes.includes(year) || (!eMes.includes(' ') && year === new Date().getFullYear().toString());
+            }).forEach(e => {
+               const val = parseFloat(e.monto.replace(/[^\d.-]/g, '')) || 0;
+               catTotals[e.tipo] = (catTotals[e.tipo] || 0) + val;
+            });
+            return catTotals;
+          };
+
+          const formatCurrency = (val: number) => {
+             return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(val);
+          };
+
+          const monthExpenses = selectedProp ? (selectedProp.expenses?.filter(e => isMatchingMonth(e.mes, selectedReportMonth)) || []) : [];
+          const totalMonthExp = monthExpenses.reduce((sum, e) => sum + (parseFloat(e.monto.replace(/[^\d.-]/g, '')) || 0), 0);
+          
+          return (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-6 duration-700 max-w-7xl mx-auto py-4">
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 mb-4">
                 <div className="space-y-2">
-                   <h4 className="text-[10px] font-bold uppercase tracking-widest text-accent">Analítica Estratégica</h4>
+                   <h4 className="text-[10px] font-bold uppercase tracking-widest text-accent">Centro de Notificaciones</h4>
                    <p className="text-4xl lg:text-5xl font-bold text-ink uppercase tracking-tight">
                       Reportes <span className="opacity-30">Mensuales</span>
                    </p>
                 </div>
-                <div className="flex gap-3 pb-2">
-                   <button className="h-12 px-6 bg-white border border-border rounded-xl text-xs font-bold uppercase tracking-widest text-ink hover:bg-gray-50 transition-all flex items-center gap-3 shadow-sm">
-                      <Download className="w-4 h-4 text-muted" /> Exportar Q2
-                   </button>
-                   <button onClick={fetchProperties} className="h-12 w-12 bg-primary text-white rounded-xl shadow-lg hover:bg-red-700 transition-all flex items-center justify-center">
-                      <RefreshCw className="w-4 h-4" />
-                   </button>
-                </div>
-             </div>
-
-             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                <div className="lg:col-span-8 bg-white rounded-3xl border border-border p-10 shadow-sm relative overflow-hidden flex flex-col group min-h-[500px]">
-                   <div className="flex justify-between items-start mb-12">
-                      <div>
-                         <h3 className="text-[10px] font-bold text-muted uppercase tracking-widest mb-1">Rendimiento Mensual</h3>
-                         <p className="text-xl font-bold text-ink uppercase">Flujo de Ingresos</p>
-                      </div>
-                      <div className="text-right">
-                         <p className="text-3xl font-bold text-accent tracking-tight leading-none">+12.4%</p>
-                         <p className="text-[9px] font-bold text-muted uppercase tracking-widest mt-1">Var vs mes anterior</p>
-                      </div>
-                   </div>
-
-                   <div className="flex-1 w-full flex items-end justify-between gap-4 relative z-10">
-                      {[65, 45, 75, 85, 55, 95, 80, 70, 90, 60, 85, 100].map((val, i) => (
-                        <div key={`report-month-bar-${i}`} className="flex-1 group/bar relative flex flex-col items-center h-full justify-end">
-                           <motion.div 
-                             initial={{ height: 0 }}
-                             animate={{ height: `${val}%` }}
-                             transition={{ delay: i * 0.05, duration: 1.2, ease: "easeOut" }}
-                             className="w-full max-w-[10px] bg-gray-100 rounded-t-lg group-hover/bar:bg-accent transition-all relative"
-                           >
-                              <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover/bar:opacity-100 transition-all bg-primary text-white text-[9px] font-bold px-2 py-1 rounded shadow-lg whitespace-nowrap">
-                                 {val}%
-                              </div>
-                           </motion.div>
-                           <span className="mt-6 text-[9px] font-bold text-muted uppercase tracking-widest">
-                              {['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][i]}
-                           </span>
-                        </div>
-                      ))}
-                   </div>
-                </div>
-
-                <div className="lg:col-span-4 space-y-8 flex flex-col">
-                   <div className="bg-primary p-10 rounded-3xl shadow-xl relative overflow-hidden flex-1 flex flex-col justify-center min-h-[300px]">
-                      <div className="relative z-10">
-                         <div className="flex items-center gap-2 mb-6">
-                            <div className="w-1.5 h-1.5 bg-accent rounded-full animate-pulse" />
-                            <h4 className="text-[9px] font-bold text-white/40 uppercase tracking-widest">Eficiencia Operativa</h4>
-                         </div>
-                         <p className="text-7xl font-bold text-white leading-none mb-6 tracking-tighter">99.4<span className="text-accent text-3xl align-top">%</span></p>
-                         <div className="pt-6 border-t border-white/10">
-                            <p className="text-[10px] text-white/40 font-medium uppercase tracking-widest leading-relaxed">Índice de rendimiento de activos gestionados.</p>
-                         </div>
-                      </div>
-                   </div>
-
-                   <div className="bg-white p-10 rounded-3xl border border-border shadow-sm flex flex-col items-center justify-center text-center group h-auto min-h-[250px]">
-                      <div className="w-16 h-16 bg-bg rounded-2xl flex items-center justify-center mb-6 shadow-inner text-accent">
-                         <PieChart className="w-8 h-8" />
-                      </div>
-                      <h4 className="text-[10px] font-bold text-muted uppercase tracking-widest mb-4">Matriz de Riesgo</h4>
-                      <div className="px-6 py-2 bg-primary text-white rounded-full">
-                         <p className="text-xl font-bold uppercase tracking-tight leading-none">Nivel A+</p>
-                      </div>
-                   </div>
-                </div>
-             </div>
-
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-                {[
-                  { label: "Portafolio Activo", val: properties.length, icon: Building2, trend: "Estable" },
-                  { label: "Presión Demanda", val: "Alta", icon: Users, trend: "+14%" },
-                  { label: "Tiempo Operativo", val: "100%", icon: Zap, trend: "Óptimo" }
-                ].map((stat, i) => (
-                  <div key={`stat-card-reports-${i}`} className="bg-white p-12 rounded-[56px] border border-border/5 shadow-premium flex flex-col items-center text-center group hover:-translate-y-2 transition-all duration-500">
-                     <div className="w-14 h-14 bg-bg rounded-2xl flex items-center justify-center mb-8 shadow-inner text-ink/40 group-hover:text-accent transition-colors">
-                        <stat.icon className="w-6 h-6" />
-                     </div>
-                     <p className="text-[9px] font-black text-ink/20 uppercase tracking-[0.4em] font-mono mb-4">{stat.label}</p>
-                     <p className="text-3xl font-bold text-ink mb-2 uppercase">{stat.val}</p>
-                      <p className="text-[9px] font-black text-accent uppercase tracking-widest">{stat.trend}</p>
-                   </div>
-                 ))}
               </div>
-           </div>
-         )}
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                
+                {/* LEFT COLUMN: Property List */}
+                <div className="lg:col-span-4 flex flex-col gap-4">
+                  <div className="bg-white p-6 rounded-3xl border border-border shadow-sm flex flex-col min-h-[500px]">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-[10px] font-bold text-muted uppercase tracking-widest">Propiedades Activas</h3>
+                      <span className="text-[10px] font-bold bg-gray-100 text-ink px-2 py-1 rounded-full">{propertiesWithExpenses.length}</span>
+                    </div>
+                    
+                    <div className="flex flex-col gap-3 overflow-y-auto pr-2 custom-scrollbar flex-1 max-h-[600px]">
+                      {propertiesWithExpenses.length === 0 ? (
+                        <div className="text-center py-10 opacity-50">
+                          <p className="text-xs font-bold uppercase tracking-widest text-muted">No hay gastos</p>
+                        </div>
+                      ) : (
+                        propertiesWithExpenses.map(p => {
+                          const isSel = selectedReportPropId === p.id;
+                          const reportYear = selectedReportMonth.split(' ').pop() || new Date().getFullYear().toString();
+                          const propYearTotal = getYearTotal(p, reportYear);
+                          const propYearCats = getYearCategories(p, reportYear);
+                          return (
+                            <button
+                              key={p.id}
+                              onClick={() => setSelectedReportPropId(p.id!)}
+                              className={`p-4 rounded-2xl flex flex-col items-start gap-2 text-left transition-all duration-300 relative border overflow-hidden smooth-transition ${
+                                isSel 
+                                  ? 'bg-gradient-to-tr from-primary to-slate-900 border-primary shadow-lg shadow-primary/20 scale-[1.02] transform' 
+                                  : 'bg-bg border-transparent hover:border-border hover:bg-gray-50'
+                              }`}
+                            >
+                              <p className={`text-xs font-black uppercase tracking-tight truncate w-full ${isSel ? 'text-white' : 'text-ink'}`}>
+                                {p.direccion}
+                              </p>
+                              <p className={`text-[10px] font-medium truncate w-full uppercase tracking-wider ${isSel ? 'text-white/60' : 'text-muted'}`}>
+                                {p.dueno || 'Sin Dueño'}
+                              </p>
+                              
+                              <div className={`w-full mt-2 pt-2 border-t ${isSel ? 'border-white/10' : 'border-border/60'}`}>
+                                 <div className="flex justify-between w-full items-end mb-2">
+                                    <p className={`text-[9px] uppercase tracking-widest font-bold mb-0.5 ${isSel ? 'text-white/40' : 'text-muted/50'}`}>Gastos Anuales ({reportYear})</p>
+                                    <p className={`text-sm font-black tracking-tight ${isSel ? 'text-accent' : 'text-primary'}`}>
+                                      {formatCurrency(propYearTotal)}
+                                    </p>
+                                 </div>
+                                 <div className="flex gap-1 flex-wrap">
+                                    {Object.entries(propYearCats).sort((a,b)=>b[1]-a[1]).slice(0, 3).map(([cat, val]) => (
+                                      <span key={cat} className={`text-[8px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 uppercase tracking-widest ${isSel ? 'bg-white/10 text-white/80' : 'bg-gray-100 text-muted'}`}>
+                                         <div className={`w-1 h-1 rounded-full ${getCategoryColor(cat)}`} />
+                                         {cat} {/* {formatCurrency(val)} - omitted not to clutter too much */}
+                                      </span>
+                                    ))}
+                                    {Object.entries(propYearCats).length > 3 && (
+                                       <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 uppercase tracking-widest ${isSel ? 'bg-white/5 text-white/50' : 'bg-transparent text-muted/50'}`}>
+                                          +{Object.entries(propYearCats).length - 3}
+                                       </span>
+                                    )}
+                                 </div>
+                              </div>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* RIGHT COLUMN: Analytics & Sending */}
+                <div className="lg:col-span-8 flex flex-col">
+                  {!selectedProp ? (
+                    <div className="bg-white rounded-3xl border border-border flex flex-col items-center justify-center p-12 min-h-[500px] shadow-sm text-center">
+                      <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-6">
+                        <FileText className="w-8 h-8 text-muted" />
+                      </div>
+                      <h3 className="text-xl font-black text-ink uppercase tracking-tight mb-2">Seleccione una Propiedad</h3>
+                      <p className="text-sm font-medium text-muted max-w-sm">Elija una propiedad de la lista para previsualizar los gastos y generar el reporte mensual.</p>
+                    </div>
+                  ) : (
+                    <div className="bg-white rounded-3xl border border-border shadow-sm p-8 flex flex-col animate-in fade-in zoom-in-95 duration-500">
+                      
+                      {/* Header without selector */}
+                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 pb-8 border-b border-border/60">
+                        <div>
+                          <h2 className="text-2xl font-black text-ink uppercase tracking-tight mb-1">{selectedProp.direccion}</h2>
+                          <div className="flex items-center gap-3">
+                            <span className="text-[10px] bg-gray-100 text-muted px-2 py-1 rounded font-mono uppercase tracking-widest">
+                              {selectedProp.dueno || 'Sin Doc.'}
+                            </span>
+                            <span className="text-[10px] text-muted font-mono">{selectedProp.mailD || 'Sin email'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
+                        
+                        {/* Columna Izquierda (Historial Anual) */}
+                        <div className="flex flex-col">
+                           <h4 className="text-[10px] font-bold text-muted uppercase tracking-widest mb-6 border-b border-border/60 pb-2">
+                             Historial Anual de Gastos {new Date().getFullYear()}
+                           </h4>
+                           <div className="flex flex-col gap-1">
+                              {MONTHS_WITH_YEAR.filter(m => m.endsWith(new Date().getFullYear().toString())).reverse().map((m) => {
+                                 const mTotal = getMonthTotal(selectedProp, m);
+                                 const mExps = selectedProp.expenses?.filter(e => isMatchingMonth(e.mes, m)) || [];
+                                 
+                                 // agrupar por categoría
+                                 const catTotals: Record<string, number> = {};
+                                 mExps.forEach(e => {
+                                    const val = parseFloat(e.monto.replace(/[^\d.-]/g, '')) || 0;
+                                    catTotals[e.tipo] = (catTotals[e.tipo] || 0) + val;
+                                 });
+
+                                 const isSel = selectedReportMonth === m;
+
+                                 return (
+                                   <button 
+                                      key={m}
+                                      onClick={() => setSelectedReportMonth(m)}
+                                      className={`w-full flex items-center p-3 rounded-xl cursor-pointer smooth-transition border text-left ${
+                                        isSel ? 'bg-gray-50 border-border shadow-sm ring-1 ring-border relative z-10' : 'bg-transparent border-transparent hover:bg-gray-50/50'
+                                      }`}
+                                   >
+                                     <div className={`w-20 lg:w-28 font-bold text-[10px] lg:text-xs uppercase tracking-widest shrink-0 ${isSel ? 'text-ink' : 'text-muted'}`}>
+                                       {m.split(' ')[0]}
+                                     </div>
+                                     
+                                     <div className="flex-1 px-4 flex items-center h-2.5">
+                                        {mTotal > 0 ? (
+                                          <div className="w-full h-full bg-gray-100 rounded-full overflow-hidden flex shadow-inner">
+                                             {Object.entries(catTotals).map(([cat, val], i) => (
+                                                <div 
+                                                   key={i} 
+                                                   title={`${cat}: ${formatCurrency(val)}`}
+                                                   className={`h-full ${getCategoryColor(cat)}`} 
+                                                   style={{ width: `${(val / mTotal) * 100}%` }} 
+                                                />
+                                             ))}
+                                          </div>
+                                        ) : (
+                                          <div className="w-full h-[1px] border-t border-dashed border-border/60" />
+                                        )}
+                                     </div>
+
+                                     <div className={`w-20 lg:w-24 text-right font-black text-[10px] lg:text-xs tracking-tight shrink-0 ${mTotal > 0 ? 'text-ink' : 'text-muted/40'}`}>
+                                        {mTotal > 0 ? formatCurrency(mTotal) : '-'}
+                                     </div>
+                                   </button>
+                                 );
+                              })}
+                           </div>
+                        </div>
+
+                        {/* Columna Derecha: Detalle del mes seleccionado */}
+                        <div className="flex flex-col bg-bg/50 p-6 rounded-3xl border border-border/80 relative">
+                           <div className="mb-6 flex justify-between items-end">
+                              <div>
+                                <h4 className="text-[10px] font-bold text-accent uppercase tracking-widest mb-1">Detalle del Mes</h4>
+                                <h3 className="text-xl font-black text-ink uppercase tracking-tight">{selectedReportMonth}</h3>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-[9px] font-bold text-muted uppercase tracking-widest mb-1">Total</p>
+                                <p className="text-2xl font-black text-ink tracking-tight leading-none">{formatCurrency(totalMonthExp)}</p>
+                              </div>
+                           </div>
+                           
+                           <div className="flex-1 overflow-y-auto mb-6 custom-scrollbar max-h-[300px]">
+                              {monthExpenses.length === 0 ? (
+                                 <div className="flex flex-col items-center justify-center text-center py-12 text-muted/50">
+                                   <FileText className="w-8 h-8 mb-3 opacity-20" />
+                                   <p className="text-[10px] font-bold uppercase tracking-widest">No hay registros</p>
+                                 </div>
+                              ) : (
+                                 <div className="space-y-3 pr-2">
+                                    <p className="text-[9px] font-black uppercase text-muted tracking-widest mb-2 border-b border-border/50 pb-2">Transacciones Registradas</p>
+                                    {monthExpenses.map((exp, idx) => (
+                                      <div key={idx} className="bg-white px-4 py-3 rounded-2xl border border-border flex flex-col gap-2 shadow-sm relative overflow-hidden group">
+                                        <div className={`absolute top-0 left-0 w-1 h-full ${getCategoryColor(exp.tipo)}`} />
+                                        <div className="flex justify-between items-start">
+                                           <div className="flex flex-col">
+                                              <span className="text-[10px] font-black uppercase text-ink tracking-tight mb-0.5">{exp.tipo}</span>
+                                              <span className="text-[8px] font-bold text-muted uppercase font-mono tracking-widest">Boleta/Folio: {exp.boleta || 'S/N'}</span>
+                                           </div>
+                                           <span className="text-xs font-black text-primary bg-primary/5 px-2 py-1 rounded-md">{exp.monto}</span>
+                                        </div>
+                                        {exp.link && (
+                                          <div className="pt-2 mt-1 border-t border-dashed border-border/60">
+                                            <a href={exp.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-accent hover:text-red-700 transition-colors">
+                                              <FileText className="w-3 h-3" /> Ver Adjunto PDF
+                                            </a>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                 </div>
+                              )}
+                           </div>
+
+                           {/* Email Section inside the month detail */}
+                           <div className="mt-auto pt-6 border-t border-border/60">
+                              <p className="text-[9px] font-black text-muted uppercase tracking-widest mb-3">Acciones Opcionales</p>
+                              <button 
+                                 onClick={() => sendReport(selectedProp, selectedReportMonth)}
+                                 disabled={loading || monthExpenses.length === 0}
+                                 className={`w-full py-4 rounded-xl font-black uppercase text-[10px] tracking-[0.2em] smooth-transition flex items-center justify-center gap-2 ${
+                                   loading || monthExpenses.length === 0 
+                                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none border border-transparent' 
+                                     : 'bg-gradient-to-r from-primary to-slate-900 border border-primary text-white hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-0.5 glow-hover'
+                                 }`}
+                               >
+                                 <Mail className={`w-4 h-4 ${loading ? 'animate-pulse' : ''}`} /> 
+                                 {loading ? 'Enviando Reporte...' : 'Enviar Reporte al Propietario'}
+                               </button>
+                           </div>
+
+                        </div>
+
+                      </div>
+
+                    </div>
+                  )}
+                </div>
+              </div>
+
+            </div>
+          );
+        })()}
 
         {activeModule === 'settings' && (
           <div className="max-w-6xl mx-auto py-2 animate-in fade-in slide-in-from-bottom-4 duration-500">

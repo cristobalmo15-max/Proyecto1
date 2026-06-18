@@ -442,6 +442,9 @@ app.get('/api/gmail/messages', async (req, res) => {
 
 // Serve uploads
 app.use('/uploads', express.static(UPLOADS_DIR));
+app.use('/uploads', (req, res) => {
+  res.status(404).send('File not found');
+});
 
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
