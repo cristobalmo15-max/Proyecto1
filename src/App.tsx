@@ -3542,8 +3542,8 @@ export default function App() {
                               
                               <div className={`w-full mt-2 pt-2 border-t ${isSel ? 'border-white/10' : 'border-border/60'}`}>
                                  <div className="flex justify-between w-full items-end mb-2">
-                                    <p className={`text-[9px] uppercase tracking-widest font-bold mb-0.5 ${isSel ? 'text-white/40' : 'text-muted/50'}`}>Gastos Anuales ({reportYear})</p>
-                                    <p className={`text-sm font-black tracking-tight ${isSel ? 'text-accent' : 'text-primary'}`}>
+                                    <p className={`text-[9px] uppercase tracking-widest font-bold mb-0.5 min-w-0 truncate pr-2 ${isSel ? 'text-white/40' : 'text-muted/50'}`}>Gastos Anuales ({reportYear})</p>
+                                    <p className={`text-sm font-black tracking-tight shrink-0 whitespace-nowrap ${isSel ? 'text-accent' : 'text-primary'}`}>
                                       {formatCurrency(propYearTotal)}
                                     </p>
                                  </div>
@@ -4477,7 +4477,7 @@ export default function App() {
                 </div>
                 <button
                   type="button"
-                  onClick={loginWithGoogle}
+                  onClick={loginWithGoogleScopes}
                   className="bg-amber-600 hover:bg-amber-700 text-white font-black uppercase text-[10px] tracking-widest py-3 px-6 rounded-xl transition-all shadow-md shrink-0 active:scale-95 cursor-pointer"
                 >
                   Vincular Cuenta Google
