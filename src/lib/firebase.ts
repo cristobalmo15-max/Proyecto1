@@ -2,7 +2,8 @@ import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
   GoogleAuthProvider, 
-  signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   signOut, 
   onAuthStateChanged, 
   setPersistence, 
@@ -42,11 +43,18 @@ const actionCodeSettings = {
 let cachedAccessToken: string | null = typeof window !== 'undefined' ? sessionStorage.getItem('google_access_token') : null;
 
 export const loginWithGoogle = async () => {
-    const result = await signInWithPopup(auth, googleProvider);
-    const credential = GoogleAuthProvider.credentialFromResult(result);
-    if (credential?.accessToken) {
-        cachedAccessToken = credential.accessToken;
-        sessionStorage.setItem('google_access_token', credential.accessToken);
+    // Use redirect instead of popup — more reliable in production
+    await signInWithRedirect(auth, googleProvider);
+};
+
+export const getLoginRedirectResult = async () => {
+    const result = await getRedirectResult(auth);
+    if (result) {
+        const credential = GoogleAuthProvider.credentialFromResult(result);
+        if (credential?.accessToken) {
+            cachedAccessToken = credential.accessToken;
+            sessionStorage.setItem('google_access_token', credential.accessToken);
+        }
     }
     return result;
 };
