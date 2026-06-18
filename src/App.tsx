@@ -3542,10 +3542,9 @@ export default function App() {
                               
                                <div className={`w-full mt-2 pt-2 border-t ${isSel ? 'border-white/10' : 'border-border/60'}`}>
                                  <p className={`text-[9px] uppercase tracking-widest font-bold mb-1 ${isSel ? 'text-white/40' : 'text-muted/50'}`}>Gastos Anuales ({reportYear})</p>
-                                 <p className={`text-base font-black tracking-tight w-full ${isSel ? 'text-accent' : 'text-primary'}`}>
+                                 <p className={`text-base font-black tracking-tight w-full mb-2 ${isSel ? 'text-accent' : 'text-primary'}`}>
                                    {formatCurrency(propYearTotal)}
                                  </p>
-                               </div>
                                  <div className="flex gap-1 flex-wrap">
                                     {Object.entries(propYearCats).sort((a,b)=>b[1]-a[1]).slice(0, 3).map(([cat, val]) => (
                                       <span key={cat} className={`text-[8px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 uppercase tracking-widest ${isSel ? 'bg-white/10 text-white/80' : 'bg-gray-100 text-muted'}`}>
@@ -3559,7 +3558,7 @@ export default function App() {
                                        </span>
                                     )}
                                  </div>
-                              </div>
+                               </div>
                             </button>
                           );
                         })
