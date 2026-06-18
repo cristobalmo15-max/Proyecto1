@@ -395,6 +395,7 @@ export default function App() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [emailForLogin, setEmailForLogin] = useState('');
   const [showEmailInput, setShowEmailInput] = useState(false);
+  const [hasGoogleToken, setHasGoogleToken] = useState<boolean>(() => !!localStorage.getItem('google_access_token'));
   // Filtrado de propiedades por dirección, dueño, arrendatario o aval
   const filterProperties = (propList: Property[], search: string) => {
     const s = search.toLowerCase();
@@ -595,17 +596,25 @@ export default function App() {
     });
   }, []);
 
-  // Handle redirect result after Google login (basic or with Gmail scopes)
+  // Handle redirect result after Google login (basic or with Calendar/Gmail scopes)
   useEffect(() => {
     getLoginRedirectResult().then(async (result) => {
       if (!result) return;
+
+      // Check if token was obtained (Calendar/Gmail scopes)
+      const { GoogleAuthProvider } = await import('firebase/auth');
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      const token = credential?.accessToken;
+
+      if (token) {
+        setHasGoogleToken(true);
+        showToast('Cuenta de Google vinculada con éxito ✓', 'success');
+      }
+
+      // If pending Gmail connect, also fetch emails
       const pendingGmail = sessionStorage.getItem('pendingGmailConnect');
-      if (pendingGmail === 'true') {
+      if (pendingGmail === 'true' && token) {
         sessionStorage.removeItem('pendingGmailConnect');
-        const { GoogleAuthProvider } = await import('firebase/auth');
-        const credential = GoogleAuthProvider.credentialFromResult(result);
-        const token = credential?.accessToken;
-        if (!token) return;
         try {
           const res = await fetch('/api/gmail/messages', {
             headers: { Authorization: `Bearer ${token}` }
@@ -623,7 +632,6 @@ export default function App() {
             category: 'general'
           })));
           setIsEmailConnected(true);
-          showToast('Gmail sincronizado', 'success');
         } catch (err) {
           console.error('[Gmail] Error fetching messages:', err);
         }
@@ -4462,7 +4470,7 @@ export default function App() {
             </div>
 
             {/* Check for Google Auth token */}
-            {!getAccessToken() && (
+            {!hasGoogleToken && (
               <div className="bg-amber-50 border border-amber-200 rounded-[28px] p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm">
                 <div className="flex items-start gap-3">
                   <span className="text-amber-600 text-xl mt-0.5">⚠️</span>
