@@ -66,7 +66,7 @@ import {
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { ReportModal } from './components/ReportModal';
 import { AdminPanel } from './components/AdminPanel';
-import { auth, db, storage, loginWithGoogle, getLoginRedirectResult, logout, sendAccessLink, isSignInWithEmailLink, signInWithEmailLink, getAccessToken } from './lib/firebase';
+import { auth, db, storage, loginWithGoogle, loginWithGoogleScopes, getLoginRedirectResult, logout, sendAccessLink, isSignInWithEmailLink, signInWithEmailLink, getAccessToken } from './lib/firebase';
 import { GoogleAuthProvider, onAuthStateChanged, User } from 'firebase/auth';
 import { 
   collection, 
@@ -268,40 +268,10 @@ export default function App() {
 
   const finalizeConnection = async () => {
     setShowPermissionModal(false);
-    setIsAuthenticating(true);
-    
-    try {
-        const result = await loginWithGoogle();
-        const credential = GoogleAuthProvider.credentialFromResult(result);
-        const token = credential?.accessToken;
-        
-        if (!token) throw new Error("No token");
-
-        // Fetch messages
-        const res = await fetch('/api/gmail/messages', {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        const data = await res.json();
-        const messages = data.messages || [];
-        
-        setConnectedEmail(result.user.email || customEmailInput);
-        setEmails(messages.map((m: any) => ({
-             id: m.id,
-             from: m.payload?.headers?.find((h: any) => h.name === 'From')?.value || 'Desconocido',
-             subject: m.payload?.headers?.find((h: any) => h.name === 'Subject')?.value || 'Sin asunto',
-             date: 'Hoy',
-             body: m.snippet || '',
-             read: true,
-             category: 'general'
-        })));
-        setIsEmailConnected(true);
-        showToast('Gmail sincronizado', 'success');
-    } catch (err) {
-        console.error(err);
-        showToast('Error de autenticación: ' + (err instanceof Error ? err.message : 'Error desconocido'), 'error');
-    } finally {
-        setIsAuthenticating(false);
-    }
+    // Store flag so when we come back from redirect we know to connect Gmail
+    sessionStorage.setItem('pendingGmailConnect', 'true');
+    await loginWithGoogleScopes();
+    // Page will redirect to Google — execution stops here
   };
   
   const cleanRutInput = (value: string) => {
@@ -625,9 +595,40 @@ export default function App() {
     });
   }, []);
 
-  // Handle redirect result after Google login
+  // Handle redirect result after Google login (basic or with Gmail scopes)
   useEffect(() => {
-    getLoginRedirectResult().catch((err) => {
+    getLoginRedirectResult().then(async (result) => {
+      if (!result) return;
+      const pendingGmail = sessionStorage.getItem('pendingGmailConnect');
+      if (pendingGmail === 'true') {
+        sessionStorage.removeItem('pendingGmailConnect');
+        const { GoogleAuthProvider } = await import('firebase/auth');
+        const credential = GoogleAuthProvider.credentialFromResult(result);
+        const token = credential?.accessToken;
+        if (!token) return;
+        try {
+          const res = await fetch('/api/gmail/messages', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const data = await res.json();
+          const messages = data.messages || [];
+          setConnectedEmail(result.user.email || '');
+          setEmails(messages.map((m: any) => ({
+            id: m.id,
+            from: m.payload?.headers?.find((h: any) => h.name === 'From')?.value || 'Desconocido',
+            subject: m.payload?.headers?.find((h: any) => h.name === 'Subject')?.value || 'Sin asunto',
+            date: 'Hoy',
+            body: m.snippet || '',
+            read: true,
+            category: 'general'
+          })));
+          setIsEmailConnected(true);
+          showToast('Gmail sincronizado', 'success');
+        } catch (err) {
+          console.error('[Gmail] Error fetching messages:', err);
+        }
+      }
+    }).catch((err) => {
       console.error('[Auth] Redirect result error:', err);
     });
   }, []);
