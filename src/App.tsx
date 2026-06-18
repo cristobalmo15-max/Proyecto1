@@ -29,6 +29,7 @@ import {
   ShieldCheck,
   LayoutDashboard,
   FileSearch,
+  Database,
   CopyX,
   Receipt,
   BarChart3,
@@ -389,13 +390,34 @@ export default function App() {
     emailSubject: '',
     emailTemplate: '',
     tickets: [] as any[],
-    meetings: [] as any[]
+    meetings: [] as any[],
+    activityLogs: [] as any[]
   });
   const [expenseSearch, setExpenseSearch] = useState('');
   const [selectedProp, setSelectedProp] = useState<Property | null>(null);
   const [selectedReportPropId, setSelectedReportPropId] = useState<string | null>(null);
   const [selectedReportMonth, setSelectedReportMonth] = useState<string>(MONTHS_WITH_YEAR[0]);
   const [reportsTab, setReportsTab] = useState<'details' | 'preview'>('details');
+
+  const logActivity = async (actionText: string, isMass = false, details = null) => {
+    if (!user) return;
+    const newLog = {
+      id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      action: actionText,
+      timestamp: new Date().toISOString(),
+      isMass,
+      details
+    };
+    const currentLogs = appSettings.activityLogs || [];
+    const updatedLogs = [newLog, ...currentLogs].slice(0, 100);
+    const updatedSettings = { ...appSettings, activityLogs: updatedLogs };
+    setAppSettings(updatedSettings);
+    try {
+      await setDoc(doc(db, 'settings', user.uid), updatedSettings, { merge: true });
+    } catch (e) {
+      console.error('Error logging activity:', e);
+    }
+  };
   const [selectedYearFilter, setSelectedYearFilter] = useState<string>('all');
   const [selectedReportsYear, setSelectedReportsYear] = useState<string>('all');
   const [isAdding, setIsAdding] = useState(false);
@@ -735,6 +757,9 @@ export default function App() {
       });
 
       await batch.commit();
+      const totalContracts = syncedData.length;
+      const totalAttachments = bulkFiles.length;
+      await logActivity(`Subida masiva de ${totalContracts} contratos con ${totalAttachments} archivos adjuntos`, true);
       setBulkData([]);
       setBulkFiles([]);
       showToast('Sincronización masiva completada exitosamente');
@@ -1271,10 +1296,13 @@ export default function App() {
         updatedAt: serverTimestamp()
       };
       
+      const address = formData.direccion || propData.direccion || 'Sin dirección';
       if (formData.id) {
         await updateDoc(doc(db, 'properties', formData.id), propData);
+        await logActivity(`Edición de ficha de propiedad en ${address}`);
       } else {
         await addDoc(collection(db, 'properties'), { ...propData, createdAt: serverTimestamp() });
+        await logActivity(`Creación de propiedad en ${address}`);
       }
       await fetchProperties();
       
@@ -1294,7 +1322,10 @@ export default function App() {
     try {
       setLoading(true);
       setLoadingStatus('Eliminando propiedad...');
+      const propToDelete = properties.find(p => p.id === id);
+      const address = propToDelete ? propToDelete.direccion : 'Sin dirección';
       await deleteDoc(doc(db, 'properties', id));
+      await logActivity(`Eliminación de propiedad en ${address}`);
       showToast('Propiedad eliminada correctamente');
     } catch (e: any) {
       console.error('Error deleting property:', e);
@@ -1343,6 +1374,7 @@ export default function App() {
       await updateDoc(doc(db, 'properties', selectedProp.id), {
         expenses: updatedExpenses
       });
+      await logActivity(`Registro de gasto (${expenseForm.tipo}: ${expenseForm.monto}) para ${selectedProp.direccion}`);
 
       setExpenseForm({ ...expenseForm, monto: '', boleta: '', file: null });
       showToast('Gasto registrado');
@@ -1358,12 +1390,15 @@ export default function App() {
     try {
       const prop = properties.find(p => p.id === propId);
       if (!prop) return;
+      const expense = prop.expenses?.[expenseIndex];
+      const detail = expense ? ` (${expense.tipo}: ${expense.monto})` : '';
       const updatedExpenses = [...(prop.expenses || [])];
       updatedExpenses.splice(expenseIndex, 1);
       await updateDoc(doc(db, 'properties', propId), {
         expenses: updatedExpenses,
         updatedAt: serverTimestamp()
       });
+      await logActivity(`Eliminación de gasto${detail} para ${prop.direccion}`);
       showToast('Gasto eliminado correctamente');
     } catch (e: any) {
       console.error('Error deleting expense:', e);
@@ -1397,6 +1432,7 @@ export default function App() {
         f_ini: oldTermino,
         termino: currentTermino.toISOString().split('T')[0]
       });
+      await logActivity(`Renovación de contrato para ${selectedProp.direccion}`);
       showToast('Contrato renovado');
     } catch (e) {
       showToast('Error al renovar', 'error');
@@ -2012,7 +2048,7 @@ export default function App() {
             { id: 'ai', icon: <Zap className="w-4 h-4" />, label: 'Procesador IA' },
             { id: 'reports', icon: <PieChart className="w-4 h-4" />, label: 'Reportes Mensuales' },
             { id: 'support', icon: <Calendar className="w-4 h-4" />, label: 'Soporte y Reuniones' },
-            { id: 'email', icon: <Mail className="w-4 h-4" />, label: 'Correo' },
+            { id: 'settings', icon: <Mail className="w-4 h-4" />, label: 'Correo' },
             ...(isAdmin ? [{ id: 'admin', icon: <ShieldCheck className="w-4 h-4" />, label: 'Admin Master' }] : [])
           ].map((item) => (
             <button
@@ -2112,141 +2148,161 @@ export default function App() {
 
         {activeModule === 'dashboard' && (
           <div className="space-y-8 animate-in fade-in duration-700">
-             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-               {/* Left: Property Summary - Wider for better impact */}
-               <div className="lg:col-span-8 bg-white rounded-[40px] border border-border/10 shadow-premium overflow-hidden h-fit">
-                  <div className="p-8 border-b border-border/5 flex justify-between items-center bg-bg/20">
-                     <div>
-                        <h4 className="text-[10px] font-black text-ink/20 uppercase tracking-[0.4em] font-mono">Gestión de Activos</h4>
-                        <p className="text-xl font-bold text-ink uppercase tracking-tight mt-1">Resumen de Propiedades</p>
-                     </div>
-                     <button onClick={() => setActiveModule('properties')} className="px-6 py-3 bg-ink text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-accent transition-all shadow-premium">Propiedades Activas</button>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              
+              {/* Left Column: Meetings */}
+              <div className="lg:col-span-5 bg-gradient-to-tr from-white to-gray-50/50 p-6 rounded-[32px] border border-border/15 shadow-premium space-y-6">
+                <div className="flex justify-between items-center pb-4 border-b border-border/10">
+                  <div>
+                    <span className="text-[9px] font-black text-red-600 uppercase tracking-[0.3em] font-mono">Compromisos Clave</span>
+                    <h3 className="text-base font-bold uppercase tracking-tight text-ink mt-0.5">Reuniones Clientes</h3>
                   </div>
-                  <div className="divide-y divide-border/5 overflow-hidden">
-                    {properties.slice(0, 10).map((p, i) => (
-                      <div 
-                        key={`dashboard-prop-${p.id || 'virtual'}-${i}`} 
-                        onClick={() => { setSelectedProp(p); setActiveModule('properties'); }}
-                        className="p-6 px-10 flex justify-between items-center hover:bg-bg/10 transition-all cursor-pointer group"
-                      >
-                         <div className="flex items-center gap-8 min-w-0 flex-1">
-                            <div className="w-16 h-16 bg-bg rounded-[26px] flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-500 shrink-0">
-                               <Building2 className="w-7 h-7 text-ink/20 group-hover:text-accent" />
-                            </div>
-                            <div className="min-w-0 flex-1 text-ink">
-                               <div className="flex gap-2 text-[10px] font-black text-ink uppercase tracking-[0.2em] mb-1 font-mono truncate">
-                                  <span className="truncate">{p.dueno || 'Sin Dueño'}</span>
-                                  <span className="text-ink/40">vs</span>
-                                  <span className="truncate">{p.arrendatario || 'Sin Inquilino'}</span>
-                               </div>
-                               <div className="h-6 flex items-center gap-3">
-                                  <p className="text-[8px] font-bold text-muted uppercase tracking-widest break-words">
-                                    {p.direccion || 'Sin dirección'}
-                                  </p>
-                                  {p.flagged && (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        togglePropertyFlag(p.id, true);
-                                      }}
-                                      className="text-red-500 hover:text-gray-300 p-1 rounded-md transition-all self-center shrink-0"
-                                      title="Quitar banderita"
-                                    >
-                                      <Flag className="w-3 h-3 fill-current" />
-                                    </button>
-                                  )}
-                               </div>
-                            </div>
-                         </div>
-                         <div className="text-right ml-10 shrink-0">
-                            <p className="text-xl font-bold text-ink leading-none mb-2.5">{formatMoney(p.valor, p.tipoMonto)}</p>
-                            <span className={`text-[9px] font-black uppercase tracking-[0.2em] px-4 py-1.5 rounded-full border ${isExpired(p.termino) ? 'bg-orange-500/10 text-orange-600 border-orange-500/20' : 'bg-accent/10 text-accent border-accent/20'}`}>
-                               {isExpired(p.termino) ? 'Vencido' : 'Vigente'}
+                  <button onClick={() => setActiveModule('support')} className="px-4 py-2 bg-ink hover:bg-accent text-white rounded-full text-[9px] font-black uppercase tracking-wider transition-all shadow-md">
+                    Agendar
+                  </button>
+                </div>
+                
+                {(!appSettings.meetings || appSettings.meetings.length === 0) ? (
+                  <div className="p-6 text-center bg-white rounded-2xl border border-dashed border-border/80">
+                    <p className="text-[10px] text-muted font-bold uppercase tracking-widest">Sin reuniones agendadas.</p>
+                    <p className="text-[9px] text-muted mt-1">Usa la agenda de soporte para reservar tu bloque técnico.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-1">
+                    {appSettings.meetings.map((meet: any, idx: number) => (
+                      <div key={meet.id || idx} className="bg-white p-5 rounded-2xl border border-border/60 hover:border-red-500/30 hover:shadow-sm transition-all space-y-3 flex flex-col justify-between group">
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between items-start">
+                            <span className="text-[8px] font-bold bg-green-50 text-green-600 border border-green-200/50 px-2 py-0.5 rounded-full uppercase tracking-widest font-mono">
+                              ● Confirmada
                             </span>
-                         </div>
+                            <span className="text-[8px] font-black text-red-600 uppercase tracking-widest font-mono">IMPORTANTE</span>
+                          </div>
+                          <h4 className="text-xs font-black text-ink uppercase tracking-tight truncate leading-tight group-hover:text-red-600 transition-colors">{meet.tipo}</h4>
+                          <p className="text-[10px] text-muted font-bold">📅 {meet.fecha} &nbsp;|&nbsp; 🕒 {meet.hora} Hrs</p>
+                          <p className="text-[11px] text-muted italic line-clamp-2 leading-relaxed">" {meet.duda} "</p>
+                        </div>
+                        
+                        <div className="pt-2 border-t border-dashed border-border/60 flex items-center justify-between">
+                          <a 
+                            href={meet.meetLink && meet.meetLink !== 'Pendiente de enlace' && meet.meetLink !== 'Error al generar' ? meet.meetLink : '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => {
+                              if (!meet.meetLink || meet.meetLink === 'Pendiente de enlace' || meet.meetLink === 'Error al generar') {
+                                e.preventDefault();
+                                showToast('Enlace de Meet no disponible aún', 'error');
+                              }
+                            }}
+                            className="bg-ink hover:bg-black text-white rounded-xl py-2 px-3.5 font-bold text-[9px] uppercase tracking-wider transition-all flex items-center gap-1.5"
+                          >
+                            <Video className="w-3.5 h-3.5 text-green-400" /> Entrar a Meet
+                          </a>
+                        </div>
                       </div>
                     ))}
                   </div>
-               </div>
-               
-               {/* Right: Metrics - Compact for better visibility */}
-               <div className="lg:col-span-4 space-y-4">
-                 {/* Total Inmuebles */}
-                 <div className="bg-white p-6 rounded-[28px] border border-border/10 shadow-premium group hover:-translate-y-1 transition-all flex flex-col justify-between h-[120px]">
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-bg rounded-[14px] flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner text-accent">
-                           <Building2 size={20} />
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-black text-ink/20 uppercase tracking-[0.3em] font-mono leading-none mb-1">Total</p>
-                          <p className="text-[11px] font-black text-ink uppercase tracking-tight leading-none">Inmuebles</p>
-                        </div>
-                      </div>
-                      <div className="bg-accent/10 px-2 py-1 rounded-full border border-accent/20">
-                         <p className="text-[8px] font-black text-accent uppercase tracking-widest">Activas</p>
-                      </div>
-                    </div>
-                    <div className="flex justify-end items-baseline gap-1.5">
-                      <p className="text-4xl font-bold text-ink tracking-tighter leading-none">{properties.length}</p>
-                      <span className="text-[9px] font-black text-muted uppercase">Unid.</span>
-                    </div>
-                 </div>
+                )}
+              </div>
 
-                 {/* Ingreso Bruto */}
-                 <div className="bg-ink p-6 rounded-[28px] shadow-2xl relative overflow-hidden group flex flex-col justify-between h-[120px]">
-                    <div className="absolute -top-10 -right-10 w-32 h-32 bg-accent/10 rounded-full blur-[40px]" />
-                    <div className="relative z-10 flex justify-between items-start">
-                       <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-white/5 rounded-[14px] flex items-center justify-center border border-white/5 shadow-inner text-accent">
-                             <BarChart3 size={20} />
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em] font-mono leading-none mb-1">Ingreso</p>
-                            <p className="text-[11px] font-black text-white uppercase tracking-tight leading-none">Mensual</p>
-                          </div>
-                       </div>
-                    </div>
-                    <div className="relative z-10">
-                       <div className="flex items-baseline justify-end gap-2">
-                           {(() => {
-                             const pesosTotal = properties.filter(p => !p.tipoMonto || p.tipoMonto === 'pesos').reduce((acc, p) => acc + Number(p.valor), 0);
-                             const ufTotal = properties.filter(p => p.tipoMonto === 'uf').reduce((acc, p) => acc + Number(p.valor), 0);
-                             return (
-                               <div className="flex flex-col items-end">
-                                 {pesosTotal > 0 && <span className="text-xl font-bold text-white leading-none">{formatMoney(pesosTotal, 'pesos')}</span>}
-                                 {ufTotal > 0 && <span className="text-xs font-bold text-accent leading-none mt-1">{formatMoney(ufTotal, 'uf')}</span>}
-                                 {pesosTotal === 0 && ufTotal === 0 && <span className="text-xl font-bold text-white leading-none">$0</span>}
-                               </div>
-                             );
-                           })()}
-                       </div>
-                    </div>
-                 </div>
-
-                 {/* Vencimientos */}
-                 <div className="bg-[#fffaf5] p-6 rounded-[28px] border border-[#f5e6d3] shadow-premium group transition-all flex flex-col justify-between h-[120px]">
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-white rounded-[14px] flex items-center justify-center shadow-sm border border-[#f5e6d3]/30 text-[#d97706]">
-                           <FileText size={20} />
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-black text-[#d97706]/40 uppercase tracking-[0.3em] font-mono leading-none mb-1">Alertas</p>
-                          <p className="text-[11px] font-black text-[#d97706] uppercase tracking-tight leading-none">Vencimientos</p>
-                        </div>
+              {/* Right Column: Activity log */}
+              <div className="lg:col-span-7 bg-white p-6 rounded-[32px] border border-border/10 shadow-premium space-y-6">
+                <div className="flex justify-between items-center pb-4 border-b border-border/10">
+                  <div>
+                    <span className="text-[9px] font-black text-muted uppercase tracking-[0.3em] font-mono">Bitácora Técnica</span>
+                    <h3 className="text-base font-bold uppercase tracking-tight text-ink mt-0.5">Historial de Ediciones</h3>
+                  </div>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-muted bg-gray-50 border border-border px-3 py-1 rounded-full">
+                    {user.displayName || 'Administrador'}
+                  </span>
+                </div>
+                
+                {(() => {
+                  const logs = appSettings.activityLogs || [];
+                  
+                  if (logs.length === 0) {
+                    return (
+                      <div className="p-8 text-center bg-gray-50/50 rounded-2xl border border-dashed border-border/80">
+                        <p className="text-xs text-muted font-bold uppercase tracking-widest">No hay ediciones registradas todavía.</p>
+                        <p className="text-[10px] text-muted mt-1">Las modificaciones que realices en tus propiedades se verán reflejadas aquí en tiempo real.</p>
                       </div>
+                    );
+                  }
+                  
+                  return (
+                    <div className="relative border-l border-border/80 ml-4 pl-6 space-y-6 max-h-[550px] overflow-y-auto custom-scrollbar pr-1">
+                      {logs.map((log: any, idx: number) => {
+                        let IconComponent = Pencil;
+                        let iconBg = 'bg-stone-50 border-stone-200 text-stone-600';
+                        const text = log.action.toLowerCase();
+                        
+                        if (log.isMass || text.includes('masiva')) {
+                          IconComponent = Database;
+                          iconBg = 'bg-red-50 border-red-200 text-red-600';
+                        } else if (text.includes('creación') || text.includes('creado')) {
+                          IconComponent = Plus;
+                          iconBg = 'bg-green-50 border-green-200 text-green-600';
+                        } else if (text.includes('eliminación') || text.includes('eliminado')) {
+                          IconComponent = Trash2;
+                          iconBg = 'bg-red-50 border-red-200 text-red-600';
+                        } else if (text.includes('gasto') || text.includes('expenses')) {
+                          IconComponent = Receipt;
+                          iconBg = 'bg-amber-50 border-amber-200 text-amber-600';
+                        } else if (text.includes('renovación') || text.includes('renovado')) {
+                          IconComponent = RefreshCw;
+                          iconBg = 'bg-blue-50 border-blue-200 text-blue-600';
+                        }
+                        
+                        const timeAgoStr = () => {
+                          const diffMs = Date.now() - new Date(log.timestamp).getTime();
+                          const diffMins = Math.floor(diffMs / 60000);
+                          const diffHrs = Math.floor(diffMins / 60);
+                          const diffDays = Math.floor(diffHrs / 24);
+                          
+                          if (diffMins < 1) return 'Hace unos instantes';
+                          if (diffMins < 60) return `Hace ${diffMins} min`;
+                          if (diffHrs < 24) return `Hace ${diffHrs} hrs`;
+                          return `Hace ${diffDays} días`;
+                        };
+                        
+                        return (
+                          <div key={log.id || idx} className="relative group">
+                            {/* Timeline Node Point */}
+                            <div className={`absolute -left-[38px] top-0.5 w-6.5 h-6.5 rounded-full border flex items-center justify-center shadow-xs ${iconBg} transition-transform group-hover:scale-110 z-10`}>
+                              <IconComponent className="w-3 h-3" />
+                            </div>
+                            
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-gray-50/30 border border-border/40 hover:bg-white hover:border-red-500/10 hover:shadow-xs transition-all duration-300">
+                              <div className="space-y-0.5">
+                                <p className={`text-[11px] font-bold uppercase tracking-tight text-ink ${log.isMass ? 'text-red-700 font-extrabold' : ''}`}>
+                                  {log.action}
+                                </p>
+                                <p className="text-[8px] text-muted font-bold font-mono tracking-widest uppercase">
+                                  {new Date(log.timestamp).toLocaleString('es-CL')}
+                                </p>
+                              </div>
+                              
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="text-[8px] font-bold text-muted bg-white border border-border/60 px-2 py-0.5 rounded shadow-xs">
+                                  {timeAgoStr()}
+                                </span>
+                                {log.isMass && (
+                                  <span className="text-[8px] font-black bg-red-600 text-white px-2 py-0.5 rounded shadow-xs uppercase tracking-wider">
+                                    MASIVO
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div className="flex justify-end items-baseline gap-1.5">
-                      <p className="text-4xl font-bold text-ink tracking-tighter leading-none">{properties.filter(p => isExpired(p.termino)).length}</p>
-                      <span className="text-[9px] font-black text-muted uppercase">prop.</span>
-                    </div>
-                 </div>
-               </div>
-             </div>
+                  );
+                })()}
+              </div>
+            </div>
           </div>
         )}
-
 
         {activeModule === 'properties' && (
           <div className="flex flex-col lg:flex-row h-full overflow-hidden rounded-xl lg:rounded-[24px] border border-border/10 bg-white shadow-sm relative z-10">
@@ -2354,7 +2410,7 @@ export default function App() {
                       <div className="flex justify-between items-center mb-1">
                         <span className="text-[7px] text-slate-400 font-bold uppercase">Contrato</span>
                         {p.f_ini && (
-                          <span className="text-[8px] font-black bg-red-600 text-white px-1.5 py-0.5 rounded font-mono shadow-sm">
+                          <span className="text-[11px] font-extrabold text-red-600 font-mono tracking-wider">
                             {(() => {
                               const parts = p.f_ini.split('-');
                               if (parts.length >= 2) {
@@ -3250,6 +3306,9 @@ export default function App() {
                            });
 
                            await batch.commit();
+                           const totalContracts = syncedData.length;
+                           const totalAttachments = bulkFiles.length;
+                           await logActivity(`Subida masiva de ${totalContracts} contratos con ${totalAttachments} archivos adjuntos`, true);
                            setBulkData([]);
                            setBulkFiles([]);
                            showToast('Sincronización masiva completada exitosamente');
@@ -3397,7 +3456,7 @@ export default function App() {
                       </select>
                     </div>
                     
-                    <div className="flex flex-col gap-3 overflow-y-auto pr-2 custom-scrollbar flex-1 max-h-[600px]">
+                    <div className="flex flex-col gap-3 overflow-y-auto pr-2 custom-scrollbar flex-1 max-h-[calc(100vh-230px)]">
                       {propertiesWithExpenses.length === 0 ? (
                         <div className="text-center py-10 opacity-50">
                           <p className="text-xs font-bold uppercase tracking-widest text-muted">No hay gastos</p>
@@ -3421,8 +3480,8 @@ export default function App() {
                               <div className="flex justify-between items-center w-full mb-1">
                                 <span className={`text-[7px] font-bold uppercase ${isSel ? 'text-white/50' : 'text-slate-400'}`}>Contrato</span>
                                 {p.f_ini && (
-                                  <span className={`text-[8px] font-black px-1.5 py-0.5 rounded font-mono shadow-sm ${
-                                    isSel ? 'bg-white/20 text-white' : 'bg-red-600 text-white'
+                                  <span className={`text-[11px] font-extrabold font-mono tracking-wider ${
+                                    isSel ? 'text-red-300' : 'text-red-600'
                                   }`}>
                                     {(() => {
                                       const parts = p.f_ini.split('-');
@@ -3790,22 +3849,22 @@ export default function App() {
         })()}
 
         {activeModule === 'settings' && (
-          <div className="max-w-6xl mx-auto py-2 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="max-w-7xl mx-auto py-2 animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
             {/* Context Heading */}
-            <div className="mb-8 bg-white p-6 rounded-3xl border border-border shadow-sm">
-              <h3 className="text-xl font-bold text-ink flex items-center gap-2">
+            <div className="mb-4 bg-white p-6 rounded-[28px] border border-border shadow-sm">
+              <h3 className="text-lg font-bold text-ink flex items-center gap-2">
                 <span className="p-1.5 bg-accent/10 text-accent rounded-lg flex items-center justify-center">
                   <Mail className="w-5 h-5" />
                 </span>
                 Centro de Alertas de Vencimiento para el Administrador
               </h3>
-              <p className="text-xs text-muted font-semibold mt-1 max-w-2xl leading-relaxed">
+              <p className="text-xs text-muted font-semibold mt-1 max-w-3xl leading-relaxed">
                 ¿Para qué es este correo? Este sistema **no envía correos directos a tus dueños ni arrendatarios** para evitar roces o malentendidos. En su lugar, es un **asistente automático para TI (el Administrador)**. Al conectar tu cuenta, te despachará avisos directos a tu propio correo (personal o ejecutivo) informándote con nombre y dirección qué contratos están por expirar.
               </p>
             </div>
 
             {/* Steps Stepper Indicator */}
-            <div className="grid grid-cols-4 gap-3 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
               {[
                 { step: 1, label: '1. SMTP Remitente', desc: 'De dónde se envía' },
                 { step: 2, label: '2. Correo de Destino', desc: 'Dónde lo recibes' },
@@ -3815,21 +3874,21 @@ export default function App() {
                 <button
                   key={s.step}
                   onClick={() => setCorreoStep(s.step)}
-                  className={`p-4 rounded-2xl border text-left transition-all duration-300 relative ${
+                  className={`p-3.5 rounded-2xl border text-left transition-all duration-300 relative ${
                     correoStep === s.step
-                      ? 'bg-primary text-white border-primary shadow-lg shadow-primary/10 scale-[1.02]'
+                      ? 'bg-primary text-white border-primary shadow-md scale-[1.01]'
                       : 'bg-white text-ink border-border hover:bg-gray-50'
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
+                    <span className={`w-4.5 h-4.5 rounded-full flex items-center justify-center text-[10px] font-black ${
                       correoStep === s.step ? 'bg-white text-primary' : 'bg-gray-100 text-muted'
                     }`}>
                       {s.step}
                     </span>
                     <span className="text-[10px] font-bold uppercase tracking-wide truncate">{s.label}</span>
                   </div>
-                  <p className={`text-[9px] font-medium mt-1 truncate ${
+                  <p className={`text-[8.5px] font-medium mt-1 truncate ${
                     correoStep === s.step ? 'text-white/80' : 'text-muted'
                   }`}>
                     {s.desc}
@@ -3840,21 +3899,15 @@ export default function App() {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               {/* Stepper Content Panel */}
-              <div className="lg:col-span-7 bg-white p-6 rounded-[32px] border border-border shadow-sm space-y-6">
+              <div className="lg:col-span-7 bg-white p-6 rounded-[28px] border border-border shadow-sm space-y-5">
                 {correoStep === 1 && (
                   <div className="space-y-4 animate-in fade-in duration-300">
                     <div>
-                      <h4 className="text-sm font-black uppercase text-primary mb-1">Paso 1: Configurar Correo Remitente (SMTP)</h4>
-                      <button 
-                        onClick={() => setShowReportModal(true)}
-                        className="bg-accent text-white px-4 py-2 rounded-full text-xs font-bold mb-4 flex items-center gap-2"
-                      >
-                          <FileCheck className="w-4 h-4" /> Generar Reporte
-                      </button>
-                      <p className="text-xs text-muted font-bold leading-tight">Elige el correo de origen mediante el cual la plataforma despachará los correos informativos.</p>
+                      <h4 className="text-xs font-black uppercase text-primary mb-1">Paso 1: Configurar Correo Remitente (SMTP)</h4>
+                      <p className="text-[10px] text-muted font-bold leading-tight">Elige el correo de origen mediante el cual la plataforma despachará los correos informativos.</p>
                     </div>
 
-                    <div className="flex gap-2 pb-2">
+                    <div className="flex gap-2 pb-1">
                       <button
                         onClick={() => {
                           setAppSettings({
@@ -3864,9 +3917,9 @@ export default function App() {
                           });
                           showToast('Configurado para Gmail automáticamente');
                         }}
-                        className="flex-1 py-3 px-4 rounded-xl border border-border bg-gray-50/50 hover:bg-white text-xs font-black flex items-center justify-center gap-2 transition-all hover:border-accent"
+                        className="flex-1 py-2.5 px-4 rounded-xl border border-border bg-gray-50/50 hover:bg-white text-[10px] font-black flex items-center justify-center gap-2 transition-all hover:border-accent"
                       >
-                        <span className="w-2 h-2 rounded-full bg-red-500" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
                         Gmail SMTP
                       </button>
                       <button
@@ -3878,139 +3931,77 @@ export default function App() {
                           });
                           showToast('Configurado para Outlook automáticamente');
                         }}
-                        className="flex-1 py-3 px-4 rounded-xl border border-border bg-gray-50/50 hover:bg-white text-xs font-black flex items-center justify-center gap-2 transition-all hover:border-accent"
+                        className="flex-1 py-2.5 px-4 rounded-xl border border-border bg-gray-50/50 hover:bg-white text-[10px] font-black flex items-center justify-center gap-2 transition-all hover:border-accent"
                       >
-                        <span className="w-2 h-2 rounded-full bg-red-500" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
                         Outlook SMTP
                       </button>
                     </div>
 
-                    <div className="space-y-3">
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <label className="text-[10px] font-black text-muted uppercase tracking-wider">Tu Correo Remitente (SMTP User)</label>
-                          {appSettings.smtpUser && (
-                            <span className="text-[8px] bg-green-50 text-green-600 px-2 py-0.5 rounded-md font-bold uppercase tracking-tight">
-                              Remitente Activo
-                            </span>
-                          )}
-                        </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="sm:col-span-2">
+                        <label className="text-[9px] font-black text-muted uppercase tracking-wider block mb-1">Servidor (Host)</label>
                         <input
-                          type="email"
-                          placeholder="ejemplo@correo-de-envios.com"
-                          value={appSettings.smtpUser || ''}
-                          onChange={(e) => setAppSettings({ ...appSettings, smtpUser: e.target.value })}
-                          className="w-full bg-gray-50 hover:bg-white border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent focus:ring-2 focus:ring-accent/10 transition-all font-mono"
+                          type="text"
+                          placeholder="smtp.gmail.com"
+                          value={appSettings.smtpHost || ''}
+                          onChange={(e) => setAppSettings({ ...appSettings, smtpHost: e.target.value })}
+                          className="w-full bg-gray-50 border border-border rounded-xl p-2.5 text-xs font-semibold outline-none focus:bg-white focus:border-accent font-mono"
                         />
                       </div>
-
                       <div>
-                        <label className="text-[10px] font-black text-muted uppercase tracking-wider mb-1 block">Contraseña Especial de Aplicación</label>
+                        <label className="text-[9px] font-black text-muted uppercase tracking-wider block mb-1">Puerto</label>
                         <input
-                          type="password"
-                          placeholder="•••• •••• •••• ••••"
-                          value={appSettings.smtpPass || ''}
-                          onChange={(e) => setAppSettings({ ...appSettings, smtpPass: e.target.value })}
-                          className="w-full bg-gray-50 hover:bg-white border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent focus:ring-2 focus:ring-accent/10 transition-all font-mono"
+                          type="number"
+                          placeholder="587"
+                          value={appSettings.smtpPort || ''}
+                          onChange={(e) => setAppSettings({ ...appSettings, smtpPort: e.target.value })}
+                          onKeyDown={(e) => { if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault(); }}
+                          className="w-full bg-gray-50 border border-border rounded-xl p-2.5 text-xs font-semibold outline-none focus:bg-white focus:border-accent font-mono"
                         />
                       </div>
+                    </div>
 
-                      {/* Explicit interactive tips */}
-                      {appSettings.smtpUser?.includes('@gmail.com') ? (
-                        <div className="p-4 bg-red-50/40 rounded-2xl border border-red-100 flex gap-3">
-                          <span className="w-8 h-8 rounded-full bg-red-500/15 flex items-center justify-center shrink-0">
-                            <Lock className="w-4 h-4 text-red-600" />
-                          </span>
-                          <div>
-                            <p className="text-xs font-bold text-red-800 uppercase tracking-tight mb-0.5">¿Cómo conseguir la contraseña en Gmail?</p>
-                            <p className="text-[11px] text-muted font-medium leading-relaxed">
-                              Por seguridad, Google te pide crear una contraseña especial para aplicaciones de terceros:
-                            </p>
-                            <ol className="list-decimal text-[11px] text-muted font-medium ml-4 mt-1 space-y-0.5">
-                              <li>Ve a tu Cuenta Google (Seguridad).</li>
-                              <li>Activa la "Verificación en 2 pasos" (es obligatorio).</li>
-                              <li>Abajo busca "Contraseñas de aplicación".</li>
-                              <li>Digita un nombre como "Arriendos" y copia el código de 16 caracteres.</li>
-                            </ol>
-                            <button
-                              onClick={() => window.open('https://myaccount.google.com/apppasswords', '_blank')}
-                              className="mt-2 text-[10px] font-bold text-accent hover:underline flex items-center gap-1 uppercase tracking-wider"
-                            >
-                              Abrir Configuración de Clave Google <ExternalLink className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </div>
-                      ) : (appSettings.smtpUser?.includes('@outlook.com') || appSettings.smtpUser?.includes('@hotmail.com')) ? (
-                        <div className="p-4 bg-red-50/40 rounded-2xl border border-red-100 flex gap-3">
-                          <span className="w-8 h-8 rounded-full bg-red-500/15 flex items-center justify-center shrink-0">
-                            <Lock className="w-4 h-4 text-red-600" />
-                          </span>
-                          <div>
-                            <p className="text-xs font-bold text-red-800 uppercase tracking-tight mb-0.5">¿Configuración en cuentas Microsoft?</p>
-                            <p className="text-[11px] text-muted font-medium leading-relaxed">
-                              Microsoft requiere generar una contraseña exclusiva si tienes habilitada la autenticación en dos factores en tu cuenta Outlook/Hotmail.
-                            </p>
-                            <button
-                              onClick={() => window.open('https://account.microsoft.com/security', '_blank')}
-                              className="mt-2 text-[10px] font-bold text-accent hover:underline flex items-center gap-1 uppercase tracking-wider"
-                            >
-                              Seguridad Cuenta Microsoft <ExternalLink className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="p-4 bg-gray-50 rounded-2xl border border-border flex gap-3">
-                          <span className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center shrink-0">
-                            <Settings2 className="w-4 h-4 text-gray-600" />
-                          </span>
-                          <div>
-                            <p className="text-xs font-bold text-gray-800 uppercase tracking-tight mb-0.5">Servidor SMTP Avanzado</p>
-                            <p className="text-[11px] text-muted font-medium leading-relaxed">
-                              Si tienes un correo propio corporativo o dominio personalizado, puedes especificar manualmente el host y puerto SMTP.
-                            </p>
-                            <button
-                              onClick={() => setShowAdvanced(!showAdvanced)}
-                              className="mt-2 text-[10px] font-black text-primary hover:underline uppercase tracking-widest"
-                            >
-                              {showAdvanced ? 'Ocultar Datos Técnicos' : 'Mostrar Datos Técnicos SMTP'}
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                    <div>
+                      <label className="text-[9px] font-black text-muted uppercase tracking-wider block mb-1">Usuario (Remitente)</label>
+                      <input
+                        type="email"
+                        placeholder="ejemplo@correo.com"
+                        value={appSettings.smtpUser || ''}
+                        onChange={(e) => setAppSettings({ ...appSettings, smtpUser: e.target.value })}
+                        className="w-full bg-gray-50 border border-border rounded-xl p-2.5 text-xs font-semibold outline-none focus:bg-white focus:border-accent font-mono"
+                      />
+                    </div>
 
-                      {showAdvanced && (
-                        <div className="grid grid-cols-2 gap-3 p-4 bg-gray-50 rounded-2xl border border-border animate-in fade-in duration-300">
-                          <div>
-                            <label className="text-[9px] font-black text-muted uppercase block mb-1">Dirección de Servidor SMTP</label>
-                            <input
-                              type="text"
-                              placeholder="smtp.miproveedor.com"
-                              value={appSettings.smtpHost || ''}
-                              onChange={(e) => setAppSettings({ ...appSettings, smtpHost: e.target.value })}
-                              className="w-full bg-white border border-border rounded-xl p-2.5 text-xs font-bold outline-none font-mono"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[9px] font-black text-muted uppercase block mb-1">Puerto de Envío</label>
-                            <input
-                              type="text"
-                              placeholder="587"
-                              value={appSettings.smtpPort || ''}
-                              onChange={(e) => setAppSettings({ ...appSettings, smtpPort: e.target.value })}
-                              className="w-full bg-white border border-border rounded-xl p-2.5 text-xs font-bold outline-none font-mono"
-                            />
-                          </div>
-                        </div>
-                      )}
+                    <div>
+                      <label className="text-[9px] font-black text-muted uppercase tracking-wider block mb-1">Contraseña Especial de Aplicación</label>
+                      <input
+                        type="password"
+                        placeholder="••••••••••••••••"
+                        value={appSettings.smtpPass || ''}
+                        onChange={(e) => setAppSettings({ ...appSettings, smtpPass: e.target.value })}
+                        className="w-full bg-gray-50 border border-border rounded-xl p-2.5 text-xs font-semibold outline-none focus:bg-white focus:border-accent font-mono"
+                      />
                     </div>
 
                     <div className="pt-2 flex justify-end">
                       <button
-                        onClick={() => {
-                          updateAppSettings(appSettings);
-                          setCorreoStep(2);
+                        onClick={async () => {
+                          if (!appSettings.smtpHost || !appSettings.smtpPort || !appSettings.smtpUser || !appSettings.smtpPass) {
+                            showToast('Complete todos los campos SMTP', 'error');
+                            return;
+                          }
+                          try {
+                            setLoading(true);
+                            await updateAppSettings(appSettings);
+                            setCorreoStep(2);
+                          } catch (err: any) {
+                            showToast('Error: ' + err.message, 'error');
+                          } finally {
+                            setLoading(false);
+                          }
                         }}
-                        className="bg-primary hover:bg-primary/95 text-white font-black uppercase text-[10px] tracking-widest py-3 px-6 rounded-xl transition-all"
+                        className="bg-primary hover:bg-red-700 text-white font-black uppercase text-[10px] tracking-widest py-3 px-6 rounded-xl transition-all shadow-md"
                       >
                         Guardar & Continuar Paso 2
                       </button>
@@ -4021,38 +4012,38 @@ export default function App() {
                 {correoStep === 2 && (
                   <div className="space-y-4 animate-in fade-in duration-300">
                     <div>
-                      <h4 className="text-sm font-black uppercase text-primary mb-1">Paso 2: Correo Destinatario (A dónde te llegará)</h4>
-                      <p className="text-xs text-muted font-bold leading-tight">Digita la dirección de correo personal o ejecutiva a la que quieres que te lleguen las alertas de vencimiento.</p>
+                      <h4 className="text-xs font-black uppercase text-primary mb-1">Paso 2: Correo Destinatario (A dónde te llegará)</h4>
+                      <p className="text-[10px] text-muted font-bold leading-tight">Digita la dirección de correo personal o ejecutiva a la que quieres que te lleguen las alertas de vencimiento.</p>
                     </div>
 
                     <div className="space-y-4">
                       <div className="p-4 bg-gray-50 rounded-2xl border border-border">
-                        <label className="text-[10px] font-black text-muted uppercase tracking-wider block mb-1.5">Tu Correo donde Recibirás las Alertas (Ejecutivo / Personal)</label>
+                        <label className="text-[9px] font-black text-muted uppercase tracking-wider block mb-1.5">Tu Correo donde Recibirás las Alertas (Ejecutivo / Personal)</label>
                         <input
                           type="email"
                           placeholder="tu-correo-personal-o-de-trabajo@ejemplo.com"
                           value={appSettings.reportEmail || ''}
                           onChange={(e) => setAppSettings({ ...appSettings, reportEmail: e.target.value })}
-                          className="w-full bg-white border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:border-accent font-mono"
+                          className="w-full bg-white border border-border rounded-xl p-2.5 text-xs font-semibold outline-none focus:border-accent font-mono"
                         />
-                        <p className="text-[11px] text-muted font-bold mt-2 leading-relaxed">
+                        <p className="text-[10.5px] text-muted font-bold mt-2 leading-relaxed">
                           📌 ¡Toda la información clave a tu bandeja! Cuando un contrato esté por expirar, te notificaremos aquí con el listado detallando dirección de la casa, nombre del dueño y arrendatario involucrado.
                         </p>
                       </div>
 
-                      <div className="p-4 bg-gray-50 rounded-2xl border border-border space-y-3">
-                        <label className="text-[10px] font-black text-muted uppercase tracking-wider block">Frecuencia de las Alertas del Administrador</label>
+                      <div className="p-4 bg-gray-50 rounded-2xl border border-border space-y-2">
+                        <label className="text-[9px] font-black text-muted uppercase tracking-wider block mb-1">Frecuencia de las Alertas del Administrador</label>
                         
                         <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-border">
-                          <input type="checkbox" defaultChecked disabled id="trig-1" className="w-4 h-4 text-accent border-border rounded focus:ring-accent" />
-                          <label htmlFor="trig-1" className="text-xs font-bold text-ink cursor-pointer select-none">
+                          <input type="checkbox" defaultChecked disabled className="w-3.5 h-3.5 text-accent border-border rounded focus:ring-accent" />
+                          <label className="text-xs font-bold text-ink cursor-pointer select-none">
                             Enviar reporte de contratos que vencen <span className="text-accent italic">dentro de los próximos 30 días</span>.
                           </label>
                         </div>
 
                         <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-border">
-                          <input type="checkbox" defaultChecked disabled id="trig-2" className="w-4 h-4 text-accent border-border rounded focus:ring-accent" />
-                          <label htmlFor="trig-2" className="text-xs font-bold text-ink cursor-pointer select-none">
+                          <input type="checkbox" defaultChecked disabled className="w-3.5 h-3.5 text-accent border-border rounded focus:ring-accent" />
+                          <label className="text-xs font-bold text-ink cursor-pointer select-none">
                             Enviar auditoría de contratos <span className="text-danger italic">ya vencidos sin renovar</span>.
                           </label>
                         </div>
@@ -4067,11 +4058,22 @@ export default function App() {
                         Atrás
                       </button>
                       <button
-                        onClick={() => {
-                          updateAppSettings(appSettings);
-                          setCorreoStep(3);
+                        onClick={async () => {
+                          if (!appSettings.reportEmail) {
+                            showToast('Debe configurar el correo de destino', 'error');
+                            return;
+                          }
+                          try {
+                            setLoading(true);
+                            await updateAppSettings(appSettings);
+                            setCorreoStep(3);
+                          } catch (err: any) {
+                            showToast('Error: ' + err.message, 'error');
+                          } finally {
+                            setLoading(false);
+                          }
                         }}
-                        className="bg-primary hover:bg-primary/95 text-white font-black uppercase text-[10px] tracking-widest py-3 px-6 rounded-xl transition-all"
+                        className="bg-primary hover:bg-red-700 text-white font-black uppercase text-[10px] tracking-widest py-3 px-6 rounded-xl transition-all shadow-md"
                       >
                         Guardar & Continuar Paso 3
                       </button>
@@ -4082,36 +4084,36 @@ export default function App() {
                 {correoStep === 3 && (
                   <div className="space-y-4 animate-in fade-in duration-300 w-full">
                     <div>
-                      <h4 className="text-sm font-black uppercase text-primary mb-1">Paso 3: Redacción del Mensaje de Alerta</h4>
-                      <p className="text-xs text-muted font-bold leading-tight">Configura la estructura. Usa variables dinámicas para plasmar los datos de propiedad, dueño y arrendatario automáticamente.</p>
+                      <h4 className="text-xs font-black uppercase text-primary mb-1">Paso 3: Redacción del Mensaje de Alerta</h4>
+                      <p className="text-[10px] text-muted font-bold leading-tight">Configura la estructura. Usa variables dinámicas para plasmar los datos de propiedad, dueño y arrendatario automáticamente.</p>
                     </div>
 
                     <div className="space-y-3">
                       <div>
-                        <label className="text-[10px] font-black text-muted uppercase tracking-wider mb-1 block">Asunto de la Notificación</label>
+                        <label className="text-[9px] font-black text-muted uppercase tracking-wider mb-1 block">Asunto de la Notificación</label>
                         <input
                           type="text"
                           placeholder="[Alerta Vencimiento] Propiedad: {DIRECCION} - Dueño: {DUENO}"
                           value={appSettings.emailSubject || ''}
                           onChange={(e) => setAppSettings({ ...appSettings, emailSubject: e.target.value })}
-                          className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-bold outline-none focus:border-accent"
+                          className="w-full bg-gray-50 border border-border rounded-xl p-2.5 text-xs font-bold outline-none focus:border-accent"
                         />
                       </div>
 
                       <div>
-                        <label className="text-[10px] font-black text-muted uppercase tracking-wider mb-1 block">Plantilla del Mensaje de Alerta para Administrador</label>
+                        <label className="text-[9px] font-black text-muted uppercase tracking-wider mb-1 block">Plantilla del Mensaje de Alerta</label>
                         <textarea
-                          rows={8}
-                          placeholder={`Hola,\nLe recordamos que el arriendo de {DIRECCION} del dueño {DUENO} con el inquilino {INQUILINO} vencerá pronto el {FECHA_VENCIMIENTO}...`}
+                          rows={6}
+                          placeholder={`Hola,\n\nLe recordamos que el arriendo de {DIRECCION} vencerá pronto...`}
                           value={appSettings.emailTemplate || ''}
                           onChange={(e) => setAppSettings({ ...appSettings, emailTemplate: e.target.value })}
-                          className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-medium outline-none focus:border-accent font-sans leading-relaxed text-ink h-48"
+                          className="w-full bg-gray-50 border border-border rounded-xl p-2.5 text-xs font-medium outline-none focus:border-accent font-sans leading-relaxed text-ink h-36"
                         />
                       </div>
 
                       {/* Dynamic variables list helper */}
                       <div className="p-3 bg-gray-50 rounded-2xl border border-dashed border-border">
-                        <p className="text-[9px] font-black text-muted uppercase tracking-wider mb-2">Variables Especiales Disponibles (Haz Clic para Añadir)</p>
+                        <p className="text-[8.5px] font-black text-muted uppercase tracking-wider mb-2">Variables Especiales Disponibles (Haz Clic para Añadir)</p>
                         <div className="flex flex-wrap gap-1.5">
                           {[
                             { tag: '{DIRECCION}', desc: 'Ubicación / Dirección de la casa' },
@@ -4126,9 +4128,8 @@ export default function App() {
                               onClick={() => {
                                 const currentText = appSettings.emailTemplate || '';
                                 setAppSettings({ ...appSettings, emailTemplate: currentText + ' ' + item.tag });
-                                showToast(`Variable ${item.tag} añadida al cuerpo`);
                               }}
-                              className="text-[10px] bg-white hover:bg-accent hover:text-white border border-border/80 text-ink rounded-lg px-2.5 py-1 font-mono font-bold transition-all shrink-0 flex items-center gap-1 active:scale-95"
+                              className="text-[9px] font-black bg-white hover:bg-slate-100 border border-border px-2.5 py-1 rounded-lg text-ink uppercase tracking-tight transition-all"
                               title={item.desc}
                             >
                               {item.tag}
@@ -4162,11 +4163,18 @@ export default function App() {
                         Atrás
                       </button>
                       <button
-                        onClick={() => {
-                          updateAppSettings(appSettings);
-                          setCorreoStep(4);
+                        onClick={async () => {
+                          try {
+                            setLoading(true);
+                            await updateAppSettings(appSettings);
+                            setCorreoStep(4);
+                          } catch (err: any) {
+                            showToast('Error: ' + err.message, 'error');
+                          } finally {
+                            setLoading(false);
+                          }
                         }}
-                        className="bg-primary hover:bg-primary/95 text-white font-black uppercase text-[10px] tracking-widest py-3 px-6 rounded-xl transition-all"
+                        className="bg-primary hover:bg-red-700 text-white font-black uppercase text-[10px] tracking-widest py-3 px-6 rounded-xl transition-all shadow-md"
                       >
                         Guardar & Continuar Paso 4
                       </button>
@@ -4177,52 +4185,53 @@ export default function App() {
                 {correoStep === 4 && (
                   <div className="space-y-4 animate-in fade-in duration-300">
                     <div>
-                      <h4 className="text-sm font-black uppercase text-primary mb-1">Paso 4: Probar Despacho de la Alerta</h4>
-                      <p className="text-xs text-muted font-bold leading-tight">Garantiza los flujos enviándote una alerta-informe de prueba a tu dirección de destino de inmediato.</p>
+                      <h4 className="text-xs font-black uppercase text-primary mb-1">Paso 4: Probar Despacho de la Alerta</h4>
+                      <p className="text-[10px] text-muted font-bold leading-tight">Garantiza los flujos enviándote una alerta-informe de prueba a tu dirección de destino de inmediato.</p>
                     </div>
 
-                    <div className="p-4 bg-gray-50 rounded-[24px] border border-border/60 flex items-center gap-4">
+                    <div className="p-4 bg-gray-50 rounded-[20px] border border-border/60 flex items-center gap-4">
                       <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center text-accent">
-                        <Send className="w-5 h-5" />
+                        <Send className="w-4 h-4" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-black uppercase tracking-wider text-muted">Bandeja de Entrada</p>
-                        <p className="text-sm font-extrabold text-ink leading-tight truncate">Enviar reporte unificado a mi correo</p>
+                        <p className="text-[8px] font-black uppercase tracking-wider text-muted font-mono">Bandeja de Entrada</p>
+                        <p className="text-xs font-extrabold text-ink leading-tight truncate">Enviar reporte unificado a mi correo</p>
                         <p className="text-[9px] text-muted font-bold truncate">Destino: {appSettings.reportEmail || 'Sin configurar'}</p>
                       </div>
                       <button
-                        onClick={sendTestReport}
-                        className="bg-accent hover:bg-accent/95 text-white font-black uppercase text-[9px] tracking-widest py-2.5 px-4 rounded-xl transition-all hover:scale-105 shrink-0"
+                        onClick={async () => {
+                          if (!appSettings.reportEmail) {
+                            showToast('Configura el correo destinatario primero', 'error');
+                            return;
+                          }
+                          setLoading(true);
+                          try {
+                            await sendTestReport();
+                          } catch (err: any) {
+                            showToast('Error al enviar prueba: ' + err.message, 'error');
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                        className="bg-accent hover:bg-red-700 text-white font-black uppercase text-[9px] tracking-widest py-2.5 px-4 rounded-xl transition-all hover:scale-105 shrink-0"
                       >
                         Enviar Ahora
                       </button>
                     </div>
 
                     {smtpError && (
-                      <div className="p-4 bg-red-50 text-red-950 border border-red-200 rounded-[24px] text-xs space-y-3 animate-in fade-in duration-300">
+                      <div className="p-4 bg-red-50 text-red-950 border border-red-200 rounded-[20px] text-xs space-y-3 animate-in fade-in duration-300">
                         <div className="flex items-start gap-3">
                           <span className="text-red-600 text-lg">⚠️</span>
                           <div className="space-y-1">
-                            <p className="font-black uppercase tracking-wider text-red-800 text-[10px]">Error al Despachar Alerta</p>
-                            <p className="font-bold text-[11px] leading-relaxed">{smtpError}</p>
+                            <p className="font-black uppercase tracking-wider text-red-800 text-[9px]">Error al Despachar Alerta</p>
+                            <p className="font-bold text-[10.5px] leading-relaxed">{smtpError}</p>
                           </div>
                         </div>
-                        {smtpError.toLowerCase().includes('lock') ? (
-                          <div className="bg-white p-4 rounded-2xl space-y-2 text-[11px] border border-red-200/50">
-                            <p className="font-extrabold text-red-800 uppercase tracking-wide text-[10px]">💡 Guía de Desbloqueo (Microsoft 365 / Outlook):</p>
-                            <p className="font-bold text-slate-700 leading-normal">
-                              Este error indica que Outlook ha bloqueado temporalmente los accesos automatizados SMTP para tu cuenta por seguridad. Sigue estos pasos:
-                            </p>
-                            <ol className="list-decimal pl-4.5 space-y-1.5 text-slate-600 font-semibold leading-normal">
-                              <li>Inicia sesión de forma manual en <a href="https://login.microsoftonline.com" target="_blank" rel="noopener noreferrer" className="underline font-bold text-red-600 hover:text-red-800">Microsoft Portal</a> para confirmar si te pide cambio de contraseña o verificación adicional de identidad.</li>
-                              <li>Solicita al administrador de TI/Soporte Técnico de tu empresa que habilite expresamente el check de **SMTP Autenticado** en los atributos de tu usuario de correo dentro del **Centro de Administración de Microsoft 365**.</li>
-                              <li>Si usas autenticación multifactor (MFA), crea y utiliza una **Contraseña de Aplicación** ("App Password") en vez de tu clave habitual.</li>
-                            </ol>
-                          </div>
-                        ) : smtpError.toLowerCase().includes('535') ? (
-                          <div className="bg-white p-4 rounded-2xl space-y-2 text-[11px] border border-red-200/50">
-                            <p className="font-extrabold text-red-800 uppercase tracking-wide text-[10px]">💡 Soluciones comunes para Error 535 / Autenticación:</p>
-                            <ul className="list-disc pl-4.5 space-y-1.5 text-slate-600 font-semibold leading-normal">
+                        {smtpError.toLowerCase().includes('535') ? (
+                          <div className="bg-white p-4 rounded-2xl space-y-2 text-[10.5px] border border-red-200/50 leading-relaxed font-semibold">
+                            <p className="font-extrabold text-red-800 uppercase tracking-wide text-[9px]">💡 Soluciones comunes para Error 535 / Autenticación:</p>
+                            <ul className="list-disc pl-4.5 space-y-1 text-slate-600">
                               <li>**Si es Gmail:** Tu contraseña normal está bloqueada por Google. Activa la verificación en 2 pasos de tu cuenta Google y genera una **Contraseña de Aplicación**. Configura esa clave especial en el Paso 1.</li>
                               <li>**Si es Outlook/Office 365:** El protocolo de autenticación básica SMTP suele estar inactivo por defecto bajo las políticas modernizadas de Microsoft. Pídele al administrador de TI de tu correo activar **"SMTP Autenticado"** para tu casilla.</li>
                             </ul>
@@ -4231,15 +4240,15 @@ export default function App() {
                       </div>
                     )}
 
-                    <div className="p-4 bg-gray-50 rounded-[24px] border border-border/60 flex items-center gap-4 animate-pulse">
+                    <div className="p-4 bg-gray-50 rounded-[20px] border border-border/60 flex items-center gap-4">
                       <div className="w-10 h-10 bg-green-500/10 rounded-xl flex items-center justify-center text-green-600">
-                        <CheckCircle2 className="w-5 h-5" />
+                        <CheckCircle2 className="w-4 h-4" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-black uppercase tracking-wider text-muted">Frecuencia Automática</p>
-                        <p className="text-xs font-black text-ink leading-tight">El sistema vigila y notifica en segundo plano</p>
+                        <p className="text-[8px] font-black uppercase tracking-wider text-muted font-mono">Frecuencia Automática</p>
+                        <p className="text-[11px] font-black text-ink leading-tight">El sistema vigila y notifica en segundo plano</p>
                       </div>
-                      <span className="text-[9px] text-green-600 font-extrabold bg-green-50 px-2 py-1 rounded">VIGILANDO</span>
+                      <span className="text-[8px] text-green-600 font-extrabold bg-green-50 px-2 py-0.5 rounded">VIGILANDO</span>
                     </div>
 
                     <div className="pt-4 border-t border-border flex justify-between items-center">
@@ -4251,109 +4260,103 @@ export default function App() {
                       </button>
                       
                       <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-ping" />
-                        <p className="text-[9px] font-black uppercase tracking-wider text-green-600">Servidor Automatizado Activo</p>
+                        <span className="w-2 h-2 rounded-full bg-green-500 animate-ping" />
+                        <p className="text-[8.5px] font-black uppercase tracking-wider text-green-600">Servidor Automatizado Activo</p>
                       </div>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Live Live Real-Time Interactive Mockup Preview Panel */}
+              {/* Live Preview Panel */}
               <div className="lg:col-span-5 space-y-4">
                 <div className="text-center">
-                  <span className="text-[9px] font-black text-muted uppercase tracking-[0.2em] bg-gray-100 px-3 py-1 rounded-full border border-border">VISTA PREVIA EN TU CORREO</span>
+                  <span className="text-[8.5px] font-black text-muted uppercase tracking-[0.2em] bg-gray-100 px-3 py-1 rounded-full border border-border">VISTA PREVIA EN TU CORREO</span>
                 </div>
 
-                <div className="relative bg-gradient-to-br from-gray-700 to-primary p-6 rounded-[32px] shadow-xl text-white overflow-hidden">
+                <div className="relative bg-gradient-to-br from-gray-700 to-slate-900 p-5 rounded-[24px] shadow-lg text-white overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-3xl -translate-y-6 translate-x-6" />
                   
                   {/* Mockup Top Header */}
-                  <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-red-400" />
-                      <div className="w-3 h-3 rounded-full bg-yellow-400" />
-                      <div className="w-3 h-3 rounded-full bg-green-400" />
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
+                      <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
+                      <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
                     </div>
-                    <span className="text-[10px] font-mono text-white/50 tracking-widest uppercase">CORREO ADMINISTRADOR</span>
+                    <span className="text-[9px] font-mono text-white/50 tracking-widest uppercase">CORREO ADMINISTRADOR</span>
                   </div>
 
                   {/* Envelope Header fields */}
-                  <div className="space-y-1.5 border-b border-white/10 pb-4 mb-4 text-xs font-mono">
-                    <p className="text-white/45 truncate"><span className="text-white/60 font-bold uppercase">De (Tu SMTP Remitente):</span> <span className="text-white font-semibold">{appSettings.smtpUser || 'correo-remitente-smtp@punto.cl'}</span></p>
-                    <p className="text-white/45 truncate"><span className="text-white/60 font-bold uppercase">Para (Tu Correo Destinatario):</span> <span className="text-accent-light font-bold underline">{appSettings.reportEmail || 'tu-correo-administracióndonde-recibes@correo.com'}</span></p>
-                    <p className="text-white/45 truncate"><span className="text-white/60 font-bold uppercase">Asunto de Alerta:</span> <span className="text-accent-light font-bold">
-                      {
-                        (() => {
-                          const target = properties.find(p => p.id === previewPropId) || properties[0] || {
-                            direccion: 'Av. Vitacura 2930, Depto 1402',
-                            dueno: 'Juan Carlos Pérez'
-                          };
-                          const rawSubject = appSettings.emailSubject || '[Alerta Vencimiento] Propiedad: {DIRECCION} - Dueño: {DUENO}';
-                          return rawSubject
-                            .replace(/{DIRECCION}/g, target.direccion || 'Av. Vitacura 2930, Depto 1402')
-                            .replace(/{DUENO}/g, target.dueno || 'Juan Carlos Pérez');
-                        })()
-                      }
-                    </span></p>
-                  </div>
-
-                  {/* Letter Content Simulation */}
-                  <div className="bg-white text-primary p-5 rounded-2xl min-h-[220px] shadow-inner font-sans text-[11px] leading-relaxed select-none overflow-y-auto max-h-[300px] border border-white/10">
-                    <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
-                      <span className="text-[9px] font-black text-accent bg-accent/10 px-2 py-0.5 rounded uppercase">Para el Administrador</span>
-                      <span className="text-[9px] font-mono text-muted">Aviso Interno #PP-2026</span>
-                    </div>
-
-                    <div className="whitespace-pre-wrap font-medium text-ink">
+                  <div className="space-y-1.5 border-b border-white/10 pb-3 mb-3 text-[10px] font-mono">
+                    <p className="text-white/45 truncate"><span className="text-white/60 font-bold uppercase">De:</span> <span className="text-white font-semibold">{appSettings.smtpUser || 'remitente@correo.com'}</span></p>
+                    <p className="text-white/45 truncate"><span className="text-white/60 font-bold uppercase">Para:</span> <span className="text-white font-semibold">{appSettings.reportEmail || 'destinatario@correo.com'}</span></p>
+                    <p className="text-white/45 truncate"><span className="text-white/60 font-bold uppercase">Asunto:</span> <span className="text-white font-semibold">
                       {
                         (() => {
                           const target = properties.find(p => p.id === previewPropId) || properties[0] || {
                             direccion: 'Av. Vitacura 2930, Depto 1402',
                             dueno: 'Juan Carlos Pérez',
                             arrendatario: 'Valentina Martínez',
-                            monto: 850000,
-                            vencimiento: '30/06/2026',
-                            mailD: 'juan@propietario.cl'
+                            valor: 850000,
+                            termino: '2026-06-30'
                           };
-                          const rawTemplate = appSettings.emailTemplate || `Estimado Administrador,
+                          const rawSubject = appSettings.emailSubject || '[Alerta Vencimiento] Propiedad: {DIRECCION} - Dueño: {DUENO}';
+                          return rawSubject
+                            .replace(/{INQUILINO}/g, target.arrendatario || 'Valentina Martínez')
+                            .replace(/{DIRECCION}/g, target.direccion || 'Av. Vitacura 2930, Depto 1402')
+                            .replace(/{DUENO}/g, target.dueno || 'Juan Carlos Pérez')
+                            .replace(/{VALOR}/g, `$${(Number(target.valor) || 850000).toLocaleString('cl-CL')}`)
+                            .replace(/{FECHA_VENCIMIENTO}/g, target.termino || '2026-06-30');
+                        })()
+                      }
+                    </span></p>
+                  </div>
 
-Te notificamos que el contrato de arriendo para la propiedad en {DIRECCION} está próximo a vencer.
+                  {/* Letter Content Simulation */}
+                  <div className="bg-white text-ink p-4 rounded-xl min-h-[200px] shadow-inner font-sans text-[11px] leading-relaxed select-none overflow-y-auto max-h-[260px] border border-gray-100">
+                    <div className="flex justify-between items-center mb-3 border-b border-gray-100 pb-1.5">
+                      <span className="text-[8px] font-black text-accent bg-accent/10 px-2 py-0.5 rounded uppercase">Para el Administrador</span>
+                      <span className="text-[8px] font-mono text-muted">Aviso Interno #PP-2026</span>
+                    </div>
 
-Detalles de la Gestión:
-🏠 Dirección de Propiedad: {DIRECCION}
-👤 Nombre del Dueño / Propietario: {DUENO}
-🔑 Nombre del Arrendatario / Inquilino: {INQUILINO}
-📅 Fecha exacta del Vencimiento: {FECHA_VENCIMIENTO}
-💵 Renta de Arriendo Mensual: {VALOR}
-
-Recuerda contactar al propietario y al inquilino para coordinar la renovación o entrega segura del inmueble.`;
+                    <div className="whitespace-pre-wrap font-medium text-slate-800">
+                      {
+                        (() => {
+                          const target = properties.find(p => p.id === previewPropId) || properties[0] || {
+                            direccion: 'Av. Vitacura 2930, Depto 1402',
+                            dueno: 'Juan Carlos Pérez',
+                            arrendatario: 'Valentina Martínez',
+                            valor: 850000,
+                            termino: '2026-06-30'
+                          };
+                          const rawTemplate = appSettings.emailTemplate || `Hola,\n\nTe notificamos que el contrato de arriendo para la propiedad en {DIRECCION} está próximo a vencer.\n\nDetalles de la Gestión:\n🏠 Dirección de Propiedad: {DIRECCION}\n👤 Nombre del Dueño: {DUENO}\n🔑 Nombre del Arrendatario: {INQUILINO}\n📅 Fecha del Vencimiento: {FECHA_VENCIMIENTO}\n💵 Renta de Arriendo Mensual: {VALOR}`;
 
                           return rawTemplate
                             .replace(/{INQUILINO}/g, target.arrendatario || 'Valentina Martínez')
                             .replace(/{DIRECCION}/g, target.direccion || 'Av. Vitacura 2930, Depto 1402')
                             .replace(/{DUENO}/g, target.dueno || 'Juan Carlos Pérez')
-                            .replace(/{VALOR}/g, `$${(target.monto || 850000).toLocaleString('cl-CL')}`)
-                            .replace(/{FECHA_VENCIMIENTO}/g, target.vencimiento || '30/06/2026');
+                            .replace(/{VALOR}/g, `$${(Number(target.valor) || 850000).toLocaleString('cl-CL')}`)
+                            .replace(/{FECHA_VENCIMIENTO}/g, target.termino || '2026-06-30');
                         })()
                       }
                     </div>
 
-                    <div className="mt-6 pt-4 border-t border-gray-100 flex justify-between items-center text-[9px] text-muted font-bold tracking-tight">
+                    <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center text-[8.5px] text-muted font-bold tracking-tight">
                       <p>PuntoPropiedades • Panel Administrativo</p>
-                      <p className="text-xs">🔒 Conexión Encriptada SSL</p>
+                      <p className="text-[10px]">🔒 SSL</p>
                     </div>
                   </div>
                 </div>
 
                 {/* Automation Summary Card */}
-                <div className="bg-gradient-to-tr from-gray-50 to-gray-100 p-5 rounded-3xl border border-border shadow-sm space-y-3">
-                  <h4 className="text-[10px] font-black text-ink uppercase tracking-wider flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4 text-accent" />
+                <div className="bg-gradient-to-tr from-gray-50 to-gray-100 p-4 rounded-2xl border border-border shadow-sm space-y-2">
+                  <h4 className="text-[9px] font-black text-ink uppercase tracking-wider flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-accent" />
                     Auditoría de Envíos Segura
                   </h4>
-                  <p className="text-[11px] text-muted font-medium leading-relaxed">
-                    Tus conexiones SMTP son almacenadas de forma estrictamente segura. Las transmisiones usan cifrado SSL/TLS de punto a punto, imposibilitando fugas de seguridad.
+                  <p className="text-[10px] text-muted font-medium leading-relaxed">
+                    Las conexiones SMTP son almacenadas de forma segura. Las transmisiones usan cifrado SSL/TLS, imposibilitando fugas.
                   </p>
                 </div>
               </div>
@@ -4371,29 +4374,34 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
         )}
 
         {activeModule === 'support' && (
-          <div className="max-w-6xl mx-auto py-2 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* Page Header */}
-            <div className="text-center space-y-2 mb-8 bg-white p-8 rounded-[36px] border border-border shadow-sm">
-              <span className="text-[10px] bg-accent/10 border border-accent/20 text-accent font-black tracking-widest px-4 py-1.5 rounded-full uppercase">Mesa de Ayuda & Consultorías</span>
-              <h2 className="text-3xl lg:text-4xl font-extrabold tracking-tight text-ink uppercase italic shrink-0 leading-none">Acompañamiento Técnico & Reuniones</h2>
-              <p className="text-muted font-bold text-sm max-w-xl mx-auto">
-                No queremos que seas un usuario, queremos que seas un experto. Agenda una reunión personalizada con nuestro equipo de éxito o abre un ticket prioritario con nosotros.
-              </p>
+          <div className="max-w-7xl mx-auto py-4 animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-10">
+            {/* Page Header - Restyled with a spacious layout */}
+            
+            {/* Page Header - Compact & Fluid */}
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8 border-b border-border/10 pb-6">
+              <div>
+                <span className="text-[9px] bg-red-50 border border-red-100 text-red-600 font-extrabold tracking-widest px-3 py-1 rounded-full uppercase font-mono shadow-xs">
+                  Mesa de Ayuda & Consultorías
+                </span>
+                <h2 className="text-xl lg:text-2xl font-black text-ink uppercase tracking-tight mt-1.5">
+                  Acompañamiento Técnico & Reuniones
+                </h2>
+              </div>
 
               {/* Support Module Subtab selector */}
-              <div className="flex justify-center gap-3 mt-6">
+              <div className="flex gap-2 flex-wrap">
                 {[
-                  { id: 'meetings', icon: <Calendar className="w-4 h-4" />, label: 'Asesoría & Reuniones' },
-                  { id: 'tickets', icon: <Inbox className="w-4 h-4" />, label: 'Tickets de Soporte' },
-                  { id: 'faq', icon: <Globe className="w-4 h-4" />, label: 'Centro de Ayuda / FAQ' }
+                  { id: 'meetings', icon: <Calendar className="w-4 h-4" />, label: 'Reuniones' },
+                  { id: 'tickets', icon: <Inbox className="w-4 h-4" />, label: 'Tickets' },
+                  { id: 'faq', icon: <Globe className="w-4 h-4" />, label: 'Ayuda / FAQ' }
                 ].map((tab: any) => (
                   <button
                     key={tab.id}
                     onClick={() => setSupportTab(tab.id)}
-                    className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-black uppercase text-[10px] tracking-wider transition-all duration-300 border ${
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-black uppercase text-[9px] tracking-wider transition-all duration-300 border ${
                       supportTab === tab.id
-                        ? 'bg-primary text-white border-primary shadow-lg shadow-primary/10'
-                        : 'bg-gray-50 text-muted border-border/60 hover:bg-white hover:text-ink'
+                        ? 'bg-primary text-white border-primary shadow-sm scale-[1.02]'
+                        : 'bg-gray-50 text-muted border-border/60 hover:bg-white hover:text-ink hover:border-red-500/20'
                     }`}
                   >
                     {tab.icon}
@@ -4405,11 +4413,11 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
 
             {/* TAB CONTAINER 1: MEETINGS SCHEDULE */}
             {supportTab === 'meetings' && (
-              <div className="space-y-6 animate-in fade-in duration-300">
+              <div className="space-y-8 animate-in fade-in duration-300">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                   {/* Left block - Consult types */}
-                  <div className="lg:col-span-4 space-y-4">
-                    <h3 className="text-xs font-black uppercase text-muted tracking-wider mb-2">1. Selecciona el Tipo de Reunión</h3>
+                  <div className="lg:col-span-4 space-y-6">
+                    <h3 className="text-xs font-black uppercase text-muted tracking-widest mb-4">1. Selecciona el Tipo de Reunión</h3>
                     
                     {[
                       { type: 'Capacitación de Lector IA', duration: '60 min', desc: 'Exploración profunda del procesador de contratos, optimización de variables y corrección de rutinas.', color: 'border-accent' },
@@ -4419,17 +4427,17 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
                       <button
                         key={meet.type}
                         onClick={() => setSelectedMeetingType(meet.type)}
-                        className={`w-full text-left p-5 bg-white border rounded-[28px] transition-all space-y-2 relative group hover:-translate-y-0.5 ${
+                        className={`w-full text-left p-4 md:p-5 bg-white border rounded-[24px] transition-all space-y-3 relative group hover:-translate-y-1 duration-300 ${
                           selectedMeetingType === meet.type
-                            ? `border-l-8 ${meet.color} ring-2 ring-primary/5 shadow-md`
-                            : 'border-border hover:shadow-sm'
+                            ? `border-l-8 ${meet.color} ring-4 ring-primary/5 shadow-premium`
+                            : 'border-border/60 hover:shadow-md'
                         }`}
                       >
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs font-black text-primary uppercase tracking-tight truncate max-w-[70%]">{meet.type}</span>
-                          <span className="text-[9px] bg-gray-100 text-muted font-black uppercase tracking-widest px-2 py-0.5 rounded-full">{meet.duration}</span>
+                        <div className="flex justify-between items-center gap-2">
+                          <span className="text-xs font-black text-primary uppercase tracking-tight truncate">{meet.type}</span>
+                          <span className="text-[9px] bg-gray-50 border border-border/50 text-muted font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-full shrink-0">{meet.duration}</span>
                         </div>
-                        <p className="text-[11px] text-muted font-medium leading-relaxed leading-tight">
+                        <p className="text-[11px] text-muted font-medium leading-relaxed">
                           {meet.desc}
                         </p>
                       </button>
@@ -4437,26 +4445,25 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
                   </div>
 
                   {/* Calendar booking form inside */}
-                  <div className="lg:col-span-8 bg-white p-6 rounded-[36px] border border-border shadow-sm space-y-6">
+                  <div className="lg:col-span-8 bg-white p-6 md:p-8 rounded-[28px] border border-border/10 shadow-md space-y-6">
                     <div>
-                      <h4 className="text-sm font-black uppercase text-primary mb-1">2. Fecha & Hora de la Reunión</h4>
-                      <p className="text-xs text-muted font-bold">Disponible sólo de lunes a sábado. Horarios garantizados con expertos de PuntoPropiedades.</p>
+                      <h4 className="text-sm font-black uppercase text-primary mb-1 tracking-wider">2. Fecha & Hora de la Reunión</h4>
+                      <p className="text-xs text-muted font-semibold">Disponible sólo de lunes a sábado. Horarios garantizados con expertos de PuntoPropiedades.</p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                       {/* Visual mock calendar */}
-                      <div className="space-y-2">
+                      <div className="space-y-4">
                         <label className="text-[9px] font-black uppercase text-muted tracking-widest block">Seleccionar Día (Próximos 7 días)</label>
-                        <div className="grid grid-cols-7 gap-1.5 p-3 bg-gray-50 rounded-2xl border border-border text-center font-bold text-xs">
+                        <div className="grid grid-cols-7 gap-2 p-4 bg-gray-50 rounded-2xl border border-border text-center font-bold text-xs">
                           {['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'].map(d => (
                             <span key={d} className="text-[10px] text-muted uppercase font-black py-1">{d}</span>
                           ))}
                           {(() => {
                             const cells = [];
                             const today = new Date();
-                            // Generate starting from yesterday to cover slots or show actual printable days
                             const start = new Date(today);
-                            start.setDate(today.getDate() - today.getDay()); // Start of week
+                            start.setDate(today.getDate() - today.getDay());
 
                             for (let i = 0; i < 14; i++) {
                               const d = new Date(start);
@@ -4468,16 +4475,16 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
 
                               cells.push(
                                 <button
-                                  key={`line-3052-${i}`}
+                                  key={`calendar-cell-${i}`}
                                   type="button"
                                   disabled={isSunday || isPast}
                                   onClick={() => setMeetingDate(dateStr)}
-                                  className={`aspect-square rounded-xl text-[11px] flex flex-col items-center justify-center font-bold transition-all ${
+                                  className={`aspect-square rounded-2xl text-[11px] flex flex-col items-center justify-center font-bold transition-all duration-300 ${
                                     isSelected
-                                      ? 'bg-accent text-white shadow-lg shadow-accent/20 scale-105'
+                                      ? 'bg-accent text-white shadow-lg shadow-accent/20 scale-105 border-transparent'
                                       : isSunday || isPast
                                       ? 'text-muted/20 cursor-not-allowed bg-transparent'
-                                      : 'bg-white border border-border text-ink hover:border-accent hover:text-accent'
+                                      : 'bg-white border border-border text-ink hover:border-accent hover:text-accent hover:shadow-xs'
                                   }`}
                                 >
                                   {d.getDate()}
@@ -4495,18 +4502,18 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
                       </div>
 
                       {/* Hour slots */}
-                      <div className="space-y-2">
+                      <div className="space-y-4">
                         <label className="text-[9px] font-black uppercase text-muted tracking-widest block">Horarios Disponibles (Hora Chilena)</label>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 gap-3">
                           {['09:00', '10:30', '14:30', '16:00'].map((hour) => (
                             <button
                               key={hour}
                               type="button"
                               onClick={() => setMeetingTime(hour)}
-                              className={`py-3 px-4 rounded-xl font-bold text-xs transition-all border text-center ${
+                              className={`py-4 px-4 rounded-2xl font-bold text-xs transition-all duration-300 border text-center ${
                                 meetingTime === hour
                                   ? 'bg-primary text-white border-primary shadow-md scale-[1.03]'
-                                  : 'bg-white border-border hover:border-accent text-ink'
+                                  : 'bg-white border-border hover:border-accent text-ink hover:shadow-xs'
                               }`}
                             >
                               🕒 {hour} Hrs
@@ -4521,14 +4528,14 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
                       </div>
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <label className="text-[10px] font-black uppercase text-muted tracking-widest block">¿Qué duda o requerimiento técnico tienes hoy?</label>
                       <input
                         type="text"
                         placeholder="Ej: Automatizar lectura de 50 contratos de arriendo..."
                         value={meetingReason}
                         onChange={(e) => setMeetingReason(e.target.value)}
-                        className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent"
+                        className="w-full bg-gray-50 border border-border/80 rounded-2xl p-4 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all"
                       />
                     </div>
 
@@ -4549,7 +4556,6 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
                             estado: 'Confirmada'
                           };
 
-                          // Crear evento en Calendar si está autenticado
                           const token = getAccessToken();
                           if (token) {
                             try {
@@ -4573,7 +4579,6 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
                               
                               if (meetingRes.ok) {
                                   const meetingData = await meetingRes.json();
-                                  console.log('[DEBUG] meetingData:', meetingData);
                                   newMeeting.meetLink = meetingData.hangoutLink;
                               } else {
                                   newMeeting.meetLink = 'Error al generar';
@@ -4586,20 +4591,17 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
                           }
 
                           const updatedMeetings = [newMeeting, ...(appSettings.meetings || [])];
-                          console.log('[DEBUG] Saving new meeting:', newMeeting, 'New list:', updatedMeetings);
                           const updatedSettings = { ...appSettings, meetings: updatedMeetings };
                           setAppSettings(updatedSettings);
                           await updateAppSettings(updatedSettings);
                           
                           showToast('Reunión agendada con éxito. Se ha enviado una confirmación al correo.', 'success');
-                          
-                          // No longer calling /api/send-report here as meeting email is handled in /api/create-meeting
 
                           setMeetingDate('');
                           setMeetingTime('');
                           setMeetingReason('');
                         }}
-                        className="bg-accent hover:bg-accent/95 hover:shadow-lg text-white font-black uppercase text-[10px] tracking-widest py-3.5 px-8 rounded-xl transition-all"
+                        className="bg-accent hover:bg-accent/95 hover:shadow-lg hover:shadow-accent/20 hover:-translate-y-0.5 text-white font-black uppercase text-[10px] tracking-widest py-4 px-8 rounded-xl transition-all"
                       >
                         ✓ Agendar con un solo Click
                       </button>
@@ -4608,39 +4610,39 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
                 </div>
 
                 {/* Scheduled list section */}
-                <div className="bg-white p-6 rounded-[36px] border border-border shadow-sm space-y-4">
-                  <h3 className="text-sm font-black uppercase text-primary flex items-center gap-2">
-                    <span className="w-1.5 h-[14px] bg-accent rounded" />
-                    Tus Reuniones Confirmadas ({appSettings.meetings?.length || 0})
+                <div className="bg-white p-8 md:p-10 rounded-[40px] border border-border/10 shadow-premium space-y-6">
+                  <h3 className="text-sm font-black uppercase text-primary flex items-center gap-2.5">
+                    <span className="w-2 h-4 bg-accent rounded" />
+                    Tus Reuniones Confirmadas (${appSettings.meetings?.length || 0})
                   </h3>
 
                   {(!appSettings.meetings || appSettings.meetings.length === 0) ? (
-                    <div className="p-8 text-center bg-gray-50/50 rounded-2xl border border-dashed border-border">
+                    <div className="p-10 text-center bg-gray-50/50 rounded-[28px] border border-dashed border-border/80">
                       <p className="text-xs text-muted font-bold uppercase tracking-widest">Aún no agendas reuniones técnicas para esta semana.</p>
                       <p className="text-[10px] text-muted mt-1">Usa el programador interactivo de arriba para asegurar tu bloque con un especialista.</p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {appSettings.meetings.map((meet: any, i: number) => (
-                        <div key={meet.id || `meet-${i}-${meet.fecha || 'no-date'}`} className="p-5 rounded-2xl border border-border bg-gray-50/30 hover:bg-white hover:shadow-md transition-all space-y-3 relative group">
-                          <span className="absolute top-4 right-4 text-[9px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">
-                            ● {meet.estado || 'Sin estado'}
+                        <div key={meet.id || i} className="p-6 md:p-8 rounded-[32px] border border-border bg-gray-50/30 hover:bg-white hover:shadow-premium hover:-translate-y-0.5 transition-all duration-300 space-y-4 relative group">
+                          <span className="absolute top-6 right-6 text-[9px] bg-green-50 text-green-600 px-3 py-1 rounded-full font-bold uppercase tracking-widest border border-green-200/50">
+                            ● ${meet.estado || 'Sin estado'}
                           </span>
                           <div>
-                            <span className="text-[9px] font-black uppercase tracking-wider text-accent font-mono block mb-1">PROGRAMADO CON ÉXITO</span>
-                            <h4 className="text-xs font-black text-ink uppercase tracking-tight truncate leading-tight">{meet.tipo}</h4>
-                            <p className="text-[10px] font-black text-muted uppercase mt-1">📅 {meet.fecha} &nbsp;|&nbsp; 🕒 {meet.hora} Hrs</p>
-                            <p className="text-[11px] text-muted italic mt-2 leading-snug">" {meet.duda} "</p>
+                            <span className="text-[9px] font-black uppercase tracking-widest text-accent font-mono block mb-1">PROGRAMADO CON ÉXITO</span>
+                            <h4 className="text-xs font-black text-ink uppercase tracking-tight truncate leading-tight">${meet.tipo}</h4>
+                            <p className="text-[10px] font-black text-muted uppercase mt-1">📅 ${meet.fecha} &nbsp;|&nbsp; 🕒 ${meet.hora} Hrs</p>
+                            <p className="text-[11px] text-muted italic mt-3 leading-relaxed">" ${meet.duda} "</p>
                           </div>
                           
-                          <div className="pt-2 flex justify-between items-center gap-2 border-t border-dashed border-border">
+                          <div className="pt-4 flex justify-between items-center gap-2 border-t border-dashed border-border/60">
                             <button
                               onClick={() => {
                                 window.open(meet.meetLink, '_blank');
                               }}
-                              className="bg-ink hover:bg-black text-white rounded-xl py-2 px-4 font-black text-[9px] uppercase tracking-wider transition-all flex items-center gap-1 shrink-0"
+                              className="bg-ink hover:bg-black text-white rounded-xl py-2.5 px-4 font-black text-[9px] uppercase tracking-widest transition-all flex items-center gap-1.5 shadow-sm"
                             >
-                              <Video className="w-3 h-3 text-green-400" /> Unirse a Google Meet
+                              <Video className="w-3.5 h-3.5 text-green-400" /> Unirse a Google Meet
                             </button>
 
                             <button
@@ -4651,7 +4653,7 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
                                 await updateAppSettings(updated);
                                 showToast('Reunión cancelada correctamente');
                               }}
-                              className="text-[9px] font-bold text-danger hover:underline uppercase tracking-wide shrink-0"
+                              className="text-[9px] font-bold text-danger hover:underline uppercase tracking-widest shrink-0"
                             >
                               Cancelar
                             </button>
@@ -4668,13 +4670,13 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
             {supportTab === 'tickets' && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-in fade-in duration-300">
                 {/* Send a dynamic ticket */}
-                <div className="lg:col-span-5 bg-white p-6 rounded-[36px] border border-border shadow-sm space-y-4">
+                <div className="lg:col-span-5 bg-white p-6 md:p-8 rounded-[28px] border border-border/10 shadow-md space-y-5">
                   <div>
-                    <h4 className="text-sm font-black uppercase text-primary mb-1">Abrir un Ticket Técnico</h4>
-                    <p className="text-xs text-muted font-bold leading-tight">Envíanos tu reporte de error, duda o sugerencia de forma prioritaria.</p>
+                    <h4 className="text-sm font-black uppercase text-primary mb-1 tracking-wider">Abrir un Ticket Técnico</h4>
+                    <p className="text-xs text-muted font-semibold leading-tight">Envíanos tu reporte de error, duda o sugerencia de forma prioritaria.</p>
                   </div>
 
-                  <div className="space-y-3 font-medium text-xs">
+                  <div className="space-y-4 font-medium text-xs">
                     <div>
                       <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Asunto de Incidente</label>
                       <input
@@ -4682,17 +4684,17 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
                         placeholder="Ej: Contrato no extrae el aval legal..."
                         value={ticketSubject}
                         onChange={(e) => setTicketSubject(e.target.value)}
-                        className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent"
+                        className="w-full bg-gray-50 border border-border/80 rounded-2xl p-4 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all"
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Módulo / Categoría</label>
                         <select
                           value={ticketCategory}
                           onChange={(e) => setTicketCategory(e.target.value)}
-                          className="w-full bg-gray-50 border border-border rounded-xl p-2.5 text-xs font-bold outline-none cursor-pointer"
+                          className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-bold outline-none cursor-pointer"
                         >
                           <option value="Lector IA">Lector IA</option>
                           <option value="Sincronización Correo">Sincronización Correo</option>
@@ -4705,7 +4707,7 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
                         <select
                           value={ticketPriority}
                           onChange={(e) => setTicketPriority(e.target.value)}
-                          className="w-full bg-gray-50 border border-border rounded-xl p-2.5 text-xs font-bold outline-none cursor-pointer"
+                          className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-bold outline-none cursor-pointer"
                         >
                           <option value="Alta">Alta (Crítica)</option>
                           <option value="Media">Media</option>
@@ -4721,7 +4723,7 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
                         placeholder="Digita con precisión los pasos de reproducción o detalle técnico..."
                         value={ticketMessage}
                         onChange={(e) => setTicketMessage(e.target.value)}
-                        className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-medium outline-none focus:bg-white focus:border-accent"
+                        className="w-full bg-gray-50 border border-border/80 rounded-2xl p-4 text-xs font-medium outline-none focus:bg-white focus:border-accent transition-all"
                       />
                     </div>
 
@@ -4732,7 +4734,6 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
                           return;
                         }
 
-                        // Create simulated support replies
                         let responseText = `Hola Cristóbal. Hemos recibido tu incidente en el módulo ${ticketCategory}. `;
                         if (ticketCategory === 'Lector IA') {
                           responseText += 'Nuestro modelo de Inteligencia Artificial para contratos se encuentra funcionando con normalidad. No obstante, te sugerimos verificar que el documento cuente con el texto legible en PDF. Si el contenido fue digitalizado de forma errónea o desenfocada, procesaremos un rasterizado OCR inteligente de inmediato para asegurar su extracción.';
@@ -4789,7 +4790,7 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
                         setTicketSubject('');
                         setTicketMessage('');
                       }}
-                      className="w-full bg-primary hover:bg-black text-white font-black uppercase text-[10px] tracking-widest py-3 rounded-xl transition-all"
+                      className="w-full bg-primary hover:bg-black text-white font-black uppercase text-[10px] tracking-widest py-4 rounded-2xl transition-all shadow-md"
                     >
                       Enviar Reporte Técnico
                     </button>
@@ -4797,7 +4798,7 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
                 </div>
 
                 {/* Right block: Live visual list of open tickets */}
-                <div className="lg:col-span-7 bg-white p-6 rounded-[36px] border border-border shadow-sm space-y-4">
+                <div className="lg:col-span-7 bg-white p-6 md:p-8 rounded-[28px] border border-border/10 shadow-md space-y-6">
                   <h3 className="text-sm font-black uppercase text-primary">Listado Histórico de Incidentes</h3>
 
                   {(() => {
@@ -4839,31 +4840,31 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
                     ];
 
                     return (
-                      <div className="space-y-3">
+                      <div className="space-y-4">
                         {ticketsToRender.map((ticket: any) => {
                           const isExpanded = expandedTicketId === ticket.id;
                           return (
-                            <div key={ticket.id} className="border border-border rounded-2xl overflow-hidden transition-all bg-gray-50/25 hover:bg-white hover:border-accent">
+                            <div key={ticket.id} className="border border-border/60 rounded-2xl overflow-hidden transition-all bg-gray-50/20 hover:bg-white hover:border-accent">
                               {/* Header button click */}
                               <button
                                 onClick={() => setExpandedTicketId(isExpanded ? null : ticket.id)}
-                                className="w-full text-left p-4 flex justify-between items-start gap-3"
+                                className="w-full text-left p-5 flex justify-between items-start gap-4"
                               >
-                                <div className="space-y-1 py-0.5">
-                                  <div className="flex items-center gap-2">
+                                <div className="space-y-1.5 py-0.5">
+                                  <div className="flex items-center gap-2.5">
                                     <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                                      ticket.prioridad === 'Alta' ? 'bg-red-50 text-danger' : 'bg-gray-100 text-muted'
+                                      ticket.prioridad === 'Alta' ? 'bg-red-50 text-danger border border-red-200/30' : 'bg-gray-100 text-muted border border-border/30'
                                     }`}>
                                       {ticket.prioridad}
                                     </span>
-                                    <span className="text-[9px] text-muted font-bold font-mono tracking-widest">{ticket.categoria}</span>
+                                    <span className="text-[9px] text-muted font-extrabold font-mono tracking-widest">{ticket.categoria}</span>
                                   </div>
                                   <h4 className="text-xs font-black text-ink uppercase leading-snug tracking-tight">{ticket.asunto}</h4>
                                   <p className="text-[9px] text-muted block">Abierto el: {new Date(ticket.fecha).toLocaleDateString()}</p>
                                 </div>
 
-                                <div className="flex flex-col items-end gap-1 shrink-0">
-                                  <span className={`text-[8px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider ${
+                                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                                  <span className={`text-[8px] px-2.5 py-0.5 rounded-md font-bold uppercase tracking-wider ${
                                     ticket.estado === 'Respondido' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-accent'
                                   }`}>
                                     ● {ticket.estado}
@@ -4874,34 +4875,34 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
 
                               {/* Conversation detail expanded */}
                               {isExpanded && (
-                                <div className="p-4 border-t border-border bg-white space-y-4 animate-in slide-in-from-top-2 duration-300">
+                                <div className="p-5 border-t border-border/60 bg-white space-y-5 animate-in slide-in-from-top-2 duration-300">
                                   {/* Original Doubt */}
                                   <div className="flex items-start gap-3">
-                                    <div className="w-7 h-7 bg-primary text-white font-black text-[10px] rounded-full flex items-center justify-center uppercase shrink-0">
+                                    <div className="w-8 h-8 bg-primary text-white font-black text-[10px] rounded-full flex items-center justify-center uppercase shrink-0 shadow-xs">
                                       TÚ
                                     </div>
-                                    <div className="bg-gray-50 p-3 rounded-2xl border border-border shrink-1 max-w-[85%]">
+                                    <div className="bg-gray-50 p-4 rounded-[20px] border border-border/60 max-w-[85%]">
                                       <p className="text-xs font-semibold text-ink leading-relaxed font-sans">{ticket.mensaje}</p>
-                                      <span className="text-[8px] text-muted/50 font-mono tracking-widest uppercase block mt-1">{new Date(ticket.fecha).toLocaleTimeString()}</span>
+                                      <span className="text-[8px] text-muted/50 font-mono tracking-widest uppercase block mt-1.5">{new Date(ticket.fecha).toLocaleTimeString()}</span>
                                     </div>
                                   </div>
 
                                   {/* Responses list */}
                                   {ticket.respuestas?.map((resp: any, rIdx: number) => (
                                     <div key={rIdx} className="flex items-start justify-end gap-3">
-                                      <div className="bg-red-50 p-3 rounded-2xl border border-red-100 max-w-[85%] text-right shrink-1">
+                                      <div className="bg-red-50/50 p-4 rounded-[20px] border border-red-100 max-w-[85%] text-right">
                                         <p className="text-[9px] font-mono font-black uppercase text-accent tracking-widest mb-1">{resp.remitente}</p>
                                         <p className="text-xs font-medium text-red-900 leading-relaxed font-sans text-left">{resp.mensaje}</p>
-                                        <span className="text-[8px] text-accent/40 font-mono tracking-widest uppercase block mt-1 text-right">{new Date(resp.fecha).toLocaleTimeString()}</span>
+                                        <span className="text-[8px] text-accent/40 font-mono tracking-widest uppercase block mt-1.5 text-right">{new Date(resp.fecha).toLocaleTimeString()}</span>
                                       </div>
-                                      <div className="w-7 h-7 bg-accent text-white font-black text-[9px] rounded-full flex items-center justify-center shrink-0">
+                                      <div className="w-8 h-8 bg-accent text-white font-black text-[9px] rounded-full flex items-center justify-center shrink-0 shadow-xs">
                                         {resp.avatar || 'PP'}
                                       </div>
                                     </div>
                                   ))}
 
                                   {/* Send custom message reply to continue */}
-                                  <div className="flex gap-2 pt-2 border-t border-dashed border-border">
+                                  <div className="flex gap-3 pt-3 border-t border-dashed border-border/60">
                                     <input
                                       type="text"
                                       placeholder="Digitar respuesta de seguimiento..."
@@ -4918,7 +4919,6 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
                                             fecha: new Date().toISOString()
                                           };
 
-                                          // Submitting follow up simulated text
                                           const adminReply = {
                                             remitente: 'Claudio - Soporte Técnico',
                                             avatar: 'CS',
@@ -4943,7 +4943,7 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
                                           showToast('Mensaje enviado. Respuesta coordinada.', 'success');
                                         }
                                       }}
-                                      className="flex-1 bg-gray-50 border border-border rounded-xl px-3 py-2 text-xs font-medium outline-none focus:bg-white focus:border-accent"
+                                      className="flex-1 bg-gray-50 border border-border rounded-xl px-4 py-3 text-xs font-medium outline-none focus:bg-white focus:border-accent"
                                     />
                                     <button
                                       onClick={() => {
@@ -4953,9 +4953,9 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
                                           input.dispatchEvent(e);
                                         }
                                       }}
-                                      className="p-2.5 bg-primary hover:bg-black text-white rounded-xl flex items-center justify-center shrink-0"
+                                      className="p-3 bg-primary hover:bg-black text-white rounded-xl flex items-center justify-center shrink-0 shadow-sm"
                                     >
-                                      <Send className="w-3.5 h-3.5" />
+                                      <Send className="w-4 h-4" />
                                     </button>
                                   </div>
                                 </div>
@@ -4972,14 +4972,13 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
 
             {/* TAB CONTAINER 3: FAQ KNOWLEDGE BASE */}
             {supportTab === 'faq' && (
-              <div className="max-w-4xl mx-auto bg-white p-8 rounded-[36px] border border-border shadow-sm space-y-6 animate-in fade-in duration-300">
-                <div className="text-center space-y-1">
-                  <h3 className="text-lg font-black uppercase text-primary">Centro de Respuestas Rápidas</h3>
+              <div className="max-w-4xl mx-auto bg-white p-6 md:p-8 rounded-[28px] border border-border/10 shadow-md space-y-6 animate-in fade-in duration-300">
+                <div className="text-center space-y-2">
+                  <h3 className="text-lg font-black uppercase text-primary tracking-wider">Centro de Respuestas Rápidas</h3>
                   <p className="text-xs text-muted font-bold">Obtén soluciones inmediatas y óptimas de manera directa sobre procesos críticos.</p>
                 </div>
 
-                {/* Sub accordion collapsible items wrapper */}
-                <div className="space-y-3 font-semibold text-xs">
+                <div className="space-y-4 font-semibold text-xs">
                   {[
                     {
                       q: '¿Cómo funciona la sincronización automática de arriendos por correo?',
@@ -5002,16 +5001,16 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
                       cat: 'Lector IA'
                     }
                   ].map((faq, i) => (
-                    <div key={`line-4513-${i}`} className="p-5 rounded-2xl bg-gray-50/50 border border-border/80 flex flex-col gap-2">
-                      <div className="flex justify-between items-start gap-3">
-                        <span className="text-[9px] font-mono tracking-widest font-black uppercase text-accent bg-accent/10 px-2.5 py-0.5 rounded-full shrink-0">
+                    <div key={`faq-item-${i}`} className="p-6 rounded-[24px] bg-gray-50/30 border border-border/60 hover:bg-white hover:shadow-xs transition-all flex flex-col gap-3">
+                      <div className="flex justify-between items-start gap-3 flex-wrap">
+                        <span className="text-[9px] font-mono tracking-widest font-black uppercase text-accent bg-accent/10 px-3 py-1 rounded-full shrink-0">
                           {faq.cat}
                         </span>
                         <h4 className="text-xs font-black text-ink uppercase leading-snug tracking-tight flex-1">
                           {faq.q}
                         </h4>
                       </div>
-                      <p className="text-[11px] text-muted font-medium leading-relaxed mt-1 font-sans">
+                      <p className="text-[11px] text-muted font-semibold leading-relaxed mt-1 font-sans">
                         {faq.a}
                       </p>
                     </div>
@@ -5021,7 +5020,8 @@ Recuerda contactar al propietario y al inquilino para coordinar la renovación o
             )}
           </div>
         )}
-      </main>
+
+        </main>
 
       <AnimatePresence>
         {previewData && (
