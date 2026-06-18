@@ -127,7 +127,24 @@ app.post('/api/create-meeting', async (req, res) => {
               from: (smtpConfig?.user || process.env.SMTP_FROM || process.env.SMTP_USER),
               to: recipientEmail,
               subject: `Reunión Confirmada: ${title}`,
-              text: `Se ha agendado una nueva reunión:\n\nAsunto: ${title}\nInicio: ${start}\nFin: ${end}\n\nLink de unión: ${meetLink}\n\nNota: ${description || 'Sin descripción'}`
+              text: `Se ha agendado una nueva reunión:\n\nAsunto: ${title}\nInicio: ${start}\nFin: ${end}\n\nLink de unión: ${meetLink}\n\nNota: ${description || 'Sin descripción'}`,
+              html: `
+                <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px; background-color: #f9f9f9;">
+                  <h2 style="color: #d32f2f; border-bottom: 2px solid #d32f2f; padding-bottom: 10px;">Reunión Confirmada</h2>
+                  <p>Se ha agendado una nueva reunión:</p>
+                  <table style="width: 100%; margin: 20px 0;">
+                    <tr><td style="padding: 5px 0;"><strong>Asunto:</strong></td><td style="padding: 5px 0;">${title}</td></tr>
+                    <tr><td style="padding: 5px 0;"><strong>Inicio:</strong></td><td style="padding: 5px 0;">${start}</td></tr>
+                    <tr><td style="padding: 5px 0;"><strong>Fin:</strong></td><td style="padding: 5px 0;">${end}</td></tr>
+                  </table>
+                  <p style="text-align: center; margin: 30px 0;">
+                    <a href="${meetLink}" style="padding: 12px 24px; background-color: #d32f2f; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: bold;">Unirse a Google Meet</a>
+                  </p>
+                  <p><strong>Nota:</strong> ${description ? description.replace(/\n/g, '<br>') : 'Sin descripción'}</p>
+                  <hr style="border: 0; border-top: 1px solid #ddd; margin: 25px 0 15px;">
+                  <p style="font-size: 13px; color: #555;">Atentamente,<br><strong>Punto Propiedades</strong></p>
+                </div>
+              `
             });
             console.log(`[Email] Notification sent to ${recipientEmail}`);
         } catch (emailErr) {

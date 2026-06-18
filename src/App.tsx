@@ -4566,19 +4566,27 @@ export default function App() {
                       const seenEmails = new Set();
 
                       properties.forEach(p => {
-                        if (p.dueno && p.mailD && p.mailD.trim()) {
-                          const email = p.mailD.trim().toLowerCase();
-                          if (!seenEmails.has(email)) {
-                            seenEmails.add(email);
-                            clientsList.push({ name: p.dueno, email: p.mailD.trim(), role: 'Propietario' });
-                          }
+                        if (p.dueno && !p.dueno.toLowerCase().includes('aval') && p.mailD && p.mailD.trim()) {
+                          const nombres = p.dueno.split(',').map(s => s.trim());
+                          const mails = p.mailD.split(',').map(s => s.trim());
+                          nombres.forEach((nombre, i) => {
+                            const email = mails[i];
+                            if (nombre && email && !seenEmails.has(email.toLowerCase())) {
+                              seenEmails.add(email.toLowerCase());
+                              clientsList.push({ name: nombre, email: email, role: 'Propietario' });
+                            }
+                          });
                         }
-                        if (p.arrendatario && p.mailA && p.mailA.trim()) {
-                          const email = p.mailA.trim().toLowerCase();
-                          if (!seenEmails.has(email)) {
-                            seenEmails.add(email);
-                            clientsList.push({ name: p.arrendatario, email: p.mailA.trim(), role: 'Arrendatario' });
-                          }
+                        if (p.arrendatario && !p.arrendatario.toLowerCase().includes('aval') && p.mailA && p.mailA.trim()) {
+                          const nombres = p.arrendatario.split(',').map(s => s.trim());
+                          const mails = p.mailA.split(',').map(s => s.trim());
+                          nombres.forEach((nombre, i) => {
+                            const email = mails[i];
+                            if (nombre && email && !seenEmails.has(email.toLowerCase())) {
+                              seenEmails.add(email.toLowerCase());
+                              clientsList.push({ name: nombre, email: email, role: 'Arrendatario' });
+                            }
+                          });
                         }
                       });
 
@@ -4600,7 +4608,7 @@ export default function App() {
                             const isSel = selectedClientEmail === client.email;
                             return (
                               <button
-                                key={`client-btn-${idx}`}
+                                key={client.email}
                                 type="button"
                                 onClick={() => {
                                   setSelectedClientEmail(client.email);
@@ -4666,15 +4674,15 @@ export default function App() {
                 )}
 
                 <div className="space-y-4 pt-2 border-t border-dashed border-border/60">
-                  <h4 className="text-[10px] font-black uppercase text-muted tracking-widest">2. Detalles de Asesoría</h4>
+                  <h4 className="text-[10px] font-black uppercase text-muted tracking-widest">2. Detalles de la Reunión</h4>
                   
                   {/* Meeting Type Selector */}
                   <div className="space-y-2">
                     {[
-                      { type: 'Capacitación de Lector IA', duration: '60 min', desc: 'Exploración profunda del procesador de contratos, optimización de variables y corrección de rutinas.', color: 'border-accent' },
-                      { type: 'Automatización de Envíos SMTP', duration: '45 min', desc: 'Te ayudamos a enlazar tu correo corporativo y estructurar tus avisos para eliminar rebotes de cobranza.', color: 'border-green-500' },
-                      { type: 'Migración Masiva de Portafolio', duration: '30 min', desc: 'Asistencia técnica directa para subir todo tu listado histórico de contratos desde planillas o carpetas.', color: 'border-yellow-500' },
-                      { type: 'Reunión General / Consulta Técnica', duration: '30 min', desc: 'Resolución de dudas generales de uso de la plataforma o nuevas ideas para tu negocio.', color: 'border-blue-500' }
+                      { type: 'Revisión de Gastos', duration: '30 min', desc: 'Análisis detallado de los gastos de la propiedad para tu revisión.', color: 'border-blue-500' },
+                      { type: 'Revisión de Contrato', duration: '45 min', desc: 'Revisión de cláusulas, términos y condiciones del contrato de arriendo.', color: 'border-purple-500' },
+                      { type: 'Revisión de Propiedad', duration: '30 min', desc: 'Discusión sobre el estado, reparaciones o mejoras de tu propiedad.', color: 'border-amber-500' },
+                      { type: 'Otros', duration: '30 min', desc: 'Otros temas de interés relacionados con la gestión de tus propiedades.', color: 'border-slate-500' }
                     ].map((meet) => (
                       <button
                         key={meet.type}
@@ -4698,10 +4706,10 @@ export default function App() {
                   </div>
 
                   <div>
-                    <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Duda o requerimiento técnico</label>
+                    <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Motivo o Notas de la Reunión</label>
                     <input
                       type="text"
-                      placeholder="Ej: Revisar arriendos cargados..."
+                      placeholder="Ej: Revisar estado de cuenta..."
                       value={meetingReason}
                       onChange={(e) => setMeetingReason(e.target.value)}
                       className="w-full bg-gray-50 border border-border/80 rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent"
@@ -4771,20 +4779,27 @@ export default function App() {
                   <div className="space-y-4">
                     <label className="text-[9px] font-black uppercase text-muted tracking-widest block">Horarios Disponibles (Hora Chilena)</label>
                     <div className="grid grid-cols-2 gap-2.5">
-                      {['09:00', '10:30', '14:30', '16:00'].map((hour) => (
-                        <button
-                          key={`meetings-hour-${hour}`}
-                          type="button"
-                          onClick={() => setMeetingTime(hour)}
-                          className={`py-3.5 px-3 rounded-2xl font-bold text-xs transition-all border text-center cursor-pointer ${
-                            meetingTime === hour
-                              ? 'bg-primary text-white border-primary shadow-sm scale-[1.02]'
-                              : 'bg-white border-border hover:border-accent text-ink hover:shadow-xs'
-                          }`}
-                        >
-                          🕒 {hour} Hrs
-                        </button>
-                      ))}
+                      {['09:00', '10:30', '14:30', '16:00'].map((hour) => {
+                        const slotDate = new Date(meetingDate + 'T' + hour);
+                        const isPast = slotDate < new Date();
+                        return (
+                          <button
+                            key={`meetings-hour-${hour}`}
+                            type="button"
+                            disabled={isPast || !meetingDate}
+                            onClick={() => setMeetingTime(hour)}
+                            className={`py-3.5 px-3 rounded-2xl font-bold text-xs transition-all border text-center cursor-pointer ${
+                              isPast || !meetingDate
+                                ? 'opacity-30 cursor-not-allowed bg-gray-100'
+                                : meetingTime === hour
+                                ? 'bg-primary text-white border-primary shadow-sm scale-[1.02]'
+                                : 'bg-white border-border hover:border-accent text-ink hover:shadow-xs'
+                            }`}
+                          >
+                            🕒 {hour} Hrs
+                          </button>
+                        );
+                      })}
                     </div>
                     {meetingTime ? (
                       <p className="text-[10px] text-accent font-black uppercase tracking-wider text-right">Hora: {meetingTime} Hrs</p>
