@@ -54,10 +54,15 @@ export const loginWithGoogle = async () => {
   }
 };
 
-// Extended login for Gmail/Calendar — uses redirect
+// Extended login for Gmail/Calendar scopes — popup for immediate result
 export const loginWithGoogleScopes = async () => {
-  sessionStorage.setItem('pendingGmailConnect', 'true');
-  await signInWithRedirect(auth, googleProviderWithScopes);
+  const result = await signInWithPopup(auth, googleProviderWithScopes);
+  const credential = GoogleAuthProvider.credentialFromResult(result);
+  if (credential?.accessToken) {
+    cachedAccessToken = credential.accessToken;
+    localStorage.setItem('google_access_token', credential.accessToken);
+  }
+  return result;
 };
 
 export const getLoginRedirectResult = async () => {
