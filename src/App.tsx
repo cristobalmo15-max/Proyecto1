@@ -4483,7 +4483,24 @@ export default function App() {
                 </div>
                 <button
                   type="button"
-                  onClick={loginWithGoogleScopes}
+                  onClick={async () => {
+                    try {
+                      const result = await loginWithGoogleScopes();
+                      const { GoogleAuthProvider } = await import('firebase/auth');
+                      const credential = GoogleAuthProvider.credentialFromResult(result);
+                      if (credential?.accessToken) {
+                        setHasGoogleToken(true);
+                        showToast('✓ Cuenta de Google vinculada correctamente', 'success');
+                      } else {
+                        showToast('No se obtuvieron permisos de Calendar. Intenta de nuevo.', 'error');
+                      }
+                    } catch (err: any) {
+                      if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+                        console.error('[Google Calendar]', err);
+                        showToast('Error al vincular Google: ' + (err.message || 'Error desconocido'), 'error');
+                      }
+                    }
+                  }}
                   className="bg-amber-600 hover:bg-amber-700 text-white font-black uppercase text-[10px] tracking-widest py-3 px-6 rounded-xl transition-all shadow-md shrink-0 active:scale-95 cursor-pointer"
                 >
                   Vincular Cuenta Google
