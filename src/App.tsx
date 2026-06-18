@@ -245,7 +245,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [impersonatedUid, setImpersonatedUid] = useState<string | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
-  const [activeModule, setActiveModule] = useState<'dashboard' | 'properties' | 'ai' | 'expenses' | 'reports' | 'support' | 'settings' | 'email' | 'admin'>('dashboard');
+  const [activeModule, setActiveModule] = useState<'dashboard' | 'properties' | 'ai' | 'expenses' | 'reports' | 'support' | 'meetings' | 'settings' | 'email' | 'admin'>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isEmailConnected, setIsEmailConnected] = useState(false);
   const [connectedEmail, setConnectedEmail] = useState('');
@@ -545,7 +545,7 @@ export default function App() {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   // New states for interactive Support and Correo settings
-  const [supportTab, setSupportTab] = useState<'meetings' | 'tickets' | 'faq'>('meetings');
+  const [supportTab, setSupportTab] = useState<'tickets' | 'faq'>('tickets');
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketCategory, setTicketCategory] = useState('Lector IA');
   const [ticketPriority, setTicketPriority] = useState('Alta');
@@ -557,6 +557,12 @@ export default function App() {
   const [meetingTime, setMeetingTime] = useState('');
   const [meetingReason, setMeetingReason] = useState('');
   const [linkSent, setLinkSent] = useState(false);
+  const [clientSearchQuery, setClientSearchQuery] = useState('');
+  const [selectedClientEmail, setSelectedClientEmail] = useState('');
+  const [selectedClientName, setSelectedClientName] = useState('');
+  const [manualGuestEmail, setManualGuestEmail] = useState('');
+  const [manualGuestName, setManualGuestName] = useState('');
+  const [isManualGuest, setIsManualGuest] = useState(false);
 
   const [correoStep, setCorreoStep] = useState<number>(1);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -2047,7 +2053,8 @@ export default function App() {
             { id: 'properties', icon: <Building2 className="w-4 h-4" />, label: 'Propiedades Activas' },
             { id: 'ai', icon: <Zap className="w-4 h-4" />, label: 'Procesador IA' },
             { id: 'reports', icon: <PieChart className="w-4 h-4" />, label: 'Reportes Mensuales' },
-            { id: 'support', icon: <Calendar className="w-4 h-4" />, label: 'Soporte y Reuniones' },
+            { id: 'meetings', icon: <Video className="w-4 h-4" />, label: 'Reuniones & Meet' },
+            { id: 'support', icon: <Headset className="w-4 h-4" />, label: 'Mesa de Soporte' },
             { id: 'settings', icon: <Mail className="w-4 h-4" />, label: 'Correo' },
             ...(isAdmin ? [{ id: 'admin', icon: <ShieldCheck className="w-4 h-4" />, label: 'Admin Master' }] : [])
           ].map((item) => (
@@ -2095,9 +2102,9 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <main className={`flex-1 flex flex-col ${activeModule === 'properties' ? 'overflow-hidden' : 'overflow-y-auto'} ${activeModule === 'properties' ? 'p-3 md:p-6' : activeModule === 'settings' || activeModule === 'support' || activeModule === 'admin' ? 'p-6 pt-4' : 'p-8'} relative`}>
+      <main className={`flex-1 flex flex-col ${activeModule === 'properties' ? 'overflow-hidden' : 'overflow-y-auto'} ${activeModule === 'properties' ? 'p-3 md:p-6' : activeModule === 'settings' || activeModule === 'support' || activeModule === 'meetings' || activeModule === 'admin' ? 'p-6 pt-4' : 'p-8'} relative`}>
         {activeModule !== 'properties' && activeModule !== 'ai' && activeModule !== 'reports' && (
-          <header className={`flex justify-between items-center ${activeModule === 'settings' || activeModule === 'support' || activeModule === 'admin' ? 'mb-4' : 'mb-8'}`}>
+          <header className={`flex justify-between items-center ${activeModule === 'settings' || activeModule === 'support' || activeModule === 'meetings' || activeModule === 'admin' ? 'mb-4' : 'mb-8'}`}>
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-gradient-to-tr from-red-600 to-red-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-accent/20">
                 <Building2 className="w-6 h-6" />
@@ -2108,7 +2115,8 @@ export default function App() {
                   {/* {activeModule === 'email' && 'Centro de Comunicaciones'} */}
                   {activeModule === 'ai' && 'Motor de Inteligencia'}
                   {activeModule === 'reports' && 'Reportes Mensuales'}
-                  {activeModule === 'support' && 'Soporte y Agenda'}
+                  {activeModule === 'support' && 'Mesa de Soporte'}
+                  {activeModule === 'meetings' && 'Reuniones & Calendario'}
                   {activeModule === 'settings' && 'Correo'}
                   {activeModule === 'admin' && 'Administración Master'}
                 </h2>
@@ -4391,7 +4399,7 @@ export default function App() {
               {/* Support Module Subtab selector */}
               <div className="flex gap-2 flex-wrap">
                 {[
-                  { id: 'meetings', icon: <Calendar className="w-4 h-4" />, label: 'Reuniones' },
+                  
                   { id: 'tickets', icon: <Inbox className="w-4 h-4" />, label: 'Tickets' },
                   { id: 'faq', icon: <Globe className="w-4 h-4" />, label: 'Ayuda / FAQ' }
                 ].map((tab: any) => (
@@ -4412,261 +4420,6 @@ export default function App() {
             </div>
 
             {/* TAB CONTAINER 1: MEETINGS SCHEDULE */}
-            {supportTab === 'meetings' && (
-              <div className="space-y-8 animate-in fade-in duration-300">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                  {/* Left block - Consult types */}
-                  <div className="lg:col-span-4 space-y-6">
-                    <h3 className="text-xs font-black uppercase text-muted tracking-widest mb-4">1. Selecciona el Tipo de Reunión</h3>
-                    
-                    {[
-                      { type: 'Capacitación de Lector IA', duration: '60 min', desc: 'Exploración profunda del procesador de contratos, optimización de variables y corrección de rutinas.', color: 'border-accent' },
-                      { type: 'Automatización de Envíos SMTP', duration: '45 min', desc: 'Te ayudamos a enlazar tu correo corporativo y estructurar tus avisos para eliminar rebotes de cobranza.', color: 'border-green-500' },
-                      { type: 'Migración Masiva de Portafolio', duration: '30 min', desc: 'Asistencia técnica directa para subir todo tu listado histórico de contratos desde planillas o carpetas.', color: 'border-yellow-500' }
-                    ].map((meet) => (
-                      <button
-                        key={meet.type}
-                        onClick={() => setSelectedMeetingType(meet.type)}
-                        className={`w-full text-left p-4 md:p-5 bg-white border rounded-[24px] transition-all space-y-3 relative group hover:-translate-y-1 duration-300 ${
-                          selectedMeetingType === meet.type
-                            ? `border-l-8 ${meet.color} ring-4 ring-primary/5 shadow-premium`
-                            : 'border-border/60 hover:shadow-md'
-                        }`}
-                      >
-                        <div className="flex justify-between items-center gap-2">
-                          <span className="text-xs font-black text-primary uppercase tracking-tight truncate">{meet.type}</span>
-                          <span className="text-[9px] bg-gray-50 border border-border/50 text-muted font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-full shrink-0">{meet.duration}</span>
-                        </div>
-                        <p className="text-[11px] text-muted font-medium leading-relaxed">
-                          {meet.desc}
-                        </p>
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Calendar booking form inside */}
-                  <div className="lg:col-span-8 bg-white p-6 md:p-8 rounded-[28px] border border-border/10 shadow-md space-y-6">
-                    <div>
-                      <h4 className="text-sm font-black uppercase text-primary mb-1 tracking-wider">2. Fecha & Hora de la Reunión</h4>
-                      <p className="text-xs text-muted font-semibold">Disponible sólo de lunes a sábado. Horarios garantizados con expertos de PuntoPropiedades.</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      {/* Visual mock calendar */}
-                      <div className="space-y-4">
-                        <label className="text-[9px] font-black uppercase text-muted tracking-widest block">Seleccionar Día (Próximos 7 días)</label>
-                        <div className="grid grid-cols-7 gap-2 p-4 bg-gray-50 rounded-2xl border border-border text-center font-bold text-xs">
-                          {['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'].map(d => (
-                            <span key={d} className="text-[10px] text-muted uppercase font-black py-1">{d}</span>
-                          ))}
-                          {(() => {
-                            const cells = [];
-                            const today = new Date();
-                            const start = new Date(today);
-                            start.setDate(today.getDate() - today.getDay());
-
-                            for (let i = 0; i < 14; i++) {
-                              const d = new Date(start);
-                              d.setDate(start.getDate() + i);
-                              const isSunday = d.getDay() === 0;
-                              const isPast = d < today && d.toDateString() !== today.toDateString();
-                              const dateStr = d.toISOString().split('T')[0];
-                              const isSelected = meetingDate === dateStr;
-
-                              cells.push(
-                                <button
-                                  key={`calendar-cell-${i}`}
-                                  type="button"
-                                  disabled={isSunday || isPast}
-                                  onClick={() => setMeetingDate(dateStr)}
-                                  className={`aspect-square rounded-2xl text-[11px] flex flex-col items-center justify-center font-bold transition-all duration-300 ${
-                                    isSelected
-                                      ? 'bg-accent text-white shadow-lg shadow-accent/20 scale-105 border-transparent'
-                                      : isSunday || isPast
-                                      ? 'text-muted/20 cursor-not-allowed bg-transparent'
-                                      : 'bg-white border border-border text-ink hover:border-accent hover:text-accent hover:shadow-xs'
-                                  }`}
-                                >
-                                  {d.getDate()}
-                                </button>
-                              );
-                            }
-                            return cells;
-                          })()}
-                        </div>
-                        {meetingDate ? (
-                          <p className="text-[11px] text-accent font-black uppercase tracking-wider text-right">Día: {meetingDate}</p>
-                        ) : (
-                          <p className="text-[10px] text-danger font-bold tracking-tight text-right italic">Debe seleccionar un día válido</p>
-                        )}
-                      </div>
-
-                      {/* Hour slots */}
-                      <div className="space-y-4">
-                        <label className="text-[9px] font-black uppercase text-muted tracking-widest block">Horarios Disponibles (Hora Chilena)</label>
-                        <div className="grid grid-cols-2 gap-3">
-                          {['09:00', '10:30', '14:30', '16:00'].map((hour) => (
-                            <button
-                              key={hour}
-                              type="button"
-                              onClick={() => setMeetingTime(hour)}
-                              className={`py-4 px-4 rounded-2xl font-bold text-xs transition-all duration-300 border text-center ${
-                                meetingTime === hour
-                                  ? 'bg-primary text-white border-primary shadow-md scale-[1.03]'
-                                  : 'bg-white border-border hover:border-accent text-ink hover:shadow-xs'
-                              }`}
-                            >
-                              🕒 {hour} Hrs
-                            </button>
-                          ))}
-                        </div>
-                        {meetingTime ? (
-                          <p className="text-[11px] text-accent font-black uppercase tracking-wider text-right">Hora: {meetingTime} Hrs</p>
-                        ) : (
-                          <p className="text-[10px] text-danger font-bold tracking-tight text-right italic">Debe elegir un horario</p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <label className="text-[10px] font-black uppercase text-muted tracking-widest block">¿Qué duda o requerimiento técnico tienes hoy?</label>
-                      <input
-                        type="text"
-                        placeholder="Ej: Automatizar lectura de 50 contratos de arriendo..."
-                        value={meetingReason}
-                        onChange={(e) => setMeetingReason(e.target.value)}
-                        className="w-full bg-gray-50 border border-border/80 rounded-2xl p-4 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all"
-                      />
-                    </div>
-
-                    <div className="pt-2 flex justify-end">
-                      <button
-                        onClick={async () => {
-                          if (!meetingDate || !meetingTime) {
-                            showToast('Por favor, selecciona fecha y hora en los paneles de arriba', 'error');
-                            return;
-                          }
-                          let newMeeting = {
-                            id: `meet-${Date.now()}`,
-                            tipo: selectedMeetingType,
-                            fecha: meetingDate,
-                            hora: meetingTime,
-                            duda: meetingReason || 'Dudas generales en la plataforma',
-                            meetLink: '',
-                            estado: 'Confirmada'
-                          };
-
-                          const token = getAccessToken();
-                          if (token) {
-                            try {
-                              const meetingRes = await fetch('/api/create-meeting', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                                body: JSON.stringify({
-                                  title: `Reunión: ${newMeeting.tipo}`,
-                                  description: newMeeting.duda,
-                                  start: new Date(newMeeting.fecha + 'T' + newMeeting.hora).toISOString(),
-                                  end: new Date(new Date(newMeeting.fecha + 'T' + newMeeting.hora).getTime() + 60 * 60 * 1000).toISOString(),
-                                  recipientEmail: appSettings.reportEmail || 'cristobalmo15@gmail.com',
-                                  smtpConfig: {
-                                    host: appSettings.smtpHost,
-                                    port: appSettings.smtpPort,
-                                    user: appSettings.smtpUser,
-                                    pass: appSettings.smtpPass
-                                  }
-                                })
-                              });
-                              
-                              if (meetingRes.ok) {
-                                  const meetingData = await meetingRes.json();
-                                  newMeeting.meetLink = meetingData.hangoutLink;
-                              } else {
-                                  newMeeting.meetLink = 'Error al generar';
-                              }
-                            } catch (e) {
-                              newMeeting.meetLink = 'Error al generar';
-                            }
-                          } else {
-                            newMeeting.meetLink = 'Pendiente de enlace';
-                          }
-
-                          const updatedMeetings = [newMeeting, ...(appSettings.meetings || [])];
-                          const updatedSettings = { ...appSettings, meetings: updatedMeetings };
-                          setAppSettings(updatedSettings);
-                          await updateAppSettings(updatedSettings);
-                          
-                          showToast('Reunión agendada con éxito. Se ha enviado una confirmación al correo.', 'success');
-
-                          setMeetingDate('');
-                          setMeetingTime('');
-                          setMeetingReason('');
-                        }}
-                        className="bg-accent hover:bg-accent/95 hover:shadow-lg hover:shadow-accent/20 hover:-translate-y-0.5 text-white font-black uppercase text-[10px] tracking-widest py-4 px-8 rounded-xl transition-all"
-                      >
-                        ✓ Agendar con un solo Click
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Scheduled list section */}
-                <div className="bg-white p-8 md:p-10 rounded-[40px] border border-border/10 shadow-premium space-y-6">
-                  <h3 className="text-sm font-black uppercase text-primary flex items-center gap-2.5">
-                    <span className="w-2 h-4 bg-accent rounded" />
-                    Tus Reuniones Confirmadas (${appSettings.meetings?.length || 0})
-                  </h3>
-
-                  {(!appSettings.meetings || appSettings.meetings.length === 0) ? (
-                    <div className="p-10 text-center bg-gray-50/50 rounded-[28px] border border-dashed border-border/80">
-                      <p className="text-xs text-muted font-bold uppercase tracking-widest">Aún no agendas reuniones técnicas para esta semana.</p>
-                      <p className="text-[10px] text-muted mt-1">Usa el programador interactivo de arriba para asegurar tu bloque con un especialista.</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {appSettings.meetings.map((meet: any, i: number) => (
-                        <div key={meet.id || i} className="p-6 md:p-8 rounded-[32px] border border-border bg-gray-50/30 hover:bg-white hover:shadow-premium hover:-translate-y-0.5 transition-all duration-300 space-y-4 relative group">
-                          <span className="absolute top-6 right-6 text-[9px] bg-green-50 text-green-600 px-3 py-1 rounded-full font-bold uppercase tracking-widest border border-green-200/50">
-                            ● ${meet.estado || 'Sin estado'}
-                          </span>
-                          <div>
-                            <span className="text-[9px] font-black uppercase tracking-widest text-accent font-mono block mb-1">PROGRAMADO CON ÉXITO</span>
-                            <h4 className="text-xs font-black text-ink uppercase tracking-tight truncate leading-tight">${meet.tipo}</h4>
-                            <p className="text-[10px] font-black text-muted uppercase mt-1">📅 ${meet.fecha} &nbsp;|&nbsp; 🕒 ${meet.hora} Hrs</p>
-                            <p className="text-[11px] text-muted italic mt-3 leading-relaxed">" ${meet.duda} "</p>
-                          </div>
-                          
-                          <div className="pt-4 flex justify-between items-center gap-2 border-t border-dashed border-border/60">
-                            <button
-                              onClick={() => {
-                                window.open(meet.meetLink, '_blank');
-                              }}
-                              className="bg-ink hover:bg-black text-white rounded-xl py-2.5 px-4 font-black text-[9px] uppercase tracking-widest transition-all flex items-center gap-1.5 shadow-sm"
-                            >
-                              <Video className="w-3.5 h-3.5 text-green-400" /> Unirse a Google Meet
-                            </button>
-
-                            <button
-                              onClick={async () => {
-                                const remain = appSettings.meetings.filter((m: any) => m.id !== meet.id);
-                                const updated = { ...appSettings, meetings: remain };
-                                setAppSettings(updated);
-                                await updateAppSettings(updated);
-                                showToast('Reunión cancelada correctamente');
-                              }}
-                              className="text-[9px] font-bold text-danger hover:underline uppercase tracking-widest shrink-0"
-                            >
-                              Cancelar
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* TAB CONTAINER 2: INCIDENT TICKETS */}
             {supportTab === 'tickets' && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-in fade-in duration-300">
                 {/* Send a dynamic ticket */}
@@ -4960,6 +4713,424 @@ export default function App() {
                                   </div>
                                 </div>
                               )}
+        {activeModule === 'meetings' && (
+          <div className="max-w-7xl mx-auto py-2 animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
+            {/* Header: Compacto */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 border-b border-border/10 pb-5">
+              <div>
+                <span className="text-[9px] bg-red-50 border border-red-100 text-red-600 font-extrabold tracking-widest px-3 py-1.5 rounded-full uppercase font-mono shadow-xs">
+                  Gestión de Reuniones
+                </span>
+                <h2 className="text-xl lg:text-2xl font-black text-ink uppercase tracking-tight mt-1.5">
+                  Reuniones & Calendario
+                </h2>
+              </div>
+            </div>
+
+            {/* Check for Google Auth token */}
+            {!getAccessToken() && (
+              <div className="bg-amber-50 border border-amber-200 rounded-[28px] p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <span className="text-amber-600 text-xl mt-0.5">⚠️</span>
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-amber-800 tracking-wider">Conexión con Google requerida</h4>
+                    <p className="text-[11px] text-amber-700 font-semibold leading-relaxed mt-0.5">
+                      Para sincronizar con Google Calendar y generar el enlace de Google Meet automáticamente, debes vincular tu cuenta.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={loginWithGoogle}
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-black uppercase text-[10px] tracking-widest py-3 px-6 rounded-xl transition-all shadow-md shrink-0 active:scale-95 cursor-pointer"
+                >
+                  Vincular Cuenta Google
+                </button>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Left Column: Client Selector & Guest Details */}
+              <div className="lg:col-span-5 bg-white p-6 rounded-[28px] border border-border shadow-sm space-y-5">
+                <div>
+                  <h4 className="text-xs font-black uppercase text-primary mb-1 tracking-wider">1. Seleccionar Invitado</h4>
+                  <p className="text-[10px] text-muted font-bold leading-tight">Busca un cliente (propietario o arrendatario) o agrega uno de forma manual.</p>
+                </div>
+
+                {/* Guest Type Toggle Button */}
+                <div className="flex bg-gray-100 p-1 rounded-xl border border-border">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsManualGuest(false);
+                      setSelectedClientEmail('');
+                      setSelectedClientName('');
+                    }}
+                    className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-300 cursor-pointer ${
+                      !isManualGuest ? 'bg-white text-primary shadow-sm' : 'text-muted hover:text-ink'
+                    }`}
+                  >
+                    Buscar Cliente
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsManualGuest(true);
+                      setSelectedClientEmail('');
+                      setSelectedClientName('');
+                    }}
+                    className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-300 cursor-pointer ${
+                      isManualGuest ? 'bg-white text-primary shadow-sm' : 'text-muted hover:text-ink'
+                    }`}
+                  >
+                    Invitado Manual
+                  </button>
+                </div>
+
+                {!isManualGuest ? (
+                  <div className="space-y-4">
+                    {/* Client Search input */}
+                    <div className="relative">
+                      <Search className="absolute left-3.5 top-3.5 w-4 h-4 text-muted" />
+                      <input
+                        type="text"
+                        placeholder="Buscar cliente por nombre..."
+                        value={clientSearchQuery}
+                        onChange={(e) => setClientSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-border rounded-xl text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all"
+                      />
+                    </div>
+
+                    {/* Client search list */}
+                    {(() => {
+                      // Extract unique clients
+                      const clientsList = [];
+                      const seenEmails = new Set();
+
+                      properties.forEach(p => {
+                        if (p.dueno && p.mailD && p.mailD.trim()) {
+                          const email = p.mailD.trim().toLowerCase();
+                          if (!seenEmails.has(email)) {
+                            seenEmails.add(email);
+                            clientsList.push({ name: p.dueno, email: p.mailD.trim(), role: 'Propietario', phone: p.telD || '' });
+                          }
+                        }
+                        if (p.arrendatario && p.mailA && p.mailA.trim()) {
+                          const email = p.mailA.trim().toLowerCase();
+                          if (!seenEmails.has(email)) {
+                            seenEmails.add(email);
+                            clientsList.push({ name: p.arrendatario, email: p.mailA.trim(), role: 'Arrendatario', phone: p.telA || '' });
+                          }
+                        }
+                      });
+
+                      const filtered = clientsList.filter(c => 
+                        c.name.toLowerCase().includes(clientSearchQuery.toLowerCase())
+                      );
+
+                      if (filtered.length === 0) {
+                        return (
+                          <div className="text-center py-6 border border-dashed border-border/80 rounded-2xl bg-gray-50/20">
+                            <p className="text-[10px] text-muted font-bold uppercase tracking-widest">No se encontraron clientes</p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="flex flex-col gap-2 max-h-[200px] overflow-y-auto pr-1 custom-scrollbar">
+                          {filtered.map((client, idx) => {
+                            const isSel = selectedClientEmail === client.email;
+                            return (
+                              <button
+                                key={`client-btn-${idx}`}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedClientEmail(client.email);
+                                  setSelectedClientName(client.name);
+                                }}
+                                className={`w-full text-left p-3 rounded-xl border flex justify-between items-center transition-all cursor-pointer ${
+                                  isSel
+                                    ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                                    : 'bg-white border-border hover:bg-slate-50'
+                                }`}
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-[11px] font-black uppercase tracking-tight truncate">{client.name}</p>
+                                  <p className={`text-[9px] font-medium truncate ${isSel ? 'text-white/60' : 'text-muted'}`}>{client.email}</p>
+                                </div>
+                                <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full shrink-0 ${
+                                  isSel 
+                                    ? 'bg-white/15 text-white' 
+                                    : client.role === 'Propietario' 
+                                    ? 'bg-red-50 text-red-600 border border-red-200/50' 
+                                    : 'bg-green-50 text-green-600 border border-green-200/50'
+                                }`}>
+                                  {client.role}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+
+                    {selectedClientEmail && (
+                      <div className="p-4 bg-slate-50 border border-border rounded-2xl space-y-1 animate-in fade-in duration-300">
+                        <span className="text-[8px] font-black bg-slate-200 text-slate-800 px-2 py-0.5 rounded uppercase tracking-wider">Cliente Seleccionado</span>
+                        <p className="text-xs font-black text-ink uppercase mt-1.5">{selectedClientName}</p>
+                        <p className="text-[10px] text-muted font-mono leading-tight">{selectedClientEmail}</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-[9px] font-black text-muted uppercase tracking-widest block mb-1">Nombre del Invitado</label>
+                      <input
+                        type="text"
+                        placeholder="Ej: Cristóbal Muñoz"
+                        value={manualGuestName}
+                        onChange={(e) => setManualGuestName(e.target.value)}
+                        className="w-full bg-gray-50 border border-border/80 rounded-xl p-2.5 text-xs font-semibold outline-none focus:bg-white focus:border-accent"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-black text-muted uppercase tracking-widest block mb-1">Correo Electrónico</label>
+                      <input
+                        type="email"
+                        placeholder="ejemplo@correo.com"
+                        value={manualGuestEmail}
+                        onChange={(e) => setManualGuestEmail(e.target.value)}
+                        className="w-full bg-gray-50 border border-border/80 rounded-xl p-2.5 text-xs font-semibold outline-none focus:bg-white focus:border-accent font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-4 pt-2 border-t border-dashed border-border/60">
+                  <h4 className="text-[10px] font-black uppercase text-muted tracking-widest">2. Detalles de Asesoría</h4>
+                  
+                  {/* Meeting Type Selector */}
+                  <div className="space-y-2">
+                    {[
+                      { type: 'Capacitación de Lector IA', duration: '60 min', desc: 'Exploración profunda del procesador de contratos, optimización de variables y corrección de rutinas.', color: 'border-accent' },
+                      { type: 'Automatización de Envíos SMTP', duration: '45 min', desc: 'Te ayudamos a enlazar tu correo corporativo y estructurar tus avisos para eliminar rebotes de cobranza.', color: 'border-green-500' },
+                      { type: 'Migración Masiva de Portafolio', duration: '30 min', desc: 'Asistencia técnica directa para subir todo tu listado histórico de contratos desde planillas o carpetas.', color: 'border-yellow-500' },
+                      { type: 'Reunión General / Consulta Técnica', duration: '30 min', desc: 'Resolución de dudas generales de uso de la plataforma o nuevas ideas para tu negocio.', color: 'border-blue-500' }
+                    ].map((meet) => (
+                      <button
+                        key={meet.type}
+                        type="button"
+                        onClick={() => setSelectedMeetingType(meet.type)}
+                        className={`w-full text-left p-4 bg-white border rounded-2xl transition-all space-y-1 relative group hover:-translate-y-0.5 duration-300 cursor-pointer ${
+                          selectedMeetingType === meet.type
+                            ? `border-l-6 ${meet.color} ring-2 ring-primary/5 shadow-sm`
+                            : 'border-border hover:shadow-xs'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center gap-2">
+                          <span className="text-[10px] font-black text-ink uppercase tracking-tight truncate leading-tight group-hover:text-red-600 transition-colors">{meet.type}</span>
+                          <span className="text-[8px] bg-slate-100 border border-border/50 text-muted font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-full shrink-0">{meet.duration}</span>
+                        </div>
+                        <p className="text-[10px] text-muted font-medium leading-relaxed">
+                          {meet.desc}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Duda o requerimiento técnico</label>
+                    <input
+                      type="text"
+                      placeholder="Ej: Revisar arriendos cargados..."
+                      value={meetingReason}
+                      onChange={(e) => setMeetingReason(e.target.value)}
+                      className="w-full bg-gray-50 border border-border/80 rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Calendar Slots & Submission */}
+              <div className="lg:col-span-7 bg-white p-6 rounded-[28px] border border-border shadow-sm space-y-6">
+                <div>
+                  <h4 className="text-xs font-black uppercase text-primary mb-1 tracking-wider">3. Fecha & Hora de la Reunión</h4>
+                  <p className="text-[10px] text-muted font-bold leading-tight">Disponible de lunes a sábado en horario de oficina. Sincronización Meet en tiempo real.</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Visual calendar */}
+                  <div className="space-y-4">
+                    <label className="text-[9px] font-black uppercase text-muted tracking-widest block">Seleccionar Día (Próximos 7 días)</label>
+                    <div className="grid grid-cols-7 gap-1.5 p-3.5 bg-gray-50 rounded-2xl border border-border text-center font-bold text-xs">
+                      {['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'].map(d => (
+                        <span key={d} className="text-[9px] text-muted uppercase font-black py-1">{d}</span>
+                      ))}
+                      {(() => {
+                        const cells = [];
+                        const today = new Date();
+                        const start = new Date(today);
+                        start.setDate(today.getDate() - today.getDay());
+
+                        for (let i = 0; i < 14; i++) {
+                          const d = new Date(start);
+                          d.setDate(start.getDate() + i);
+                          const isSunday = d.getDay() === 0;
+                          const isPast = d < today && d.toDateString() !== today.toDateString();
+                          const dateStr = d.toISOString().split('T')[0];
+                          const isSelected = meetingDate === dateStr;
+
+                          cells.push(
+                            <button
+                              key={`meetings-calendar-cell-${i}`}
+                              type="button"
+                              disabled={isSunday || isPast}
+                              onClick={() => setMeetingDate(dateStr)}
+                              className={`aspect-square rounded-xl text-[10.5px] flex flex-col items-center justify-center font-bold transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'bg-accent text-white shadow-md scale-105 border-transparent'
+                                  : isSunday || isPast
+                                  ? 'text-muted/20 cursor-not-allowed bg-transparent'
+                                  : 'bg-white border border-border text-ink hover:border-accent hover:text-accent hover:shadow-xs'
+                              }`}
+                            >
+                              {d.getDate()}
+                            </button>
+                          );
+                        }
+                        return cells;
+                      })()}
+                    </div>
+                    {meetingDate ? (
+                      <p className="text-[10px] text-accent font-black uppercase tracking-wider text-right">Día: {meetingDate}</p>
+                    ) : (
+                      <p className="text-[9.5px] text-danger font-bold tracking-tight text-right italic">Debe seleccionar un día válido</p>
+                    )}
+                  </div>
+
+                  {/* Hour slots */}
+                  <div className="space-y-4">
+                    <label className="text-[9px] font-black uppercase text-muted tracking-widest block">Horarios Disponibles (Hora Chilena)</label>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {['09:00', '10:30', '14:30', '16:00'].map((hour) => (
+                        <button
+                          key={`meetings-hour-${hour}`}
+                          type="button"
+                          onClick={() => setMeetingTime(hour)}
+                          className={`py-3.5 px-3 rounded-2xl font-bold text-xs transition-all border text-center cursor-pointer ${
+                            meetingTime === hour
+                              ? 'bg-primary text-white border-primary shadow-sm scale-[1.02]'
+                              : 'bg-white border-border hover:border-accent text-ink hover:shadow-xs'
+                          }`}
+                        >
+                          🕒 {hour} Hrs
+                        </button>
+                      ))}
+                    </div>
+                    {meetingTime ? (
+                      <p className="text-[10px] text-accent font-black uppercase tracking-wider text-right">Hora: {meetingTime} Hrs</p>
+                    ) : (
+                      <p className="text-[9.5px] text-danger font-bold tracking-tight text-right italic">Debe elegir un horario</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-dashed border-border/60 flex flex-col gap-4">
+                  <button
+                    onClick={async () => {
+                      const guestEmail = isManualGuest ? manualGuestEmail : selectedClientEmail;
+                      const guestName = isManualGuest ? manualGuestName : selectedClientName;
+
+                      if (!guestEmail) {
+                        showToast('Por favor, selecciona un cliente o ingresa el correo del invitado', 'error');
+                        return;
+                      }
+                      if (!meetingDate || !meetingTime) {
+                        showToast('Por favor, selecciona fecha y hora en el panel de la derecha', 'error');
+                        return;
+                      }
+
+                      let newMeeting = {
+                        id: `meet-${Date.now()}`,
+                        tipo: selectedMeetingType,
+                        fecha: meetingDate,
+                        hora: meetingTime,
+                        duda: meetingReason || 'Dudas generales en la plataforma',
+                        meetLink: '',
+                        estado: 'Confirmada',
+                        invitado: `${guestName || 'Invitado'} (${guestEmail})`
+                      };
+
+                      const token = getAccessToken();
+                      setLoading(true);
+                      setLoadingStatus('Agendando reunión en Google Calendar y Meet...');
+                      setProgress(30);
+
+                      try {
+                        if (token) {
+                          const meetingRes = await fetch('/api/create-meeting', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify({
+                              title: `Reunión: ${newMeeting.tipo}`,
+                              description: `${newMeeting.duda}\nInvitado: ${newMeeting.invitado}`,
+                              start: new Date(newMeeting.fecha + 'T' + newMeeting.hora).toISOString(),
+                              end: new Date(new Date(newMeeting.fecha + 'T' + newMeeting.hora).getTime() + 60 * 60 * 1000).toISOString(),
+                              recipientEmail: guestEmail,
+                              smtpConfig: {
+                                host: appSettings.smtpHost,
+                                port: appSettings.smtpPort,
+                                user: appSettings.smtpUser,
+                                pass: appSettings.smtpPass
+                              }
+                            })
+                          });
+                          
+                          setProgress(70);
+                          if (meetingRes.ok) {
+                              const meetingData = await meetingRes.json();
+                              newMeeting.meetLink = meetingData.hangoutLink || '';
+                              showToast('Reunión agendada en Google Calendar y Meet con éxito. Enlace generado.', 'success');
+                          } else {
+                              newMeeting.meetLink = 'Error al generar';
+                              showToast('Reunión registrada localmente, pero falló la vinculación Google API.', 'error');
+                          }
+                        } else {
+                          newMeeting.meetLink = 'Pendiente de enlace';
+                          showToast('Reunión guardada localmente. Vincula tu cuenta de Google para generar el enlace Meet.', 'success');
+                        }
+
+                        const updatedMeetings = [newMeeting, ...(appSettings.meetings || [])];
+                        const updatedSettings = { ...appSettings, meetings: updatedMeetings };
+                        setAppSettings(updatedSettings);
+                        await updateAppSettings(updatedSettings);
+
+                        // Reset fields
+                        setMeetingDate('');
+                        setMeetingTime('');
+                        setMeetingReason('');
+                        setManualGuestEmail('');
+                        setManualGuestName('');
+                        setSelectedClientEmail('');
+                        setSelectedClientName('');
+                        setClientSearchQuery('');
+                      } catch (e) {
+                        console.error('Error scheduling meeting:', e);
+                        showToast('Error al agendar la reunión', 'error');
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    className="w-full bg-accent hover:bg-red-700 hover:shadow-lg hover:shadow-accent/20 text-white font-black uppercase text-xs tracking-widest py-4.5 rounded-2xl transition-all shadow-md cursor-pointer text-center"
+                  >
+                    ✓ Agendar y Crear Google Meet
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+    
                             </div>
                           );
                         })}
