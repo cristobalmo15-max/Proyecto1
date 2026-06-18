@@ -24,27 +24,38 @@ setPersistence(auth, browserSessionPersistence);
 
 export const db = getFirestore(app, 'ai-studio-3855d0b1-99e2-4f40-9ff5-b39b8506c4a7');
 export const storage = getStorage(app, firebaseConfig.storageBucket);
+
+// Provider for basic login — NO sensitive scopes (works in production without app verification)
 export const googleProvider = new GoogleAuthProvider();
-googleProvider.addScope('https://www.googleapis.com/auth/gmail.readonly');
-googleProvider.addScope('https://www.googleapis.com/auth/calendar.events');
 googleProvider.setCustomParameters({ 
-  prompt: 'select_account login',
-  display: 'popup'
+  prompt: 'select_account'
+});
+
+// Provider for Gmail/Calendar — only used when user explicitly connects their inbox
+export const googleProviderWithScopes = new GoogleAuthProvider();
+googleProviderWithScopes.addScope('https://www.googleapis.com/auth/gmail.readonly');
+googleProviderWithScopes.addScope('https://www.googleapis.com/auth/calendar.events');
+googleProviderWithScopes.setCustomParameters({ 
+  prompt: 'select_account'
 });
 
 // Configuración para el link de acceso por email
 const actionCodeSettings = {
-  url: window.location.href, // Redirigir de vuelta a esta misma página
+  url: window.location.href,
   handleCodeInApp: true,
 };
-
 
 // Variable para cachear el token en memoria con respaldo en sessionStorage
 let cachedAccessToken: string | null = typeof window !== 'undefined' ? sessionStorage.getItem('google_access_token') : null;
 
+// Basic login — redirects to Google, no restricted scopes
 export const loginWithGoogle = async () => {
-    // Use redirect instead of popup — more reliable in production
     await signInWithRedirect(auth, googleProvider);
+};
+
+// Extended login with Gmail/Calendar scopes — only when user connects inbox
+export const loginWithGoogleScopes = async () => {
+    await signInWithRedirect(auth, googleProviderWithScopes);
 };
 
 export const getLoginRedirectResult = async () => {
