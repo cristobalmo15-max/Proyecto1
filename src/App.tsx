@@ -66,7 +66,7 @@ import {
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { ReportModal } from './components/ReportModal';
 import { AdminPanel } from './components/AdminPanel';
-import { auth, db, storage, loginWithGoogle, logout, sendAccessLink, isSignInWithEmailLink, signInWithEmailLink, getAccessToken } from './lib/firebase';
+import { auth, db, storage, loginWithGoogle, getLoginRedirectResult, logout, sendAccessLink, isSignInWithEmailLink, signInWithEmailLink, getAccessToken } from './lib/firebase';
 import { GoogleAuthProvider, onAuthStateChanged, User } from 'firebase/auth';
 import { 
   collection, 
@@ -622,6 +622,13 @@ export default function App() {
     return onAuthStateChanged(auth, (u) => {
       setUser(u);
       setIsAuthReady(true);
+    });
+  }, []);
+
+  // Handle redirect result after Google login
+  useEffect(() => {
+    getLoginRedirectResult().catch((err) => {
+      console.error('[Auth] Redirect result error:', err);
     });
   }, []);
 
