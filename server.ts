@@ -231,7 +231,7 @@ app.post('/api/generate-report', async (req, res) => {
   // Total
   const total = expenses.reduce((sum: number, e: any) => sum + (Number(e.monto) || 0), 0);
   doc.rect(50, y, 500, 0.5).stroke();
-  doc.fontSize(12).fillColor('black').text(`Total Gastos: $${total}`, 450, y + 10, { align: 'right', bold: true });
+  doc.fontSize(12).fillColor('black').font('Helvetica-Bold').text(`Total Gastos: $${total}`, 450, y + 10, { align: 'right' });
 
   // Add list of expense files
   doc.moveDown(2);
