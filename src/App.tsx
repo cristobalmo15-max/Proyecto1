@@ -3751,16 +3751,24 @@ export default function App() {
                                   <span className="text-[8px] font-bold text-muted uppercase tracking-widest">Renta Mensual</span>
                                   <span className="text-sm font-black text-primary">{p.valor}</span>
                                 </div>
-                                <button
-                                  onClick={() => {
-                                    setSelectedProp(p);
-                                    setActiveModule('properties');
-                                    setActiveTab('legal');
-                                  }}
-                                  className="px-4 py-2 bg-ink hover:bg-black text-white text-[8px] font-black uppercase tracking-wider rounded-xl transition-all active:scale-95 cursor-pointer"
-                                >
-                                  Ver Ficha
-                                </button>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => viewContract(p.pdf, p.arrendatario)}
+                                    className="px-3 py-2 bg-white border border-border/80 hover:bg-gray-50 text-ink text-[8px] font-black uppercase tracking-wider rounded-xl transition-all active:scale-95 cursor-pointer shadow-sm"
+                                  >
+                                    Ver Contrato
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setSelectedProp(p);
+                                      setActiveModule('properties');
+                                      setActiveTab('legal');
+                                    }}
+                                    className="px-4 py-2 bg-ink hover:bg-black text-white text-[8px] font-black uppercase tracking-wider rounded-xl transition-all active:scale-95 cursor-pointer"
+                                  >
+                                    Ver Ficha
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           );
