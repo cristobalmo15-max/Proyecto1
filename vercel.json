@@ -1,0 +1,14 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/server"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/monthly-expiry",
+      "schedule": "0 9 1 * *"
+    }
+  ]
+}
