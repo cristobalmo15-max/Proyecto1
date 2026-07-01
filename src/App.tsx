@@ -383,6 +383,9 @@ export default function App() {
   const [selectedReportPropId, setSelectedReportPropId] = useState<string | null>(null);
   const [selectedReportMonth, setSelectedReportMonth] = useState<string>(MONTHS_WITH_YEAR[0]);
   const [reportsTab, setReportsTab] = useState<'details' | 'preview'>('details');
+  const [reportsSubModule, setReportsSubModule] = useState<'expenses' | 'expiries'>('expenses');
+  const [expiryFilter, setExpiryFilter] = useState<'all' | 'expired' | 'upcoming'>('all');
+
 
   const logActivity = async (actionText: string, isMass = false, details = null) => {
     if (!user) return;
@@ -424,6 +427,30 @@ export default function App() {
       (p.mailAval || '').toLowerCase().includes(s)
     );
   };
+
+  // Helper para identificar contratos que vencen en el mes actual o siguiente
+  const getExpiryStatus = (terminoStr?: string) => {
+    if (!terminoStr) return { isExpiryCandidate: false, isExpired: false, daysRemaining: 0 };
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expiryDate = new Date(terminoStr + 'T00:00:00');
+    
+    // Candidatos: vencidos o que vencen hasta el fin del próximo mes
+    const maxDate = new Date(today.getFullYear(), today.getMonth() + 2, 0); // último día del próximo mes
+    const isExpiryCandidate = expiryDate <= maxDate;
+    const isExpired = expiryDate < today;
+    
+    const diffTime = expiryDate.getTime() - today.getTime();
+    const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    return { isExpiryCandidate, isExpired, daysRemaining };
+  };
+
+  const expiringProperties = properties.filter(p => {
+    const { isExpiryCandidate } = getExpiryStatus(p.termino);
+    return isExpiryCandidate;
+  });
+
 
   useEffect(() => {
     // Verificar si venimos de un link de acceso por email
@@ -511,7 +538,7 @@ export default function App() {
   // Inside the main layout component, add search and admin entry.
 
   const [onlyFlagged, setOnlyFlagged] = useState(false);
-  const [sortType, setSortType] = useState<'date-asc' | 'date-desc' | 'name-asc' | 'name-desc'>('date-asc');
+  const [sortType, setSortType] = useState<'date-asc' | 'date-desc' | 'name-asc' | 'name-desc'>('date-desc');
   const [showConfirmDelete, setShowConfirmDelete] = useState<{ 
     type: 'property' | 'expense' | 'reset', 
     id?: string, 
@@ -2069,14 +2096,14 @@ export default function App() {
   const sortedProperties = [...filterProperties(properties, propSearch)]
     .sort((a, b) => {
     if (sortType === 'date-desc') {
-      const monthA = a.f_ini ? parseInt(a.f_ini.split('-')[1] || '0', 10) : 0;
-      const monthB = b.f_ini ? parseInt(b.f_ini.split('-')[1] || '0', 10) : 0;
-      return monthB - monthA;
+      const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
+      const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
+      return dateB - dateA;
     }
     if (sortType === 'date-asc') {
-      const monthA = a.f_ini ? parseInt(a.f_ini.split('-')[1] || '0', 10) : 0;
-      const monthB = b.f_ini ? parseInt(b.f_ini.split('-')[1] || '0', 10) : 0;
-      return monthA - monthB;
+      const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
+      const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
+      return dateA - dateB;
     }
     if (sortType === 'name-asc') {
       return (a.direccion || '').localeCompare(b.direccion || '');
@@ -2087,43 +2114,23 @@ export default function App() {
     return 0;
   });
 
-  const availableMonths = Array.from(new Set(
+  const availableYears = Array.from(new Set(
     properties
       .map(p => {
         if (!p.f_ini) return null;
         const parts = p.f_ini.split('-');
-        if (parts.length >= 2) return parts[1];
-        return null;
+        return parts[0];
       })
       .filter(Boolean)
   ))
-  .sort((a, b) => String(a!).localeCompare(String(b!)));
-
-  const getMonthNameByNum = (numStr: string) => {
-    const monthNum = parseInt(numStr, 10);
-    const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-    return months[monthNum - 1] || numStr;
-  };
-
-  const getMonthName = (dateStr: string | undefined): string => {
-    if (!dateStr) return 'N/A';
-    const parts = dateStr.split('-');
-    if (parts.length >= 2) {
-      return getMonthNameByNum(parts[1]);
-    }
-    return dateStr;
-  };
+  .sort((a, b) => String(b!).localeCompare(String(a!)));
 
   const filteredSidebarProps = filterProperties(properties, propSearch)
     .filter(p => !onlyFlagged || !!p.flagged)
     .filter(p => {
       if (selectedYearFilter === 'all') return true;
       if (!p.f_ini) return false;
-      const parts = p.f_ini.split('-');
-      if (parts.length >= 2) {
-        return parts[1] === selectedYearFilter;
-      }
-      return false;
+      return p.f_ini.startsWith(selectedYearFilter);
     });
   
   return (
@@ -2260,6 +2267,32 @@ export default function App() {
 
         {activeModule === 'dashboard' && (
           <div className="space-y-8 animate-in fade-in duration-700">
+            
+            {/* Banner de Alerta de Vencimientos */}
+            {expiringProperties.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-[28px] p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <span className="text-amber-600 text-xl mt-0.5">⚠️</span>
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-amber-800 tracking-wider">Atención: Vencimientos Críticos</h4>
+                    <p className="text-[11px] text-amber-700 font-semibold leading-relaxed mt-0.5">
+                      Tienes {expiringProperties.length} contrato(s) vencido(s) o por vencer en el mes actual y subsiguiente.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveModule('reports');
+                    setReportsSubModule('expiries');
+                  }}
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-black uppercase text-[10px] tracking-widest py-3 px-6 rounded-xl transition-all shadow-md shrink-0 active:scale-95 cursor-pointer"
+                >
+                  Ver Detalles
+                </button>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               
               {/* Left Column: Meetings */}
@@ -2316,6 +2349,56 @@ export default function App() {
                   </div>
                 )}
               </div>
+
+              {/* Panel Central Detallado de Vencimientos */}
+              <div className="lg:col-span-7 bg-white p-6 rounded-[32px] border border-border/10 shadow-premium space-y-6">
+                <div className="flex justify-between items-center pb-4 border-b border-border/10">
+                  <div>
+                    <span className="text-[9px] font-black text-red-600 uppercase tracking-[0.3em] font-mono">Control de Alertas</span>
+                    <h3 className="text-base font-bold uppercase tracking-tight text-ink mt-0.5">Arriendos por Vencer</h3>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setActiveModule('reports');
+                      setReportsSubModule('expiries');
+                    }} 
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-ink rounded-full text-[9px] font-black uppercase tracking-wider transition-all"
+                  >
+                    Ver Todo
+                  </button>
+                </div>
+
+                {expiringProperties.length === 0 ? (
+                  <div className="p-6 text-center bg-gray-50/50 rounded-2xl border border-dashed border-border/80">
+                    <p className="text-[10px] text-muted font-bold uppercase tracking-widest">Todos los contratos al día.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
+                    {expiringProperties.slice(0, 5).map((p, idx) => {
+                      const { isExpired, daysRemaining } = getExpiryStatus(p.termino);
+                      return (
+                        <div key={p.id || idx} className="p-3.5 bg-gray-50 border border-border/60 rounded-2xl flex items-center justify-between gap-4">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-black text-ink uppercase truncate">{p.direccion}</p>
+                            <p className="text-[9.5px] text-muted font-medium mt-0.5">
+                              Inquilino: <span className="font-bold text-slate-700">{p.arrendatario}</span> &nbsp;|&nbsp; Dueño: {p.dueno}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className={`inline-block text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full ${
+                              isExpired ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-amber-50 text-amber-600 border border-amber-200'
+                            }`}>
+                              {isExpired ? 'Vencido' : `En ${daysRemaining} días`}
+                            </span>
+                            <p className="text-[10px] font-bold text-ink mt-1 font-mono">{formatDateDMY(p.termino)}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
 
               {/* Right Column: Activity log */}
               <div className="lg:col-span-7 bg-white p-6 rounded-[32px] border border-border/10 shadow-premium space-y-6">
@@ -2454,30 +2537,19 @@ export default function App() {
                          </div>
                     )}
                   </div>
-                  {/* Sort Filter Dropdown */}
-                  <select
-                    value={sortType}
-                    onChange={(e) => setSortType(e.target.value as any)}
-                    className="h-10 px-2 rounded-xl border border-border/70 bg-white text-[10px] font-black uppercase tracking-wider text-muted outline-none cursor-pointer transition-all hover:border-primary shrink-0"
-                  >
-                    <option value="date-asc">Mes 01 - 12</option>
-                    <option value="date-desc">Mes 12 - 01</option>
-                    <option value="name-asc">A-Z</option>
-                    <option value="name-desc">Z-A</option>
-                  </select>
-                  {/* Month Filter Dropdown */}
+                  {/* Year Filter Dropdown */}
                   <select
                     value={selectedYearFilter}
                     onChange={(e) => setSelectedYearFilter(e.target.value)}
                     className={`h-10 px-2 rounded-xl border bg-white text-[10px] font-black uppercase tracking-wider outline-none cursor-pointer transition-all shrink-0 ${
                       selectedYearFilter !== 'all' 
-                         ? 'border-primary text-primary bg-red-50/30' 
-                         : 'border-border/70 text-muted hover:border-primary'
+                        ? 'border-primary text-primary bg-red-50/30' 
+                        : 'border-border/70 text-muted hover:border-primary'
                     }`}
                   >
-                    <option value="all">Mes: Todos</option>
-                    {availableMonths.map(mo => (
-                      <option key={mo as string} value={mo as string}>{getMonthNameByNum(mo as string)}</option>
+                    <option value="all">Año: Todos</option>
+                    {availableYears.map(yr => (
+                      <option key={yr} value={yr}>{yr}</option>
                     ))}
                   </select>
 
@@ -2516,10 +2588,10 @@ export default function App() {
                     .sort((a, b) => {
                       if (sortType === 'name-asc') return (a.direccion || '').localeCompare(b.direccion || '');
                       if (sortType === 'name-desc') return (b.direccion || '').localeCompare(a.direccion || '');
-                      const monthA = a.f_ini ? parseInt(a.f_ini.split('-')[1] || '0', 10) : 0;
-                      const monthB = b.f_ini ? parseInt(b.f_ini.split('-')[1] || '0', 10) : 0;
-                      if (sortType === 'date-asc') return monthA - monthB;
-                      return monthB - monthA; // date-desc default
+                      const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
+                      const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
+                      if (sortType === 'date-asc') return dateA - dateB;
+                      return dateB - dateA; // date-desc default
                     })
                     .map((p, i) => (
                       <div 
@@ -2535,7 +2607,7 @@ export default function App() {
                         <span className="text-[7px] text-slate-400 font-bold uppercase">Contrato</span>
                         {p.f_ini && (
                           <span className="text-[10px] font-extrabold text-red-600 font-mono tracking-wider">
-                            {getMonthName(p.f_ini)}
+                            {formatDateDMY(p.f_ini)}
                           </span>
                         )}
                       </div>
@@ -3571,9 +3643,130 @@ export default function App() {
                       Reportes <span className="opacity-30">Mensuales</span>
                    </p>
                 </div>
+
+                {/* Submodule Switcher */}
+                <div className="flex bg-gray-100 p-1 rounded-2xl border border-border shrink-0 self-stretch sm:self-auto">
+                  <button
+                    onClick={() => setReportsSubModule('expenses')}
+                    className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${
+                      reportsSubModule === 'expenses'
+                        ? 'bg-white text-primary shadow-sm'
+                        : 'text-muted hover:text-ink'
+                    }`}
+                  >
+                    Registro de Gastos
+                  </button>
+                  <button
+                    onClick={() => setReportsSubModule('expiries')}
+                    className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${
+                      reportsSubModule === 'expiries'
+                        ? 'bg-white text-primary shadow-sm'
+                        : 'text-muted hover:text-ink'
+                    }`}
+                  >
+                    Vencimientos ({expiringProperties.length})
+                  </button>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              {reportsSubModule === 'expiries' ? (
+                /* SECCION VENCIMIENTOS DE ARRIENDO */
+                <div className="bg-white rounded-3xl border border-border shadow-sm p-8 space-y-6 animate-in fade-in duration-500">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-border/60">
+                    <div>
+                      <h3 className="text-lg font-black uppercase tracking-tight text-ink">Arriendos que vencen este mes y el próximo</h3>
+                      <p className="text-[10px] text-muted font-bold mt-1">Control predictivo de finalizaciones de contratos de arrendamiento.</p>
+                    </div>
+
+                    {/* Filter por Estado */}
+                    <div className="flex bg-gray-100 p-1 rounded-xl border border-border self-stretch sm:self-auto">
+                      {(['all', 'expired', 'upcoming'] as const).map((filterVal) => (
+                        <button
+                          key={filterVal}
+                          onClick={() => setExpiryFilter(filterVal)}
+                          className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+                            expiryFilter === filterVal
+                              ? 'bg-white text-primary shadow-xs'
+                              : 'text-muted hover:text-ink'
+                          }`}
+                        >
+                          {filterVal === 'all' && 'Todos'}
+                          {filterVal === 'expired' && 'Vencidos'}
+                          {filterVal === 'upcoming' && 'Por Vencer'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {(() => {
+                    const filteredExpiries = expiringProperties.filter(p => {
+                      const { isExpired } = getExpiryStatus(p.termino);
+                      if (expiryFilter === 'expired') return isExpired;
+                      if (expiryFilter === 'upcoming') return !isExpired;
+                      return true;
+                    });
+
+                    if (filteredExpiries.length === 0) {
+                      return (
+                        <div className="text-center py-20 bg-gray-50/50 rounded-2xl border border-dashed border-border/60">
+                          <FileText className="w-10 h-10 text-muted/30 mx-auto mb-4" />
+                          <p className="text-xs font-bold uppercase tracking-widest text-muted">Sin registros para este filtro</p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredExpiries.map((p, idx) => {
+                          const { isExpired, daysRemaining } = getExpiryStatus(p.termino);
+                          return (
+                            <div key={p.id || idx} className="bg-white p-6 rounded-[28px] border border-border/80 hover:border-red-200/50 hover:shadow-lg transition-all duration-300 flex flex-col justify-between gap-6 relative group">
+                              <div className="space-y-4">
+                                <div className="flex justify-between items-start">
+                                  <span className={`text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full ${
+                                    isExpired ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-amber-50 text-amber-600 border border-amber-200'
+                                  }`}>
+                                    {isExpired ? 'Vencido' : `Vence en ${daysRemaining} días`}
+                                  </span>
+                                  <span className="text-[10px] font-bold text-ink font-mono">{formatDateDMY(p.termino)}</span>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <h4 className="text-sm font-black text-ink uppercase tracking-tight line-clamp-2 leading-snug group-hover:text-red-600 transition-colors">{p.direccion}</h4>
+                                  <div className="text-[10.5px] text-muted space-y-1">
+                                    <p>Propietario: <span className="font-extrabold text-slate-700">{p.dueno || 'Sin Registrar'}</span></p>
+                                    <p>Inquilino: <span className="font-extrabold text-slate-700">{p.arrendatario || 'Sin Registrar'}</span></p>
+                                    <p>Plazo Contrato: <span className="font-bold">{p.duracion || 'N/A'}</span></p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="pt-4 border-t border-dashed border-border/60 flex items-center justify-between">
+                                <div className="flex flex-col">
+                                  <span className="text-[8px] font-bold text-muted uppercase tracking-widest">Renta Mensual</span>
+                                  <span className="text-sm font-black text-primary">{p.valor}</span>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    setSelectedProp(p);
+                                    setActiveModule('properties');
+                                    setActiveTab('legal');
+                                  }}
+                                  className="px-4 py-2 bg-ink hover:bg-black text-white text-[8px] font-black uppercase tracking-wider rounded-xl transition-all active:scale-95 cursor-pointer"
+                                >
+                                  Ver Ficha
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+              ) : (
+                /* SECCION TRADICIONAL DE GASTOS */
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                 
                 {/* LEFT COLUMN: Property List */}
                 <div className="lg:col-span-4 flex flex-col gap-4">
@@ -3621,7 +3814,7 @@ export default function App() {
                                   <span className={`text-[10px] font-extrabold font-mono tracking-wider ${
                                     isSel ? 'text-red-300' : 'text-red-600'
                                   }`}>
-                                    {getMonthName(p.f_ini)}
+                                    {formatDateDMY(p.f_ini)}
                                   </span>
                                 )}
                               </div>
@@ -3973,7 +4166,7 @@ export default function App() {
                   )}
                 </div>
               </div>
-
+              )}
             </div>
           );
         })()}
