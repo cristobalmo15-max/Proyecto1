@@ -131,8 +131,8 @@ export function ReportModal({ properties, appSettings, onClose }) {
                 <p className="text-xs font-bold mb-2">Enviar a (seleccionar destinatarios):</p>
                 <div className="grid grid-cols-2 gap-2">
                     {selectedProp.mailD && selectedProp.mailD.trim() !== '' ? (
-                        selectedProp.mailD.split(',').map((email: string) => email.trim()).map((email: string) => (
-                            <label key={email} className="text-xs flex items-center gap-1 cursor-pointer hover:bg-gray-200 p-1 rounded">
+                        selectedProp.mailD.split(',').map((email: string) => email.trim()).map((email: string, idx: number) => (
+                            <label key={`${email}-${idx}`} className="text-xs flex items-center gap-1 cursor-pointer hover:bg-gray-200 p-1 rounded">
                                 <input type="checkbox" checked={selectedOwnerEmails.includes(email)} onChange={() => toggleEmail(email)} />
                                 {email}
                             </label>
@@ -146,7 +146,7 @@ export function ReportModal({ properties, appSettings, onClose }) {
 
             <div className="space-y-2 max-h-60 overflow-y-auto mb-4 border-t pt-2">
               {expenses.map((e: any, i: number) => (
-                <div key={i} className="flex justify-between border-b py-2 text-sm">
+                <div key={e.id || `${e.tipo}-${i}`} className="flex justify-between border-b py-2 text-sm">
                   <span>{e.tipo || 'Gasto'} ({e.date ? new Date(e.date).toLocaleDateString() : 'Sin fecha'})</span>
                   <span className="font-bold">${e.monto}</span>
                 </div>

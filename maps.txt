@@ -1,0 +1,73 @@
+129:  ...[ 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre' ].map(m => `${m} ${getCurrentYear - 1}`),
+130:  ...[ 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre' ].map(m => `${m} ${getCurrentYear}`)
+221:              {options.map((option) => (
+319:    const parts = ruts.split(',').map(s => s.trim()).filter(Boolean);
+326:    const parts = phones.split(',').map(s => s.trim()).filter(Boolean);
+333:    const parts = emails.split(',').map(s => s.trim()).filter(Boolean);
+563:      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+625:          setEmails(messages.map((m: any) => ({
+665:      const props = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any;
+741:      const syncedData = await Promise.all(bulkData.map(async (d) => {
+1199:    const fingerprints = await Promise.all(files.map(f => getFileFingerprint(f)));
+1205:      const chunkPromises = chunkIndices.map(async (idx) => {
+1245:    const existingAddressMap = new Map(properties.map(p => [normalizeAddress(p.direccion), p.id]));
+1246:    const existingTenantMap = new Map(properties.map(p => [normalizeText(p.arrendatario), p.id]));
+1250:    const processedResults = results.map(res => {
+1490:      mesExpenses.map(e => `- ${e.tipo}: $${e.monto} (Bol/Rol: ${e.boleta || 'S/N'})`).join('\n') +
+1540:    const expiredHtml = expired.length > 0 ? expired.map(p => `
+1690:                  {[0, 1, 2, 3].map((i) => (
+1828:                  {[LayoutDashboard, Building2, FileSearch, Receipt].map((Icon, i) => (
+1866:                      ].map((item, i) => (
+1962:                ].map((item, i) => (
+1992:            ].map((row, i) => (
+2038:      .map(p => {
+2090:          ].map((item) => (
+2210:                    {appSettings.meetings.map((meet: any, idx: number) => (
+2281:                      {logs.map((log: any, idx: number) => {
+2376:                            {filteredSidebarProps.slice(0, 5).map(p => (
+2382:                            {filteredSidebarProps.slice(0, 5).map(p => (
+2403:                    {availableYears.map(yr => (
+2447:                    .map((p, i) => (
+2623:                          ].map(tab => (
+2652:                            const names = (selectedProp.dueno || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+2653:                            const ruts = (selectedProp.rutDue || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+2654:                            const tels = (selectedProp.telD || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+2655:                            const splittedEmails = (selectedProp.mailD || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+2676:                                      {names.map((name, i) => (
+2691:                                            ruts.map((rut, idx) => (
+2708:                                            tels.map((tel, idx) => (
+2725:                                            splittedEmails.map((email, idx) => (
+2747:                            const names = (selectedProp.arrendatario || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+2748:                            const ruts = (selectedProp.rutArr || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+2749:                            const tels = (selectedProp.telA || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+2750:                            const splittedEmails = (selectedProp.mailA || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+2771:                                      {names.map((name, i) => (
+2786:                                            ruts.map((rut, idx) => (
+2803:                                            tels.map((tel, idx) => (
+2820:                                            splittedEmails.map((email, idx) => (
+2992:                                    {selectedProp.expenses?.length > 0 ? selectedProp.expenses.map((exp: any, idx: number) => (
+3233:                          {bulkData.map((d, i) => (
+3303:                             const syncedData = await Promise.all(bulkData.map(async (d) => {
+3392:              .map(p => {
+3500:                        {reportsAvailableYears.map(yr => (
+3512:                        propertiesWithExpenses.map(p => {
+3566:                                    {Object.entries(propYearCats).sort((a,b)=>b[1]-a[1]).slice(0, 3).map(([cat, val]) => (
+3644:                              {MONTHS_WITH_YEAR.filter(m => m.endsWith(new Date().getFullYear().toString())).reverse().map((m) => {
+3672:                                             {Object.entries(catTotals).map(([cat, val], i) => (
+3733:                                     {Object.entries(monthCatTotals).sort((a,b)=>b[1]-a[1]).map(([cat, val]) => {
+3763:                                        {monthExpenses.map((exp, idx) => (
+3838:                                        {monthExpenses.map((exp: any, idx: number) => (
+4092:                ].map((tab: any) => (
+4287:                        {ticketsToRender.map((ticket: any) => {
+4334:                                  {ticket.respuestas?.map((resp: any, rIdx: number) => (
+4372:                                          const updatedTickets = appSettings.tickets.map((t: any) => {
+4446:                  ].map((faq, i) => (
+4573:                          const nombres = p.dueno.split(',').map(s => s.trim());
+4574:                          const mails = p.mailD.split(',').map(s => s.trim());
+4584:                          const nombres = p.arrendatario.split(',').map(s => s.trim());
+4585:                          const mails = p.mailA.split(',').map(s => s.trim());
+4610:                          {filtered.map((client, idx) => {
+4689:                    ].map((meet) => (
+4736:                      {['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'].map(d => (
+4785:                      {['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00'].map((hour) => {
+5704:                    ].map((item, i) => (
