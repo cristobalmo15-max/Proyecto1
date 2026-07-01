@@ -520,9 +520,14 @@ export default function App() {
       showToast('No hay contrato digital disponible', 'error');
       return;
     }
-    const cleanName = (ownerName || 'Documento').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
-    const proxyUrl = `/api/punto-propiedades/visor-pdf/Contrato_${cleanName}?url=${encodeURIComponent(pdfUrl)}`;
-    window.open(proxyUrl, '_blank');
+    // Si es un enlace a Firebase Storage u otra URL externa, abrir directamente para evitar error 404 del backend en Vercel
+    if (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://')) {
+      window.open(pdfUrl, '_blank');
+    } else {
+      const cleanName = (ownerName || 'Documento').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+      const proxyUrl = `/api/punto-propiedades/visor-pdf/Contrato_${cleanName}?url=${encodeURIComponent(pdfUrl)}`;
+      window.open(proxyUrl, '_blank');
+    }
   };
   const [loading, setLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState('');
