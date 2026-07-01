@@ -127,24 +127,7 @@ app.post('/api/create-meeting', async (req, res) => {
               from: (smtpConfig?.user || process.env.SMTP_FROM || process.env.SMTP_USER),
               to: recipientEmail,
               subject: `Reunión Confirmada: ${title}`,
-              text: `Se ha agendado una nueva reunión:\n\nAsunto: ${title}\nInicio: ${start}\nFin: ${end}\n\nLink de unión: ${meetLink}\n\nNota: ${description || 'Sin descripción'}`,
-              html: `
-                <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px; background-color: #f9f9f9;">
-                  <h2 style="color: #d32f2f; border-bottom: 2px solid #d32f2f; padding-bottom: 10px;">Reunión Confirmada</h2>
-                  <p>Se ha agendado una nueva reunión:</p>
-                  <table style="width: 100%; margin: 20px 0;">
-                    <tr><td style="padding: 5px 0;"><strong>Asunto:</strong></td><td style="padding: 5px 0;">${title}</td></tr>
-                    <tr><td style="padding: 5px 0;"><strong>Inicio:</strong></td><td style="padding: 5px 0;">${start}</td></tr>
-                    <tr><td style="padding: 5px 0;"><strong>Fin:</strong></td><td style="padding: 5px 0;">${end}</td></tr>
-                  </table>
-                  <p style="text-align: center; margin: 30px 0;">
-                    <a href="${meetLink}" style="padding: 12px 24px; background-color: #d32f2f; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: bold;">Unirse a Google Meet</a>
-                  </p>
-                  <p><strong>Nota:</strong> ${description ? description.replace(/\n/g, '<br>') : 'Sin descripción'}</p>
-                  <hr style="border: 0; border-top: 1px solid #ddd; margin: 25px 0 15px;">
-                  <p style="font-size: 13px; color: #555;">Atentamente,<br><strong>Punto Propiedades</strong></p>
-                </div>
-              `
+              text: `Se ha agendado una nueva reunión:\n\nAsunto: ${title}\nInicio: ${start}\nFin: ${end}\n\nLink de unión: ${meetLink}\n\nNota: ${description || 'Sin descripción'}`
             });
             console.log(`[Email] Notification sent to ${recipientEmail}`);
         } catch (emailErr) {
@@ -430,6 +413,138 @@ app.post('/api/send-report', async (req, res) => {
     });
   }
 });
+
+// Cron Job automático mensual para avisar vencimientos de arriendos
+app.get('/api/cron/monthly-expiry', async (req, res) => {
+  // Opcional: Autorización básica con cabecera Vercel Cron
+  // if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) { ... }
+
+  try {
+    let properties: any[] = [];
+
+    // Intentar leer de Firestore si está inicializado admin
+    if (admin.apps.length) {
+      try {
+        const snapshot = await admin.firestore().collection('properties').get();
+        snapshot.forEach(doc => {
+          properties.push({ id: doc.id, ...doc.data() });
+        });
+      } catch (dbErr) {
+        console.warn('[Cron] Firestore read failed, falling back to local file:', dbErr);
+      }
+    }
+
+    // Fallback a archivo local si está vacío
+    if (properties.length === 0) {
+      properties = getData().properties || [];
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const maxDate = new Date(today.getFullYear(), today.getMonth() + 2, 0); // fin del mes siguiente
+
+    const expiringProps = properties.filter((p: any) => {
+      if (!p.termino) return false;
+      const expiryDate = new Date(p.termino + 'T00:00:00');
+      return expiryDate <= maxDate;
+    });
+
+    if (expiringProps.length === 0) {
+      return res.json({ success: true, message: 'No hay propiedades por vencer este mes o el siguiente.' });
+    }
+
+    // Obtener email de destino desde la configuración del usuario en settings
+    let targetEmail = process.env.SMTP_USER; // Default
+    let dynamicTransporter = transporter;
+
+    if (admin.apps.length) {
+      try {
+        // Buscar el documento de settings de algún usuario administrador
+        const settingsSnap = await admin.firestore().collection('settings').limit(1).get();
+        if (!settingsSnap.empty) {
+          const settingsData = settingsSnap.docs[0].data();
+          if (settingsData.reportEmail) {
+            targetEmail = settingsData.reportEmail;
+          }
+          if (settingsData.smtpHost && settingsData.smtpUser && settingsData.smtpPass) {
+            dynamicTransporter = nodemailer.createTransport({
+              host: settingsData.smtpHost,
+              port: parseInt(settingsData.smtpPort || '587'),
+              secure: settingsData.smtpPort === '465',
+              auth: { user: settingsData.smtpUser, pass: settingsData.smtpPass },
+            });
+          }
+        }
+      } catch (settingsErr) {
+        console.error('[Cron] Failed to retrieve SMTP settings from Firestore:', settingsErr);
+      }
+    }
+
+    if (!targetEmail) {
+      return res.status(400).json({ error: 'No se encontró correo de destino configurado.' });
+    }
+
+    // Crear contenido HTML
+    let tableRows = '';
+    expiringProps.forEach((p: any) => {
+      const parts = (p.termino || '').split('-');
+      const formattedDate = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : p.termino;
+      const isExpired = new Date(p.termino + 'T00:00:00') < today;
+
+      tableRows += `
+        <tr style="border-b: 1px solid #e2e8f0;">
+          <td style="padding: 12px; font-weight: bold; color: #0f172a;">${p.direccion || 'N/A'}</td>
+          <td style="padding: 12px; color: #475569;">${p.dueno || 'N/A'}</td>
+          <td style="padding: 12px; color: #475569;">${p.arrendatario || 'N/A'}</td>
+          <td style="padding: 12px; font-family: monospace; color: #b91c1c;">${p.valor || 'N/A'}</td>
+          <td style="padding: 12px; color: #475569;">${p.duracion || 'N/A'}</td>
+          <td style="padding: 12px; font-weight: bold; color: ${isExpired ? '#ef4444' : '#d97706'}">${formattedDate} ${isExpired ? '(Vencido)' : ''}</td>
+        </tr>
+      `;
+    });
+
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 16px;">
+        <h2 style="color: #b91c1c; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid #b91c1c; padding-bottom: 10px;">Aviso de Vencimientos de Arriendos</h2>
+        <p style="color: #475569; font-size: 14px;">Estimado Administrador,</p>
+        <p style="color: #475569; font-size: 14px;">A continuación se presenta el listado consolidado de contratos de arriendo que vencen o se encuentran vencidos durante el mes en curso y el próximo:</p>
+        
+        <table style="width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; text-align: left;">
+          <thead>
+            <tr style="background-color: #f1f5f9; border-bottom: 2px solid #cbd5e1; font-weight: bold; text-transform: uppercase; color: #475569;">
+              <th style="padding: 12px;">Propiedad</th>
+              <th style="padding: 12px;">Propietario</th>
+              <th style="padding: 12px;">Arrendatario</th>
+              <th style="padding: 12px;">Monto</th>
+              <th style="padding: 12px;">Plazo</th>
+              <th style="padding: 12px;">Vencimiento</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+          </tbody>
+        </table>
+
+        <p style="margin-top: 30px; font-size: 11px; color: #94a3b8; text-align: center;">Este es un mensaje generado automáticamente por el sistema Punto Propiedades.</p>
+      </div>
+    `;
+
+    await dynamicTransporter.sendMail({
+      from: `Punto Propiedades <${targetEmail}>`,
+      to: targetEmail,
+      subject: `Alerta: ${expiringProps.length} arriendos vencidos o por vencer`,
+      html: emailHtml
+    });
+
+    console.log(`[Cron] Expiry notification successfully sent to ${targetEmail}`);
+    res.json({ success: true, message: `Reporte de vencimientos enviado con éxito a ${targetEmail}.` });
+
+  } catch (err: any) {
+    console.error('[Cron] Expiry notification error:', err);
+    res.status(500).json({ error: 'Error ejecutando el Cron Job de vencimientos', details: err.message });
+  }
+});
+
 
 app.get('/api/gmail/messages', async (req, res) => {
   const token = req.headers.authorization;
