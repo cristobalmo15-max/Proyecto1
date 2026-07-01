@@ -121,6 +121,11 @@ interface Property {
   tipoMonto?: string;
   duracionMeses?: number;
   flagged?: boolean;
+  renewalHistory?: Array<{
+    date: string;
+    oldTermino: string;
+    newTermino: string;
+  }>;
 }
 
 // --- Constants ---
@@ -156,6 +161,16 @@ const formatRut = (rut: string): string => {
   const dv = cleanRut.slice(-1);
   const body = cleanRut.slice(0, -1);
   return `${body.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}-${dv}`;
+};
+
+// Helper para formatear fecha YYYY-MM-DD → DD-MM-YYYY
+const formatDateDMY = (dateStr?: string): string => {
+  if (!dateStr) return 'N/A';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  return dateStr;
 };
 
 const getSectionTitle = (names: string[], type: 'dueno' | 'arrendatario'): string => {
@@ -496,7 +511,7 @@ export default function App() {
   // Inside the main layout component, add search and admin entry.
 
   const [onlyFlagged, setOnlyFlagged] = useState(false);
-  const [sortType, setSortType] = useState<'date' | 'name-asc' | 'name-desc'>('date');
+  const [sortType, setSortType] = useState<'date-asc' | 'date-desc' | 'name-asc' | 'name-desc'>('date-desc');
   const [showConfirmDelete, setShowConfirmDelete] = useState<{ 
     type: 'property' | 'expense' | 'reset', 
     id?: string, 
@@ -1447,29 +1462,63 @@ export default function App() {
   const renewContract = async () => {
     if (!selectedProp) return;
     
-    // Limit renewal to currentYear + 1
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const nextYearLimit = currentYear + 1;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     
-    const terminoDate = new Date(selectedProp.termino);
-    if (terminoDate.getFullYear() >= nextYearLimit) {
-      showToast(`Límite de renovación alcanzado (${nextYearLimit}). Para corregir, usa "Editar Ficha".`, 'error');
+    const currentTermino = new Date(selectedProp.termino + 'T00:00:00');
+    
+    // Extraer meses del plazo
+    let months = selectedProp.duracionMeses || 0;
+    if (!months && selectedProp.duracion) {
+      const match = selectedProp.duracion.match(/(\d+)/);
+      if (match) {
+        const num = parseInt(match[1]);
+        if (selectedProp.duracion.toLowerCase().includes('año')) {
+          months = num * 12;
+        } else {
+          months = num;
+        }
+      }
+    }
+    if (!months || months <= 0) {
+      showToast('No se pudo determinar el plazo de renovación. Verifica la duración del contrato.', 'error');
       return;
     }
+    
+    // Si el contrato aún no venció, no renovar
+    if (currentTermino > today) {
+      showToast('El contrato aún no está vencido. Vence el ' + formatDateDMY(selectedProp.termino), 'error');
+      return;
+    }
+    
+    // Sumar plazo repetidamente hasta superar hoy
+    let newTermino = new Date(currentTermino);
+    let iterations = 0;
+    while (newTermino <= today && iterations < 100) {
+      newTermino.setMonth(newTermino.getMonth() + months);
+      iterations++;
+    }
+    
+    const newTerminoStr = newTermino.toISOString().split('T')[0];
+    const oldTerminoStr = selectedProp.termino;
 
     setLoading(true);
     try {
-      const oldTermino = selectedProp.termino;
-      const currentTermino = new Date(selectedProp.termino);
-      currentTermino.setFullYear(currentTermino.getFullYear() + 1);
+      // Registro de historial
+      const historyEntry = {
+        date: new Date().toISOString().split('T')[0],
+        oldTermino: oldTerminoStr,
+        newTermino: newTerminoStr
+      };
+      const existingHistory = selectedProp.renewalHistory || [];
       
       await updateDoc(doc(db, 'properties', selectedProp.id), {
-        f_ini: oldTermino,
-        termino: currentTermino.toISOString().split('T')[0]
+        // f_ini NO se modifica
+        termino: newTerminoStr,
+        renewalHistory: [...existingHistory, historyEntry]
       });
-      await logActivity(`Renovación de contrato para ${selectedProp.direccion}`);
-      showToast('Contrato renovado');
+      await logActivity(`Renovación de contrato para ${selectedProp.direccion}: ${formatDateDMY(oldTerminoStr)} → ${formatDateDMY(newTerminoStr)}`);
+      showToast(`Contrato renovado: nuevo vencimiento ${formatDateDMY(newTerminoStr)}`);
     } catch (e) {
       showToast('Error al renovar', 'error');
     } finally {
@@ -1548,7 +1597,7 @@ export default function App() {
             <p style="margin: 0; color: #ef4444; font-size: 11px; font-weight: 800; text-transform: uppercase;">Contrato Vencido</p>
           </div>
           <div style="padding: 6px 0;">
-            <p style="margin: 0; color: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase;">Venció el: <span style="color: #0f172a;">${p.termino || 'Sin fecha'}</span></p>
+            <p style="margin: 0; color: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase;">Venció el: <span style="color: #0f172a;">${formatDateDMY(p.termino) || 'Sin fecha'}</span></p>
           </div>
         </div>
         <a href="${baseUrl}?propId=${p.id || ''}" style="display: block; text-align: center; background-color: #2563eb; color: white; padding: 14px 24px; border-radius: 12px; text-decoration: none; font-weight: 800; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; transition: all 0.2s;">Gestionar Propiedad</a>
@@ -2019,9 +2068,14 @@ export default function App() {
 
   const sortedProperties = [...filterProperties(properties, propSearch)]
     .sort((a, b) => {
-    if (sortType === 'date') {
-      const dateA = a.termino ? new Date(a.termino).getTime() : Infinity;
-      const dateB = b.termino ? new Date(b.termino).getTime() : Infinity;
+    if (sortType === 'date-desc') {
+      const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
+      const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
+      return dateB - dateA;
+    }
+    if (sortType === 'date-asc') {
+      const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
+      const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
       return dateA - dateB;
     }
     if (sortType === 'name-asc') {
@@ -2132,7 +2186,7 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <main className={`flex-1 flex flex-col ${activeModule === 'properties' ? 'overflow-hidden' : 'overflow-y-auto'} ${activeModule === 'properties' ? 'p-3 md:p-6' : activeModule === 'settings' || activeModule === 'support' || activeModule === 'meetings' || activeModule === 'admin' ? 'p-6 pt-0' : 'p-8'} relative`}>
+      <main className={`flex-1 flex flex-col ${activeModule === 'properties' ? 'overflow-hidden' : 'overflow-y-auto'} ${activeModule === 'properties' ? 'p-3 md:p-6' : activeModule === 'settings' || activeModule === 'support' || activeModule === 'meetings' || activeModule === 'admin' ? 'p-6 pt-4' : 'p-8'} relative`}>
         {activeModule !== 'properties' && activeModule !== 'ai' && activeModule !== 'reports' && (
           <header className={`flex justify-between items-center ${activeModule === 'settings' || activeModule === 'support' || activeModule === 'meetings' || activeModule === 'admin' ? 'mb-4' : 'mb-8'}`}>
             <div className="flex items-center gap-4">
@@ -2195,7 +2249,7 @@ export default function App() {
                     <span className="text-[9px] font-black text-red-600 uppercase tracking-[0.3em] font-mono">Compromisos Clave</span>
                     <h3 className="text-base font-bold uppercase tracking-tight text-ink mt-0.5">Reuniones Clientes</h3>
                   </div>
-                  <button onClick={() => setActiveModule('meetings')} className="px-4 py-2 bg-ink hover:bg-accent text-white rounded-full text-[9px] font-black uppercase tracking-wider transition-all shadow-md">
+                  <button onClick={() => setActiveModule('support')} className="px-4 py-2 bg-ink hover:bg-accent text-white rounded-full text-[9px] font-black uppercase tracking-wider transition-all shadow-md">
                     Agendar
                   </button>
                 </div>
@@ -2208,7 +2262,7 @@ export default function App() {
                 ) : (
                   <div className="space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-1">
                     {appSettings.meetings.map((meet: any, idx: number) => (
-                      <div key={`meet-${meet.id || idx}`} className="bg-white p-5 rounded-2xl border border-border/60 hover:border-red-500/30 hover:shadow-sm transition-all space-y-3 flex flex-col justify-between group">
+                      <div key={meet.id || idx} className="bg-white p-5 rounded-2xl border border-border/60 hover:border-red-500/30 hover:shadow-sm transition-all space-y-3 flex flex-col justify-between group">
                         <div className="space-y-1.5">
                           <div className="flex justify-between items-start">
                             <span className="text-[8px] font-bold bg-green-50 text-green-600 border border-green-200/50 px-2 py-0.5 rounded-full uppercase tracking-widest font-mono">
@@ -2236,25 +2290,6 @@ export default function App() {
                           >
                             <Video className="w-3.5 h-3.5 text-green-400" /> Entrar a Meet
                           </a>
-                          <button
-                            onClick={async () => {
-                                const newMeetings = appSettings.meetings.filter((_: any, i: number) => i !== idx);
-                                const updatedSettings = { ...appSettings, meetings: newMeetings };
-                                setAppSettings(updatedSettings);
-                                if (user) {
-                                  try {
-                                    await setDoc(doc(db, 'settings', user.uid), updatedSettings, { merge: true });
-                                    showToast('Reunión eliminada', 'success');
-                                  } catch (e) {
-                                    console.error('Error al eliminar reunión:', e);
-                                    showToast('Error al eliminar reunión', 'error');
-                                  }
-                                }
-                            }}
-                            className="text-red-500 hover:text-red-700 bg-red-50 px-2 py-1 rounded-md text-[9px] font-black uppercase"
-                          >
-                            Eliminar
-                          </button>
                         </div>
                       </div>
                     ))}
@@ -2452,7 +2487,8 @@ export default function App() {
                       if (sortType === 'name-desc') return (b.direccion || '').localeCompare(a.direccion || '');
                       const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
                       const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
-                      return dateB - dateA;
+                      if (sortType === 'date-asc') return dateA - dateB;
+                      return dateB - dateA; // date-desc default
                     })
                     .map((p, i) => (
                       <div 
@@ -2467,14 +2503,8 @@ export default function App() {
                       <div className="flex justify-between items-center mb-1">
                         <span className="text-[7px] text-slate-400 font-bold uppercase">Contrato</span>
                         {p.f_ini && (
-                          <span className="text-[11px] font-extrabold text-red-600 font-mono tracking-wider">
-                            {(() => {
-                              const parts = p.f_ini.split('-');
-                              if (parts.length >= 2) {
-                                return `${parts[0]}-${parts[1]}`;
-                              }
-                              return p.f_ini;
-                            })()}
+                          <span className="text-[10px] font-extrabold text-red-600 font-mono tracking-wider">
+                            {formatDateDMY(p.f_ini)}
                           </span>
                         )}
                       </div>
@@ -2591,12 +2621,12 @@ export default function App() {
                              <div className="flex items-center gap-6">
                                <div className="text-center sm:text-left">
                                  <span className="text-[7px] font-black uppercase tracking-[0.15em] text-red-600/50 block mb-0.5 leading-none">Inicio Contrato</span>
-                                 <span className="text-[11px] font-black text-ink tracking-tight leading-none">{selectedProp.f_ini || 'N/A'}</span>
+                                 <span className="text-[11px] font-black text-ink tracking-tight leading-none">{formatDateDMY(selectedProp.f_ini)}</span>
                                </div>
                                <div className="w-px h-6 bg-red-100/30" />
                                <div className="text-center sm:text-left">
                                  <span className="text-[7px] font-black uppercase tracking-[0.15em] text-red-600/50 block mb-0.5 leading-none">Vencimiento</span>
-                                 <span className="text-[11px] font-black text-ink tracking-tight leading-none">{selectedProp.termino || 'Indef'}</span>
+                                 <span className="text-[11px] font-black text-ink tracking-tight leading-none">{formatDateDMY(selectedProp.termino) || 'Indef'}</span>
                                </div>
                              </div>
                            </div>
@@ -2613,6 +2643,26 @@ export default function App() {
                              </button>
                            </div>
                         </div>
+
+                        {/* Historial de Renovaciones */}
+                        {selectedProp.renewalHistory && selectedProp.renewalHistory.length > 0 && (
+                          <div className="bg-slate-50 border border-border/60 rounded-2xl p-3 mt-1">
+                            <p className="text-[8px] font-black uppercase tracking-widest text-muted mb-2 flex items-center gap-1.5">
+                              📋 Historial de Renovaciones ({selectedProp.renewalHistory.length})
+                            </p>
+                            <div className="flex flex-col gap-1 max-h-[80px] overflow-y-auto custom-scrollbar">
+                              {[...selectedProp.renewalHistory].reverse().map((entry, idx) => (
+                                <div key={`renewal-${idx}`} className="flex items-center gap-2 text-[9px]">
+                                  <span className="text-muted font-mono font-bold">{formatDateDMY(entry.date)}</span>
+                                  <span className="text-muted">:</span>
+                                  <span className="font-bold text-red-600/70">{formatDateDMY(entry.oldTermino)}</span>
+                                  <span className="text-muted">→</span>
+                                  <span className="font-bold text-green-700">{formatDateDMY(entry.newTermino)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         
                         <button 
                             onClick={() => viewContract(selectedProp.pdf, selectedProp.arrendatario)}
@@ -3086,7 +3136,7 @@ export default function App() {
                                 <div className="flex md:flex-col items-center md:items-end gap-6 md:gap-5 md:border-l border-border/50 md:pl-8 pt-6 md:pt-0 border-t md:border-t-0 w-full md:w-auto mt-2 md:mt-0">
                                    <div className="text-center md:text-right flex-1 md:flex-none">
                                       <p className="text-[9px] font-bold text-muted uppercase tracking-widest mb-1.5">Inicio Vigencia</p>
-                                      <p className="text-sm font-bold text-ink tracking-tight">{selectedProp.f_ini || 'No registrado'}</p>
+                                      <p className="text-sm font-bold text-ink tracking-tight">{formatDateDMY(selectedProp.f_ini) || 'No registrado'}</p>
                                    </div>
                                    <div className="text-center md:text-right flex-1 md:flex-none">
                                       <p className="text-[9px] font-bold text-muted uppercase tracking-widest mb-1.5">Estado Operativo</p>
@@ -3528,36 +3578,30 @@ export default function App() {
                             <button
                               key={p.id}
                               onClick={() => setSelectedReportPropId(p.id!)}
-                              className={`p-1.5 rounded-lg flex flex-col items-start gap-0.5 text-left transition-all duration-300 relative border smooth-transition ${
+                              className={`p-4 rounded-2xl flex flex-col items-start gap-2 text-left transition-all duration-300 relative border smooth-transition ${
                                 isSel 
                                   ? 'bg-gradient-to-tr from-primary to-slate-900 border-primary shadow-lg shadow-primary/20 scale-[1.02] transform' 
                                   : 'bg-bg border-transparent hover:border-border hover:bg-gray-50'
                               }`}
                             >
-                              <div className="flex justify-between items-center w-full mb-0.5">
+                              <div className="flex justify-between items-center w-full mb-1">
                                 <span className={`text-[7px] font-bold uppercase ${isSel ? 'text-white/50' : 'text-slate-400'}`}>Contrato</span>
                                 {p.f_ini && (
                                   <span className={`text-[10px] font-extrabold font-mono tracking-wider ${
                                     isSel ? 'text-red-300' : 'text-red-600'
                                   }`}>
-                                    {(() => {
-                                      const parts = p.f_ini.split('-');
-                                      if (parts.length >= 2) {
-                                        return `${parts[0]}-${parts[1]}`;
-                                      }
-                                      return p.f_ini;
-                                    })()}
+                                    {formatDateDMY(p.f_ini)}
                                   </span>
                                 )}
                               </div>
                               
-                              <div className="flex items-start justify-between gap-2 mb-0.5 w-full text-left font-sans">
-                                <div className="flex-1 min-w-0 flex flex-col gap-0">
-                                  <div className={`text-[9px] font-black uppercase tracking-tight truncate ${isSel ? 'text-white' : 'text-slate-700'}`} title={p.dueno || 'Sin Dueño'}>
+                              <div className="flex items-start justify-between gap-3 mb-1 w-full text-left font-sans">
+                                <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                                  <div className={`text-[10px] font-black uppercase tracking-tight truncate ${isSel ? 'text-white' : 'text-slate-700'}`} title={p.dueno || 'Sin Dueño'}>
                                     {p.dueno || 'Sin Dueño'}
                                   </div>
-                                  <div className={`text-[8px] font-bold uppercase italic ${isSel ? 'text-white/40' : 'text-slate-400'}`}>vs</div>
-                                  <div className={`text-[9px] font-black uppercase tracking-tight truncate ${isSel ? 'text-accent' : 'text-red-700'}`} title={p.arrendatario || 'Sin Inquilino'}>
+                                  <div className={`text-[9px] font-bold uppercase italic ${isSel ? 'text-white/40' : 'text-slate-400'}`}>vs</div>
+                                  <div className={`text-[10px] font-black uppercase tracking-tight truncate ${isSel ? 'text-accent' : 'text-red-700'}`} title={p.arrendatario || 'Sin Inquilino'}>
                                     {p.arrendatario || 'Sin Inquilino'}
                                   </div>
                                 </div>
@@ -3845,8 +3889,8 @@ export default function App() {
                                         </tr>
                                       </thead>
                                       <tbody>
-                                        {monthExpenses.map((exp: any, idx: number) => (
-                                          <tr key={`exp-${exp.id || idx}`} className="border-b border-stone-50 hover:bg-stone-50/50">
+                                        {monthExpenses.map((exp, idx) => (
+                                          <tr key={idx} className="border-b border-stone-50 hover:bg-stone-50/50">
                                             <td className="p-3 font-bold uppercase tracking-tight">{exp.tipo}</td>
                                             <td className="p-3 text-stone-500 font-mono">{exp.boleta || 'S/N'}</td>
                                             <td className="p-3 text-right font-black text-stone-900">{exp.monto}</td>
@@ -4475,10 +4519,16 @@ export default function App() {
         )}
 
         {activeModule === 'meetings' && (
-          <div className="max-w-7xl mx-auto py-0 animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-2">
+          <div className="max-w-7xl mx-auto py-2 animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
             {/* Header: Compacto */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-2 border-b border-border/10 pb-2">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 border-b border-border/10 pb-5">
               <div>
+                <span className="text-[9px] bg-red-50 border border-red-100 text-red-600 font-extrabold tracking-widest px-3 py-1.5 rounded-full uppercase font-mono shadow-xs">
+                  Gestión de Reuniones
+                </span>
+                <h2 className="text-xl lg:text-2xl font-black text-ink uppercase tracking-tight mt-1.5">
+                  Reuniones & Calendario
+                </h2>
               </div>
             </div>
 
@@ -4579,27 +4629,19 @@ export default function App() {
                       const seenEmails = new Set();
 
                       properties.forEach(p => {
-                        if (p.dueno && !p.dueno.toLowerCase().includes('aval') && p.mailD && p.mailD.trim()) {
-                          const nombres = p.dueno.split(',').map(s => s.trim());
-                          const mails = p.mailD.split(',').map(s => s.trim());
-                          nombres.forEach((nombre, i) => {
-                            const email = mails[i];
-                            if (nombre && email && !seenEmails.has(email.toLowerCase())) {
-                              seenEmails.add(email.toLowerCase());
-                              clientsList.push({ name: nombre, email: email, role: 'Propietario' });
-                            }
-                          });
+                        if (p.dueno && p.mailD && p.mailD.trim()) {
+                          const email = p.mailD.trim().toLowerCase();
+                          if (!seenEmails.has(email)) {
+                            seenEmails.add(email);
+                            clientsList.push({ name: p.dueno, email: p.mailD.trim(), role: 'Propietario' });
+                          }
                         }
-                        if (p.arrendatario && !p.arrendatario.toLowerCase().includes('aval') && p.mailA && p.mailA.trim()) {
-                          const nombres = p.arrendatario.split(',').map(s => s.trim());
-                          const mails = p.mailA.split(',').map(s => s.trim());
-                          nombres.forEach((nombre, i) => {
-                            const email = mails[i];
-                            if (nombre && email && !seenEmails.has(email.toLowerCase())) {
-                              seenEmails.add(email.toLowerCase());
-                              clientsList.push({ name: nombre, email: email, role: 'Arrendatario' });
-                            }
-                          });
+                        if (p.arrendatario && p.mailA && p.mailA.trim()) {
+                          const email = p.mailA.trim().toLowerCase();
+                          if (!seenEmails.has(email)) {
+                            seenEmails.add(email);
+                            clientsList.push({ name: p.arrendatario, email: p.mailA.trim(), role: 'Arrendatario' });
+                          }
                         }
                       });
 
@@ -4621,7 +4663,7 @@ export default function App() {
                             const isSel = selectedClientEmail === client.email;
                             return (
                               <button
-                                key={`${client.email}-${idx}`}
+                                key={`client-btn-${idx}`}
                                 type="button"
                                 onClick={() => {
                                   setSelectedClientEmail(client.email);
@@ -4687,15 +4729,15 @@ export default function App() {
                 )}
 
                 <div className="space-y-4 pt-2 border-t border-dashed border-border/60">
-                  <h4 className="text-[10px] font-black uppercase text-muted tracking-widest">2. Detalles de la Reunión</h4>
+                  <h4 className="text-[10px] font-black uppercase text-muted tracking-widest">2. Detalles de Asesoría</h4>
                   
                   {/* Meeting Type Selector */}
                   <div className="space-y-2">
                     {[
-                      { type: 'Revisión de Gastos', duration: '30 min', desc: 'Análisis detallado de los gastos de la propiedad para tu revisión.', color: 'border-blue-500' },
-                      { type: 'Revisión de Contrato', duration: '45 min', desc: 'Revisión de cláusulas, términos y condiciones del contrato de arriendo.', color: 'border-purple-500' },
-                      { type: 'Revisión de Propiedad', duration: '30 min', desc: 'Discusión sobre el estado, reparaciones o mejoras de tu propiedad.', color: 'border-amber-500' },
-                      { type: 'Otros', duration: '30 min', desc: 'Otros temas de interés relacionados con la gestión de tus propiedades.', color: 'border-slate-500' }
+                      { type: 'Capacitación de Lector IA', duration: '60 min', desc: 'Exploración profunda del procesador de contratos, optimización de variables y corrección de rutinas.', color: 'border-accent' },
+                      { type: 'Automatización de Envíos SMTP', duration: '45 min', desc: 'Te ayudamos a enlazar tu correo corporativo y estructurar tus avisos para eliminar rebotes de cobranza.', color: 'border-green-500' },
+                      { type: 'Migración Masiva de Portafolio', duration: '30 min', desc: 'Asistencia técnica directa para subir todo tu listado histórico de contratos desde planillas o carpetas.', color: 'border-yellow-500' },
+                      { type: 'Reunión General / Consulta Técnica', duration: '30 min', desc: 'Resolución de dudas generales de uso de la plataforma o nuevas ideas para tu negocio.', color: 'border-blue-500' }
                     ].map((meet) => (
                       <button
                         key={meet.type}
@@ -4719,10 +4761,10 @@ export default function App() {
                   </div>
 
                   <div>
-                    <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Motivo o Notas de la Reunión</label>
+                    <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Duda o requerimiento técnico</label>
                     <input
                       type="text"
-                      placeholder="Ej: Revisar estado de cuenta..."
+                      placeholder="Ej: Revisar arriendos cargados..."
                       value={meetingReason}
                       onChange={(e) => setMeetingReason(e.target.value)}
                       className="w-full bg-gray-50 border border-border/80 rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent"
@@ -4792,27 +4834,20 @@ export default function App() {
                   <div className="space-y-4">
                     <label className="text-[9px] font-black uppercase text-muted tracking-widest block">Horarios Disponibles (Hora Chilena)</label>
                     <div className="grid grid-cols-2 gap-2.5">
-                      {['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00'].map((hour) => {
-                        const slotDate = new Date(meetingDate + 'T' + hour);
-                        const isPast = slotDate < new Date();
-                        return (
-                          <button
-                            key={`meetings-hour-${hour}`}
-                            type="button"
-                            disabled={isPast || !meetingDate}
-                            onClick={() => setMeetingTime(hour)}
-                            className={`py-3.5 px-3 rounded-2xl font-bold text-xs transition-all border text-center cursor-pointer ${
-                              isPast || !meetingDate
-                                ? 'opacity-30 cursor-not-allowed bg-gray-100'
-                                : meetingTime === hour
-                                ? 'bg-primary text-white border-primary shadow-sm scale-[1.02]'
-                                : 'bg-white border-border hover:border-accent text-ink hover:shadow-xs'
-                            }`}
-                          >
-                            🕒 {hour} Hrs
-                          </button>
-                        );
-                      })}
+                      {['09:00', '10:30', '14:30', '16:00'].map((hour) => (
+                        <button
+                          key={`meetings-hour-${hour}`}
+                          type="button"
+                          onClick={() => setMeetingTime(hour)}
+                          className={`py-3.5 px-3 rounded-2xl font-bold text-xs transition-all border text-center cursor-pointer ${
+                            meetingTime === hour
+                              ? 'bg-primary text-white border-primary shadow-sm scale-[1.02]'
+                              : 'bg-white border-border hover:border-accent text-ink hover:shadow-xs'
+                          }`}
+                        >
+                          🕒 {hour} Hrs
+                        </button>
+                      ))}
                     </div>
                     {meetingTime ? (
                       <p className="text-[10px] text-accent font-black uppercase tracking-wider text-right">Hora: {meetingTime} Hrs</p>
@@ -4842,15 +4877,11 @@ export default function App() {
                         tipo: selectedMeetingType,
                         fecha: meetingDate,
                         hora: meetingTime,
-                        duda: meetingReason || 'Sin notas adicionales',
+                        duda: meetingReason || 'Dudas generales en la plataforma',
                         meetLink: '',
                         estado: 'Confirmada',
                         invitado: `${guestName || 'Invitado'} (${guestEmail})`
                       };
-
-                      if (newMeeting.duda === 'Dudas generales en la plataforma') {
-                          newMeeting.duda = meetingReason || 'Sin notas adicionales';
-                      }
 
                       const token = getAccessToken();
                       setLoading(true);
@@ -4883,9 +4914,8 @@ export default function App() {
                               newMeeting.meetLink = meetingData.hangoutLink || '';
                               showToast('Reunión agendada en Google Calendar y Meet con éxito. Enlace generado.', 'success');
                           } else {
-                              const errData = await meetingRes.json();
                               newMeeting.meetLink = 'Error al generar';
-                              showToast(`Error al agendar: ${errData.details || 'Revisa tu configuración SMTP'}`, 'error');
+                              showToast('Reunión registrada localmente, pero falló la vinculación Google API.', 'error');
                           }
                         } else {
                           newMeeting.meetLink = 'Pendiente de enlace';
