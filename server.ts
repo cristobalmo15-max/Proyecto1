@@ -415,7 +415,7 @@ app.post('/api/send-report', async (req, res) => {
 });
 
 // Cron Job automático mensual para avisar vencimientos de arriendos
-app.get('/api/cron/monthly-expiry', async (req, res) => {
+app.get(['/api/cron/monthly-expiry', '/api/server/cron/monthly-expiry', '/cron/monthly-expiry'], async (req, res) => {
   // Opcional: Autorización básica con cabecera Vercel Cron
   // if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) { ... }
 
