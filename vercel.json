@@ -1,14 +1,6 @@
 {
   "rewrites": [
     {
-      "source": "/api/cron/monthly-expiry",
-      "destination": "/api/server"
-    },
-    {
-      "source": "/api/punto-propiedades/visor-pdf/:name",
-      "destination": "/api/server"
-    },
-    {
       "source": "/api/(.*)",
       "destination": "/api/server"
     }

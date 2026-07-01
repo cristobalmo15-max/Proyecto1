@@ -143,7 +143,7 @@ app.post('/api/create-meeting', async (req, res) => {
 });
 
 // Visor de PDF personalizado con marca Punto Propiedades
-app.get(['/api/punto-propiedades/visor-pdf/:name', '/api/server/punto-propiedades/visor-pdf/:name', '/punto-propiedades/visor-pdf/:name'], async (req, res) => {
+app.get('/api/punto-propiedades/visor-pdf/:name', async (req, res) => {
   const fileUrl = req.query.url as string;
   if (!fileUrl) return res.status(400).send('URL de contrato no proporcionada');
   
@@ -415,7 +415,7 @@ app.post('/api/send-report', async (req, res) => {
 });
 
 // Cron Job automático mensual para avisar vencimientos de arriendos
-app.get(['/api/cron/monthly-expiry', '/api/server/cron/monthly-expiry', '/cron/monthly-expiry'], async (req, res) => {
+app.get('/api/cron/monthly-expiry', async (req, res) => {
   // Opcional: Autorización básica con cabecera Vercel Cron
   // if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) { ... }
 
