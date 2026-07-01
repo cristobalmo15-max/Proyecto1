@@ -511,7 +511,7 @@ export default function App() {
   // Inside the main layout component, add search and admin entry.
 
   const [onlyFlagged, setOnlyFlagged] = useState(false);
-  const [sortType, setSortType] = useState<'date-asc' | 'date-desc' | 'name-asc' | 'name-desc'>('date-desc');
+  const [sortType, setSortType] = useState<'date-asc' | 'date-desc' | 'name-asc' | 'name-desc'>('date-asc');
   const [showConfirmDelete, setShowConfirmDelete] = useState<{ 
     type: 'property' | 'expense' | 'reset', 
     id?: string, 
@@ -2069,14 +2069,14 @@ export default function App() {
   const sortedProperties = [...filterProperties(properties, propSearch)]
     .sort((a, b) => {
     if (sortType === 'date-desc') {
-      const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
-      const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
-      return dateB - dateA;
+      const monthA = a.f_ini ? parseInt(a.f_ini.split('-')[1] || '0', 10) : 0;
+      const monthB = b.f_ini ? parseInt(b.f_ini.split('-')[1] || '0', 10) : 0;
+      return monthB - monthA;
     }
     if (sortType === 'date-asc') {
-      const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
-      const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
-      return dateA - dateB;
+      const monthA = a.f_ini ? parseInt(a.f_ini.split('-')[1] || '0', 10) : 0;
+      const monthB = b.f_ini ? parseInt(b.f_ini.split('-')[1] || '0', 10) : 0;
+      return monthA - monthB;
     }
     if (sortType === 'name-asc') {
       return (a.direccion || '').localeCompare(b.direccion || '');
@@ -2087,23 +2087,43 @@ export default function App() {
     return 0;
   });
 
-  const availableYears = Array.from(new Set(
+  const availableMonths = Array.from(new Set(
     properties
       .map(p => {
         if (!p.f_ini) return null;
         const parts = p.f_ini.split('-');
-        return parts[0];
+        if (parts.length >= 2) return parts[1];
+        return null;
       })
       .filter(Boolean)
   ))
-  .sort((a, b) => String(b!).localeCompare(String(a!)));
+  .sort((a, b) => String(a!).localeCompare(String(b!)));
+
+  const getMonthNameByNum = (numStr: string) => {
+    const monthNum = parseInt(numStr, 10);
+    const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    return months[monthNum - 1] || numStr;
+  };
+
+  const getMonthName = (dateStr: string | undefined): string => {
+    if (!dateStr) return 'N/A';
+    const parts = dateStr.split('-');
+    if (parts.length >= 2) {
+      return getMonthNameByNum(parts[1]);
+    }
+    return dateStr;
+  };
 
   const filteredSidebarProps = filterProperties(properties, propSearch)
     .filter(p => !onlyFlagged || !!p.flagged)
     .filter(p => {
       if (selectedYearFilter === 'all') return true;
       if (!p.f_ini) return false;
-      return p.f_ini.startsWith(selectedYearFilter);
+      const parts = p.f_ini.split('-');
+      if (parts.length >= 2) {
+        return parts[1] === selectedYearFilter;
+      }
+      return false;
     });
   
   return (
@@ -2434,19 +2454,30 @@ export default function App() {
                          </div>
                     )}
                   </div>
-                  {/* Year Filter Dropdown */}
+                  {/* Sort Filter Dropdown */}
+                  <select
+                    value={sortType}
+                    onChange={(e) => setSortType(e.target.value as any)}
+                    className="h-10 px-2 rounded-xl border border-border/70 bg-white text-[10px] font-black uppercase tracking-wider text-muted outline-none cursor-pointer transition-all hover:border-primary shrink-0"
+                  >
+                    <option value="date-asc">Mes 01 - 12</option>
+                    <option value="date-desc">Mes 12 - 01</option>
+                    <option value="name-asc">A-Z</option>
+                    <option value="name-desc">Z-A</option>
+                  </select>
+                  {/* Month Filter Dropdown */}
                   <select
                     value={selectedYearFilter}
                     onChange={(e) => setSelectedYearFilter(e.target.value)}
                     className={`h-10 px-2 rounded-xl border bg-white text-[10px] font-black uppercase tracking-wider outline-none cursor-pointer transition-all shrink-0 ${
                       selectedYearFilter !== 'all' 
-                        ? 'border-primary text-primary bg-red-50/30' 
-                        : 'border-border/70 text-muted hover:border-primary'
+                         ? 'border-primary text-primary bg-red-50/30' 
+                         : 'border-border/70 text-muted hover:border-primary'
                     }`}
                   >
-                    <option value="all">Año: Todos</option>
-                    {availableYears.map(yr => (
-                      <option key={yr} value={yr}>{yr}</option>
+                    <option value="all">Mes: Todos</option>
+                    {availableMonths.map(mo => (
+                      <option key={mo as string} value={mo as string}>{getMonthNameByNum(mo as string)}</option>
                     ))}
                   </select>
 
@@ -2485,10 +2516,10 @@ export default function App() {
                     .sort((a, b) => {
                       if (sortType === 'name-asc') return (a.direccion || '').localeCompare(b.direccion || '');
                       if (sortType === 'name-desc') return (b.direccion || '').localeCompare(a.direccion || '');
-                      const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
-                      const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
-                      if (sortType === 'date-asc') return dateA - dateB;
-                      return dateB - dateA; // date-desc default
+                      const monthA = a.f_ini ? parseInt(a.f_ini.split('-')[1] || '0', 10) : 0;
+                      const monthB = b.f_ini ? parseInt(b.f_ini.split('-')[1] || '0', 10) : 0;
+                      if (sortType === 'date-asc') return monthA - monthB;
+                      return monthB - monthA; // date-desc default
                     })
                     .map((p, i) => (
                       <div 
@@ -2504,7 +2535,7 @@ export default function App() {
                         <span className="text-[7px] text-slate-400 font-bold uppercase">Contrato</span>
                         {p.f_ini && (
                           <span className="text-[10px] font-extrabold text-red-600 font-mono tracking-wider">
-                            {formatDateDMY(p.f_ini)}
+                            {getMonthName(p.f_ini)}
                           </span>
                         )}
                       </div>
@@ -3590,7 +3621,7 @@ export default function App() {
                                   <span className={`text-[10px] font-extrabold font-mono tracking-wider ${
                                     isSel ? 'text-red-300' : 'text-red-600'
                                   }`}>
-                                    {formatDateDMY(p.f_ini)}
+                                    {getMonthName(p.f_ini)}
                                   </span>
                                 )}
                               </div>
