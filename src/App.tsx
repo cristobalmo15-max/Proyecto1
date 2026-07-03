@@ -5664,7 +5664,9 @@ if (!isAuthReady) return null;
 
                         <div className="grid grid-cols-2 gap-4 pb-1.5 border-b border-border/5">
                           <div>
-                            <label className="text-[7px] font-black text-ink/20 uppercase mb-1.5 block font-mono">Inicio Ciclo</label>
+                            <label className="text-[7px] font-black text-ink/20 uppercase mb-1.5 block font-mono">
+                              Inicio Ciclo {formData.f_ini && <span className="text-primary font-bold ml-1">({formatDateDMY(formData.f_ini)})</span>}
+                            </label>
                             <input 
                               type="date" 
                               value={formData.f_ini || ''}
@@ -5709,7 +5711,9 @@ if (!isAuthReady) return null;
                         </div>
 
                         <div>
-                          <label className="text-[7px] font-black text-ink/20 uppercase mb-1.5 block font-mono">Término Ciclo (Recalculado)</label>
+                          <label className="text-[7px] font-black text-ink/20 uppercase mb-1.5 block font-mono">
+                            Término Ciclo (Recalculado) {formData.termino && <span className="text-primary font-bold ml-1">({formatDateDMY(formData.termino)})</span>}
+                          </label>
                           <input 
                             type="date" 
                             value={formData.termino || ''}
