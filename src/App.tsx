@@ -165,9 +165,23 @@ const formatRut = (rut: string): string => {
 
 // Helper para formatear fecha YYYY-MM-DD → DD-MM-YYYY
 const formatDateDMY = (dateStr?: string): string => {
-  if (!dateStr) return 'N/A';
+  if (!dateStr) return '';
   const parts = dateStr.split('-');
   if (parts.length === 3) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  return dateStr;
+};
+
+// Convierte DD-MM-YYYY → YYYY-MM-DD
+const parseDateDMYToYMD = (dateStr: string): string => {
+  if (!dateStr) return '';
+  const clean = dateStr.replace(/\//g, '-');
+  const parts = clean.split('-');
+  if (parts.length === 3) {
+    // Si ya viene YYYY-MM-DD
+    if (parts[0].length === 4) return clean;
+    // Si viene DD-MM-YYYY
     return `${parts[2]}-${parts[1]}-${parts[0]}`;
   }
   return dateStr;
@@ -5665,13 +5679,15 @@ if (!isAuthReady) return null;
                         <div className="grid grid-cols-2 gap-4 pb-1.5 border-b border-border/5">
                           <div>
                             <label className="text-[7px] font-black text-ink/20 uppercase mb-1.5 block font-mono">
-                              Inicio Ciclo {formData.f_ini && <span className="text-primary font-bold ml-1">({formatDateDMY(formData.f_ini)})</span>}
+                              Inicio Ciclo (DD-MM-AAAA)
                             </label>
                             <input 
-                              type="date" 
-                              value={formData.f_ini || ''}
+                              type="text"
+                              placeholder="DD-MM-YYYY"
+                              value={formatDateDMY(formData.f_ini) || ''}
                               onChange={(e) => {
-                                const newStart = e.target.value;
+                                const rawVal = e.target.value;
+                                const newStart = parseDateDMYToYMD(rawVal);
                                 const months = Number(formData.duracionMeses) || 12;
                                 setFormData({
                                   ...formData, 
@@ -5712,12 +5728,16 @@ if (!isAuthReady) return null;
 
                         <div>
                           <label className="text-[7px] font-black text-ink/20 uppercase mb-1.5 block font-mono">
-                            Término Ciclo (Recalculado) {formData.termino && <span className="text-primary font-bold ml-1">({formatDateDMY(formData.termino)})</span>}
+                            Término Ciclo (Recalculado) (DD-MM-AAAA)
                           </label>
                           <input 
-                            type="date" 
-                            value={formData.termino || ''}
-                            onChange={(e) => setFormData({...formData, termino: e.target.value})}
+                            type="text" 
+                            placeholder="DD-MM-YYYY"
+                            value={formatDateDMY(formData.termino) || ''}
+                            onChange={(e) => {
+                              const rawVal = e.target.value;
+                              setFormData({...formData, termino: parseDateDMYToYMD(rawVal)});
+                            }}
                             className="w-full bg-transparent text-[10px] font-bold outline-none text-ink/70 pb-1 border-b border-border/5"
                           />
                         </div>
