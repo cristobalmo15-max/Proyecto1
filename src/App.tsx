@@ -386,6 +386,8 @@ export default function App() {
   const [reportsSubModule, setReportsSubModule] = useState<'expenses' | 'expiries'>('expenses');
   const [expiryFilter, setExpiryFilter] = useState<'all' | 'expired' | 'upcoming'>('all');
   const [returnToVencimientos, setReturnToVencimientos] = useState(false);
+  const [selectedExpiryProp, setSelectedExpiryProp] = useState<Property | null>(null);
+  const [showExpiryModal, setShowExpiryModal] = useState(false);
 
 
   const logActivity = async (actionText: string, isMass = false, details = null) => {
@@ -1746,7 +1748,643 @@ export default function App() {
     return addMonthsToDate(startDate, months);
   };
 
-  if (!isAuthReady) return null;
+  
+  const renderPropertyDetailsContent = () => {
+    if (!selectedProp) return null;
+    return (
+      <div className="min-h-full flex flex-col w-full">
+                  {/* Property Header - Robust Adaptive Layout */}
+                  <div className="py-3 lg:py-4 px-6 lg:px-10 border-b border-border/10 bg-white shadow-sm shrink-0">
+                    <div className="flex flex-col gap-4">
+                      {/* Responsive Back Button */}
+                      {!showExpiryModal && (
+                        returnToVencimientos ? (
+                          <button 
+                            onClick={() => {
+                              setSelectedProp(null);
+                              setActiveModule('reports');
+                              setReportsSubModule('expiries');
+                              setReturnToVencimientos(false);
+                            }}
+                            className="flex items-center gap-1.5 self-start text-[10px] font-black uppercase tracking-widest text-white bg-red-600 hover:bg-red-700 px-4.5 py-2.5 rounded-xl shadow-md mb-2 cursor-pointer active:scale-95 transition-all"
+                          >
+                            <ArrowLeft className="w-4 h-4" />
+                            Volver a Vencimientos
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={() => setSelectedProp(null)}
+                            className="lg:hidden flex items-center gap-1.5 self-start text-[10px] font-black uppercase tracking-widest text-ink/70 hover:text-ink transition-all bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-lg border border-border/10 mb-1"
+                          >
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                            Volver al Listado
+                          </button>
+                        )
+                      )}
+                      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                        <div className="flex items-center gap-4 min-w-0 w-full lg:w-auto">
+                          <div className="w-12 h-12 bg-[#1a1a1a] text-white rounded-[14px] flex items-center justify-center shrink-0 shadow-md">
+                            <Building2 className="w-5 h-5 text-white" />
+                          </div>
+                          
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                              <div className="px-2 py-0.5 text-[8px] font-black uppercase tracking-widest bg-red-50 text-red-600 rounded-full border border-red-100 flex items-center gap-1 shadow-sm font-mono">
+                                <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                                {isExpired(selectedProp.termino) ? 'VENCIDA' : 'ACTIVA'}
+                              </div>
+                              <span className="text-[8px] font-mono font-medium text-ink/20 uppercase tracking-widest">REF: {selectedProp.id}</span>
+                            </div>
+                            
+                            <div className="py-0.5">
+                              <h3 className={`font-black tracking-tight text-ink leading-[1.1] uppercase transition-all max-w-2xl ${
+                                selectedProp.direccion.length > 100 ? 'text-xs lg:text-sm' : 
+                                selectedProp.direccion.length > 70 ? 'text-sm lg:text-base' : 
+                                selectedProp.direccion.length > 40 ? 'text-base lg:text-lg' : 
+                                'text-lg lg:text-xl'
+                              }`}>
+                                {selectedProp.direccion}
+                              </h3>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between lg:justify-end w-full lg:w-auto gap-6 pt-2 lg:pt-0 border-t lg:border-t-0 border-border/5">
+                          <div className="text-right">
+                             <p className="text-[8px] text-muted font-bold uppercase tracking-widest mb-0.5 opacity-60">VALORIZACIÓN</p>
+                             <p className="text-xl lg:text-2xl font-black text-primary leading-none tracking-tighter">
+                               {formatMoney(selectedProp.valor, selectedProp.tipoMonto)}
+                             </p>
+                          </div>
+                          <button onClick={() => { setFormData(selectedProp); setIsAdding(true); }} className="w-10 h-10 bg-gray-50 hover:bg-gray-100 text-ink rounded-xl border border-border/40 transition-all flex items-center justify-center shadow-sm group">
+                             <Pencil size={16} className="group-hover:scale-110 transition-transform duration-500" />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-3 bg-red-50/40 p-2 lg:px-4 lg:py-2 rounded-[16px] border border-red-100/50 shadow-sm flex-1 lg:flex-none">
+                           <div className="flex items-center gap-4">
+                             <div className="w-8 h-8 bg-white rounded-lg shadow-sm border border-red-100/50 flex items-center justify-center">
+                               <CalendarDays className="w-4 h-4 text-red-600" />
+                             </div>
+                             <div className="flex items-center gap-6">
+                               <div className="text-center sm:text-left">
+                                 <span className="text-[7px] font-black uppercase tracking-[0.15em] text-red-600/50 block mb-0.5 leading-none">Inicio Contrato</span>
+                                 <span className="text-[11px] font-black text-ink tracking-tight leading-none">{formatDateDMY(selectedProp.f_ini)}</span>
+                               </div>
+                               <div className="w-px h-6 bg-red-100/30" />
+                               <div className="text-center sm:text-left">
+                                 <span className="text-[7px] font-black uppercase tracking-[0.15em] text-red-600/50 block mb-0.5 leading-none">Vencimiento</span>
+                                 <span className="text-[11px] font-black text-ink tracking-tight leading-none">{formatDateDMY(selectedProp.termino) || 'Indef'}</span>
+                               </div>
+                             </div>
+                           </div>
+                           
+                           <div className="hidden sm:block w-px h-6 bg-red-100/30 mx-1.5" />
+                           
+                           <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
+                             <div className="flex flex-col items-center">
+                               <span className="text-[6px] font-bold text-red-600/40 uppercase tracking-widest mb-0.5 leading-none">Plazo</span>
+                               <span className="text-[8px] font-black text-red-700 bg-white px-1.5 py-0.5 rounded border border-red-50 shadow-sm leading-none">{selectedProp.duracion || '12M'}</span>
+                             </div>
+                             <button onClick={renewContract} className="bg-ink text-white px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center gap-1.5 shadow-sm active:scale-95">
+                               <RefreshCw className="w-3 h-3" /> Renovar
+                             </button>
+                           </div>
+                        </div>
+
+                        {/* Historial de Renovaciones */}
+                        {selectedProp.renewalHistory && selectedProp.renewalHistory.length > 0 && (
+                          <div className="bg-slate-50 border border-border/60 rounded-2xl p-3 mt-1">
+                            <p className="text-[8px] font-black uppercase tracking-widest text-muted mb-2 flex items-center gap-1.5">
+                              📋 Historial de Renovaciones ({selectedProp.renewalHistory.length})
+                            </p>
+                            <div className="flex flex-col gap-1 max-h-[80px] overflow-y-auto custom-scrollbar">
+                              {[...selectedProp.renewalHistory].reverse().map((entry, idx) => (
+                                <div key={`renewal-${idx}`} className="flex items-center gap-2 text-[9px]">
+                                  <span className="text-muted font-mono font-bold">{formatDateDMY(entry.date)}</span>
+                                  <span className="text-muted">:</span>
+                                  <span className="font-bold text-red-600/70">{formatDateDMY(entry.oldTermino)}</span>
+                                  <span className="text-muted">→</span>
+                                  <span className="font-bold text-green-700">{formatDateDMY(entry.newTermino)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        <button 
+                            onClick={() => viewContract(selectedProp.pdf, selectedProp.arrendatario)}
+                            className="px-4 py-2 bg-white border border-border/60 rounded-2xl flex items-center gap-2 transition-all hover:bg-gray-50 hover:border-border shadow-sm h-full self-stretch lg:self-auto group"
+                        >
+                          <FileText className="w-4 h-4 text-ink/70 group-hover:text-primary transition-colors" />
+                          <span className="text-[9px] font-black uppercase tracking-widest text-ink">Ver Contrato PDF</span>
+                        </button>
+                      </div>
+                      
+                      {/* Integrated Tabs Selector */}
+                      <div className="border-t border-border/10 pt-3 flex justify-center">
+                        <div className="flex bg-gray-100/60 p-1 rounded-full border border-border/30">
+                          {[
+                            { id: 'legal', label: 'Identidad', icon: Users },
+                            { id: 'finances', label: 'Gastos', icon: Receipt },
+                            { id: 'document', label: 'Contrato', icon: ShieldCheck }
+                          ].map(tab => (
+                            <button 
+                              key={tab.id}
+                              onClick={() => {
+                                  setActiveTab(tab.id as any);
+                                  document.getElementById('property-details-container')?.scrollTo({ top: 0, behavior: 'auto' });
+                              }}
+                              className={`py-1.5 px-4 lg:px-6 rounded-full font-black uppercase text-[9px] tracking-widest transition-all flex items-center gap-1.5 ${
+                                activeTab === tab.id 
+                                  ? 'bg-ink text-white shadow-sm scale-105 z-10' 
+                                  : 'text-muted hover:text-ink hover:bg-white/40'
+                              }`}
+                            >
+                              <tab.icon size={11} className={activeTab === tab.id ? 'text-white' : 'opacity-40'} />
+                              <span>{tab.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div id="details-scroll-area" className="flex-1 p-6 bg-gray-50/40">
+                    {activeTab === 'legal' && (
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-6">
+                        
+                        {/* PROFILE: OWNER */}
+                        <div className="bg-white p-6 rounded-2xl border border-border/60 shadow-sm flex flex-col relative overflow-hidden transition-all hover:shadow-md min-h-[220px]">
+                          {(() => {
+                            const names = (selectedProp.dueno || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+                            const ruts = (selectedProp.rutDue || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+                            const tels = (selectedProp.telD || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+                            const splittedEmails = (selectedProp.mailD || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+
+                            return (
+                              <div className="h-full flex flex-col">
+                                <div className="flex items-center gap-2.5 mb-5 relative z-10 shrink-0">
+                                  <div className="w-8 h-8 bg-white border border-border rounded-lg flex items-center justify-center shrink-0 shadow-sm">
+                                      <UserIcon className="w-3.5 h-3.5 text-ink" />
+                                  </div>
+                                  <span className="text-[11px] font-bold text-ink uppercase tracking-widest">{getSectionTitle(names, 'dueno')}</span>
+                                </div>
+                                
+                                {names.length === 0 && (
+                                  <div className="flex-1 flex items-center justify-center py-6">
+                                    <p className="text-xs font-medium text-gray-400">Sin Registro</p>
+                                  </div>
+                                )}
+                                
+                                {names.length > 0 && (
+                                  <div className="flex flex-col flex-1">
+                                    {/* Names vertical list matching h-auto height vibe */}
+                                    <div className="h-auto min-h-[80px] flex flex-col justify-center py-1 overflow-visible relative z-10">
+                                      {names.map((name, i) => (
+                                        <p key={`${name}-${i}`} className={`font-extrabold text-ink leading-tight uppercase break-words px-1 py-0.5 ${
+                                          names.length > 2 ? 'text-[9px]' : names.length > 1 ? 'text-[10px]' : 'text-xs'
+                                        }`} title={name}>
+                                          {`${i + 1}. `}{name}
+                                        </p>
+                                      ))}
+                                    </div>
+                                    {/* Shared structured section details */}
+                                    <div className="space-y-3 mt-auto border-t border-border/50 pt-4 px-1 relative z-10">
+                                      {/* RUT Row */}
+                                      <div className="flex items-start justify-between gap-1">
+                                        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest shrink-0">RUT</span>
+                                        <div className="text-right space-y-0.5 min-w-0 flex-1">
+                                          {ruts.length > 0 ? (
+                                            ruts.map((rut, idx) => (
+                                              <span key={idx} className="text-[10px] font-bold text-ink tracking-tight block truncate" title={rut}>
+                                                <span className="text-gray-400 font-medium text-[8px] mr-1">#{idx + 1}</span>
+                                                {formatRut(rut)}
+                                              </span>
+                                            ))
+                                          ) : (
+                                            <span className="text-[10px] font-bold text-gray-400 block">N/A</span>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* TEL Row */}
+                                      <div className="flex items-start justify-between gap-1">
+                                        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest shrink-0">TEL</span>
+                                        <div className="text-right space-y-0.5 min-w-0 flex-1">
+                                          {tels.length > 0 ? (
+                                            tels.map((tel, idx) => (
+                                              <span key={idx} className="text-[10px] font-bold text-ink tracking-tight block truncate" title={tel}>
+                                                {tels.length > 1 ? <span className="text-gray-400 font-medium text-[8px] mr-1">#{idx + 1}</span> : null}
+                                                {tel}
+                                              </span>
+                                            ))
+                                          ) : (
+                                            <span className="text-[10px] font-bold text-gray-400 block">N/A</span>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* EMAIL Row */}
+                                      <div className="flex items-start justify-between gap-1">
+                                        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest shrink-0">EMAIL</span>
+                                        <div className="text-right space-y-0.5 min-w-0 flex-1">
+                                          {splittedEmails.length > 0 ? (
+                                            splittedEmails.map((email, idx) => (
+                                              <span key={idx} className="text-[10px] font-bold text-ink hover:text-primary transition-colors cursor-pointer block truncate lowercase selection:bg-accent/20" title={email}>
+                                                {splittedEmails.length > 1 ? <span className="text-gray-400 font-medium text-[8px] mr-1">#{idx + 1}</span> : null}
+                                                {email}
+                                              </span>
+                                            ))
+                                          ) : (
+                                            <span className="text-[10px] font-bold text-gray-400 block">N/A</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+
+                        {/* PROFILE: TENANT */}
+                        <div className="bg-white p-6 rounded-2xl border border-border/60 shadow-sm flex flex-col relative overflow-hidden transition-all hover:shadow-md min-h-[220px]">
+                          {(() => {
+                            const names = (selectedProp.arrendatario || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+                            const ruts = (selectedProp.rutArr || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+                            const tels = (selectedProp.telA || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+                            const splittedEmails = (selectedProp.mailA || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+
+                            return (
+                              <div className="h-full flex flex-col">
+                                <div className="flex items-center gap-2.5 mb-5 relative z-10 shrink-0">
+                                  <div className="w-8 h-8 bg-white border border-border rounded-lg flex items-center justify-center shrink-0 shadow-sm">
+                                      <Users className="w-3.5 h-3.5 text-green-600" />
+                                  </div>
+                                  <span className="text-[9px] font-bold text-green-600 uppercase tracking-widest">{getSectionTitle(names, 'arrendatario')}</span>
+                                </div>
+                                
+                                {names.length === 0 && (
+                                  <div className="flex-1 flex items-center justify-center py-6">
+                                    <p className="text-xs font-medium text-gray-400">Sin Registro</p>
+                                  </div>
+                                )}
+                                
+                                {names.length > 0 && (
+                                  <div className="flex flex-col flex-1">
+                                    {/* Names vertical list matching h-auto height vibe */}
+                                    <div className="h-auto min-h-[80px] flex flex-col justify-center py-1 overflow-visible relative z-10">
+                                      {names.map((name, i) => (
+                                        <p key={`${name}-${i}`} className={`font-extrabold text-ink leading-tight uppercase break-words px-1 py-0.5 ${
+                                          names.length > 2 ? 'text-[9px]' : names.length > 1 ? 'text-[10px]' : 'text-xs'
+                                        }`} title={name}>
+                                          {`${i + 1}. `}{name}
+                                        </p>
+                                      ))}
+                                    </div>
+                                    {/* Shared structured section details */}
+                                    <div className="space-y-3 mt-auto border-t border-border/50 pt-4 px-1 relative z-10">
+                                      {/* RUT Row */}
+                                      <div className="flex items-start justify-between gap-1">
+                                        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest shrink-0">RUT</span>
+                                        <div className="text-right space-y-0.5 min-w-0 flex-1">
+                                          {ruts.length > 0 ? (
+                                            ruts.map((rut, idx) => (
+                                              <span key={idx} className="text-[10px] font-bold text-ink tracking-tight block truncate" title={rut}>
+                                                <span className="text-gray-400 font-medium text-[8px] mr-1">#{idx + 1}</span>
+                                                {formatRut(rut)}
+                                              </span>
+                                            ))
+                                          ) : (
+                                            <span className="text-[10px] font-bold text-gray-400 block">N/A</span>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* TEL Row */}
+                                      <div className="flex items-start justify-between gap-1">
+                                        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest shrink-0">TEL</span>
+                                        <div className="text-right space-y-0.5 min-w-0 flex-1">
+                                          {tels.length > 0 ? (
+                                            tels.map((tel, idx) => (
+                                              <span key={idx} className="text-[10px] font-bold text-ink tracking-tight block truncate" title={tel}>
+                                                {tels.length > 1 ? <span className="text-gray-400 font-medium text-[8px] mr-1">#{idx + 1}</span> : null}
+                                                {tel}
+                                              </span>
+                                            ))
+                                          ) : (
+                                            <span className="text-[10px] font-bold text-gray-400 block">N/A</span>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* EMAIL Row */}
+                                      <div className="flex items-start justify-between gap-1">
+                                        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest shrink-0">EMAIL</span>
+                                        <div className="text-right space-y-0.5 min-w-0 flex-1">
+                                          {splittedEmails.length > 0 ? (
+                                            splittedEmails.map((email, idx) => (
+                                              <span key={idx} className="text-[10px] font-bold text-ink hover:text-primary transition-colors cursor-pointer block truncate lowercase selection:bg-accent/20" title={email}>
+                                                {splittedEmails.length > 1 ? <span className="text-gray-400 font-medium text-[8px] mr-1">#{idx + 1}</span> : null}
+                                                {email}
+                                              </span>
+                                            ))
+                                          ) : (
+                                            <span className="text-[10px] font-bold text-gray-400 block">N/A</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+
+                        {/* PROFILE: GUARANTOR */}
+                        <div className="bg-white p-6 rounded-2xl border border-border/60 shadow-sm flex flex-col relative overflow-hidden transition-all hover:shadow-md min-h-[220px]">
+                          <div className="flex items-center gap-2.5 mb-5 relative z-10">
+                            <div className="w-8 h-8 bg-white border border-border rounded-lg flex items-center justify-center shrink-0 shadow-sm">
+                                <ShieldCheck className="w-3.5 h-3.5 text-orange-500" />
+                            </div>
+                            <span className="text-[9px] font-bold text-orange-500 uppercase tracking-widest">AVAL / CODEUDOR</span>
+                          </div>
+                          
+                          <div className="h-auto min-h-[80px] flex items-center py-2">
+                            <p className="font-bold tracking-tight text-ink leading-tight relative z-10 transition-all text-sm break-words">
+                              {selectedProp.aval || 'Sin Registro'}
+                            </p>
+                          </div>
+                          
+                          <div className="space-y-3 mt-auto border-t border-border/50 pt-4 px-1 relative z-10">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">RUT</span>
+                                <span className="text-[10px] font-bold text-ink tracking-tight">{selectedProp.rutAval || 'N/A'}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">TEL</span>
+                                <span className="text-[10px] font-bold text-ink tracking-tight">{selectedProp.telAval || 'N/A'}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">EMAIL</span>
+                                <span className="text-[10px] font-bold text-ink hover:text-primary transition-colors cursor-pointer truncate max-w-[140px] lowercase selection:bg-accent/20">{selectedProp.mailAval || 'N/A'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+                    )}
+                          {activeTab === 'finances' && (
+                            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 pb-4 duration-500">
+                              <AnimatePresence>
+                                {showExpenseForm && (
+                                  <motion.div 
+                                    initial={{ height: 0, opacity: 0, y: -10, scale: 0.98 }} 
+                                    animate={{ height: 'auto', opacity: 1, y: 0, scale: 1 }} 
+                                    exit={{ height: 0, opacity: 0, y: -10, scale: 0.98 }}
+                                    className="bg-white p-4 rounded-xl border border-border/60 grid grid-cols-1 md:grid-cols-12 gap-3 items-end mb-4 shadow-sm relative overflow-visible"
+                                  >
+                                     <div className="md:col-span-2">
+                                       <CustomSelect 
+                                         label="Categoría"
+                                         value={expenseForm.tipo}
+                                         onChange={(val) => setExpenseForm({...expenseForm, tipo: val})}
+                                         options={EXPENSE_TYPES}
+                                       />
+                                     </div>
+                                     <div className="md:col-span-3">
+                                       <CustomSelect 
+                                         label="Mes Fiscal"
+                                         value={expenseForm.mes}
+                                         onChange={(val) => setExpenseForm({...expenseForm, mes: val})}
+                                         options={MONTHS_WITH_YEAR}
+                                       />
+                                     </div>
+                                     <div className="md:col-span-2">
+                                      <div className="bg-gray-50 border border-border/50 rounded-xl px-3 py-1.5 focus-within:border-ink/20 focus-within:ring-2 ring-ink/5 transition-all shadow-sm group">
+                                        <label className="text-[9px] font-bold text-muted group-hover:text-ink uppercase mb-1 block tracking-widest transition-colors">Monto</label>
+                                        <div className="flex items-center gap-3">
+                                           <span className="text-muted font-bold text-base leading-none">$</span>
+                                           <input 
+                                            type="number" 
+                                            value={expenseForm.monto}
+                                            onChange={(e) => setExpenseForm({...expenseForm, monto: e.target.value})}
+                                            onKeyDown={(e) => { if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault(); }}
+                                            className="w-full bg-transparent text-base font-black outline-none text-ink placeholder:text-muted/50"
+                                            placeholder="0"
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                      <div className="bg-gray-50 border border-border/50 rounded-xl px-3 py-1.5 focus-within:border-ink/20 focus-within:ring-2 ring-ink/5 transition-all shadow-sm group">
+                                        <label className="text-[9px] font-bold text-muted group-hover:text-ink uppercase mb-1 block tracking-widest transition-colors">Comprobante</label>
+                                        <div className="flex items-center gap-2">
+                                          <label className="flex items-center gap-1.5 justify-center w-full bg-white border border-border/40 hover:bg-gray-50 rounded-lg px-2.5 py-1.5 text-[9px] font-black uppercase tracking-wider text-ink/70 cursor-pointer shadow-sm transition-all active:scale-95 truncate">
+                                            <Upload className="w-3.5 h-3.5 text-primary shrink-0" />
+                                            <span className="truncate">{expenseForm.file ? (expenseForm.file as File).name : 'Subir Archivo'}</span>
+                                            <input 
+                                              type="file" 
+                                              accept="application/pdf,image/*" 
+                                              className="hidden" 
+                                              onChange={(e) => {
+                                                const uploadedFile = e.target.files?.[0] || null;
+                                                setExpenseForm({...expenseForm, file: uploadedFile});
+                                              }} 
+                                            />
+                                          </label>
+                                          {expenseForm.file && (
+                                            <button 
+                                              onClick={() => setExpenseForm({...expenseForm, file: null})} 
+                                              className="p-1 hover:text-red-500 text-muted transition-colors rounded hover:bg-gray-100 shrink-0"
+                                              title="Eliminar archivo"
+                                              type="button"
+                                            >
+                                              <X className="w-3.5 h-3.5" />
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="md:col-span-3">
+                                      <button 
+                                        onClick={async () => {
+                                          await addExpense();
+                                          setShowExpenseForm(false);
+                                        }}
+                                        className="w-full bg-ink text-white h-[46px] rounded-lg font-bold uppercase text-[10px] tracking-widest hover:bg-black shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 group border-none"
+                                      >
+                                        {loading && loadingStatus.includes('comprobante') ? (
+                                          <div className="flex items-center gap-2">
+                                             <div className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" />
+                                             <div className="w-1.5 h-1.5 bg-white rounded-full animate-bounce [animation-delay:-0.15s]" />
+                                             <div className="w-1.5 h-1.5 bg-white rounded-full animate-bounce [animation-delay:-0.3s]" />
+                                          </div>
+                                        ) : (
+                                          <span>Registrar Pago</span>
+                                        )}
+                                      </button>
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+
+                              <div className="bg-white rounded-2xl border border-border/60 shadow-sm overflow-hidden flex flex-col">
+                                <div className="py-1.5 px-4 border-b border-border/50 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 bg-white relative z-10">
+                                  <div>
+                                     <h4 className="text-[8px] leading-[11px] font-bold uppercase tracking-widest text-muted mb-0.5">Métricas Financieras</h4>
+                                     <p className="text-sm font-bold text-ink uppercase tracking-tight">Cuentas y Pagos</p>
+                                  </div>
+                                  <button 
+                                    onClick={() => setShowExpenseForm(!showExpenseForm)} 
+                                    className={`px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${showExpenseForm ? 'bg-gray-100 text-ink shadow-sm' : 'bg-ink text-white shadow-md hover:bg-black active:scale-95'}`}
+                                  >
+                                    {showExpenseForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                                    {showExpenseForm ? 'Cerrar' : 'Nueva Transacción'}
+                                  </button>
+                                </div>
+                                <div className="overflow-x-auto">
+                                  <table className="w-full">
+                                  <thead>
+                                    <tr className="text-left text-muted border-b border-border bg-gray-50 uppercase tracking-widest text-[9px] font-bold">
+                                      <th className="p-4 pl-6">Tipo de Transacción</th>
+                                      <th className="p-4">Mes</th>
+                                      <th className="p-4 text-ink">Monto</th>
+                                      <th className="p-4 text-right pr-6">Controles</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-border/50">
+                                    {selectedProp.expenses?.length > 0 ? selectedProp.expenses.map((exp: any, idx: number) => (
+                                      <tr key={`expense-${selectedProp.id || 'current'}-${idx}`} className="hover:bg-gray-50/80 transition-all group duration-300">
+                                        <td className="p-4 pl-6">
+                                          <div className="flex items-center gap-3">
+                                             <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                                             <span className="font-bold text-xs text-ink">{exp.tipo}</span>
+                                          </div>
+                                        </td>
+                                        <td className="p-4">
+                                          <div className="bg-white px-2.5 py-1 rounded-lg border border-border/80 inline-block shadow-sm">
+                                             <span className="text-ink/70 font-bold uppercase text-[9px] tracking-widest">{exp.mes}</span>
+                                          </div>
+                                        </td>
+                                        <td className="p-4">
+                                          <span className="font-black text-ink text-sm tracking-tight">{formatMoney(exp.monto)}</span>
+                                        </td>
+                                        <td className="p-4 text-right pr-6">
+                                          <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300">
+                                            {exp.link && exp.link !== '#' && (
+                                              <button 
+                                                onClick={() => window.open(exp.link, '_blank')}
+                                                className="w-8 h-8 bg-white border border-border/80 text-muted hover:text-ink hover:border-ink/30 rounded-lg flex items-center justify-center transition-all shadow-sm hover:shadow-md"
+                                              >
+                                                <ExternalLink className="w-3.5 h-3.5" />
+                                              </button>
+                                            )}
+                                            <button 
+                                              onClick={() => setShowConfirmDelete({ type: 'expense', id: selectedProp.id, index: idx })}
+                                              className="w-8 h-8 bg-gray-50 text-muted hover:text-red-500 hover:bg-red-50 rounded-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    )) : (
+                                      <tr>
+                                        <td colSpan={4} className="p-12 text-center">
+                                           <div className="max-w-xs mx-auto">
+                                             <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-sm border border-border/50">
+                                                <Receipt className="w-5 h-5 text-muted" />
+                                             </div>
+                                             <p className="text-[10px] font-bold uppercase tracking-widest text-muted mb-2">Sin Registros</p>
+                                             <p className="text-[11px] text-ink/40 leading-relaxed">Agregue pagos o cuentas para mantener el historial financiero de esta propiedad.</p>
+                                           </div>
+                                        </td>
+                                      </tr>
+                                    )}
+                                  </tbody>
+                                </table>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {activeTab === 'document' && (
+                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8 flex flex-col items-center">
+
+                              <div className="w-full bg-white rounded-3xl border border-border/60 p-6 lg:p-8 flex flex-col md:flex-row items-center justify-between shadow-sm relative overflow-hidden gap-8">
+                                <div className="flex flex-col md:flex-row items-center gap-6 md:gap-8">
+                                  <div className="w-24 h-32 bg-gray-50 rounded-2xl shadow-sm flex flex-col items-center justify-center border border-border/50 shrink-0 hover:scale-105 hover:-rotate-2 transition-transform duration-300 group cursor-pointer">
+                                     <FileText className="w-8 h-8 text-muted group-hover:text-ink transition-colors" />
+                                  </div>
+                                  
+                                  <div className="text-center md:text-left">
+                                     <h5 className="text-lg font-bold text-ink uppercase tracking-tight mb-2">Contrato de Arriendo</h5>
+                                     <p className="text-xs text-muted max-w-md mb-6 leading-relaxed">
+                                       Documento legal actual. Puedes revisarlo en una nueva pestaña o exportar una copia física de ser necesario.
+                                     </p>
+                                     
+                                     <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
+                                       <button 
+                                          onClick={() => viewContract(selectedProp.pdf, selectedProp.arrendatario)}
+                                          className="h-10 px-6 bg-ink text-white rounded-xl font-bold uppercase text-[10px] tracking-widest shadow-md hover:bg-black transition-all flex items-center gap-2.5 active:scale-95"
+                                       >
+                                         <Eye className="w-3.5 h-3.5" /> Ver Contrato
+                                       </button>
+                                       <button className="h-10 px-6 bg-white border border-border/80 text-ink rounded-xl font-bold uppercase text-[10px] tracking-widest hover:bg-gray-50 transition-all flex items-center gap-2.5 shadow-sm hover:border-ink/20">
+                                         <Download className="w-3.5 h-3.5" /> Descargar PDF
+                                       </button>
+                                     </div>
+                                  </div>
+                                </div>
+                                
+                                <div className="flex md:flex-col items-center md:items-end gap-6 md:gap-5 md:border-l border-border/50 md:pl-8 pt-6 md:pt-0 border-t md:border-t-0 w-full md:w-auto mt-2 md:mt-0">
+                                   <div className="text-center md:text-right flex-1 md:flex-none">
+                                      <p className="text-[9px] font-bold text-muted uppercase tracking-widest mb-1.5">Inicio Vigencia</p>
+                                      <p className="text-sm font-bold text-ink tracking-tight">{formatDateDMY(selectedProp.f_ini) || 'No registrado'}</p>
+                                   </div>
+                                   <div className="text-center md:text-right flex-1 md:flex-none">
+                                      <p className="text-[9px] font-bold text-muted uppercase tracking-widest mb-1.5">Estado Operativo</p>
+                                      <div className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-2.5 py-1 rounded-md border border-green-200 shadow-sm">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                                        <p className="text-[9px] font-bold uppercase tracking-widest">Activo</p>
+                                      </div>
+                                   </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                      {/* Property Footer - SOPHISTICATED MINIMALISM */}
+                      <div className="mt-auto px-10 py-8 border-t border-border/10 bg-white/50 backdrop-blur-sm flex justify-between items-center h-24">
+                        <div className="flex items-center gap-6">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+                            <p className="text-[10px] font-black text-ink/20 uppercase tracking-[0.3em] font-mono">Operations Active</p>
+                          </div>
+                          <div className="w-px h-4 bg-border/20" />
+                          <p className="text-[10px] font-medium text-ink/10 uppercase tracking-widest italic">Document Engineering by PNT</p>
+                        </div>
+                        
+                        <button 
+                          onClick={() => setShowConfirmDelete({ type: 'property', id: selectedProp.id })}
+                          className="group flex items-center gap-3 px-6 py-3 rounded-2xl border border-danger/5 text-danger/20 hover:text-danger hover:border-danger hover:bg-danger/5 transition-all text-[11px] font-black uppercase tracking-[0.2em] shadow-sm hover:shadow-xl active:scale-95"
+                        >
+                          <Trash2 className="w-4 h-4 transition-transform group-hover:rotate-12" /> 
+                          <span>Decommission Asset</span>
+                        </button>
+                      </div>
+                    </div>
+    );
+  };
+
+if (!isAuthReady) return null;
 
   if (isLoggingIn && !user) {
     return (
@@ -2669,637 +3307,11 @@ export default function App() {
             <div 
               id="property-details-container"
               className={`flex-1 overflow-y-auto custom-scrollbar bg-bg relative z-10 transition-all ${
-                selectedProp ? 'flex flex-col' : 'hidden lg:flex'
+                selectedProp && !showExpiryModal ? 'flex flex-col' : 'hidden lg:flex'
               }`}
             >
-              {selectedProp ? (
-                <div className="min-h-full flex flex-col w-full">
-                  {/* Property Header - Robust Adaptive Layout */}
-                  <div className="py-3 lg:py-4 px-6 lg:px-10 border-b border-border/10 bg-white shadow-sm shrink-0">
-                    <div className="flex flex-col gap-4">
-                      {/* Responsive Back Button */}
-                      {returnToVencimientos ? (
-                        <button 
-                          onClick={() => {
-                            setSelectedProp(null);
-                            setActiveModule('reports');
-                            setReportsSubModule('expiries');
-                            setReturnToVencimientos(false);
-                          }}
-                          className="flex items-center gap-1.5 self-start text-[10px] font-black uppercase tracking-widest text-white bg-red-600 hover:bg-red-700 px-4.5 py-2.5 rounded-xl shadow-md mb-2 cursor-pointer active:scale-95 transition-all"
-                        >
-                          <ArrowLeft className="w-4 h-4" />
-                          Volver a Vencimientos
-                        </button>
-                      ) : (
-                        <button 
-                          onClick={() => setSelectedProp(null)}
-                          className="lg:hidden flex items-center gap-1.5 self-start text-[10px] font-black uppercase tracking-widest text-ink/70 hover:text-ink transition-all bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-lg border border-border/10 mb-1"
-                        >
-                          <ArrowLeft className="w-3.5 h-3.5" />
-                          Volver al Listado
-                        </button>
-                      )}
-                      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-                        <div className="flex items-center gap-4 min-w-0 w-full lg:w-auto">
-                          <div className="w-12 h-12 bg-[#1a1a1a] text-white rounded-[14px] flex items-center justify-center shrink-0 shadow-md">
-                            <Building2 className="w-5 h-5 text-white" />
-                          </div>
-                          
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2 mb-1">
-                              <div className="px-2 py-0.5 text-[8px] font-black uppercase tracking-widest bg-red-50 text-red-600 rounded-full border border-red-100 flex items-center gap-1 shadow-sm font-mono">
-                                <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                                {isExpired(selectedProp.termino) ? 'VENCIDA' : 'ACTIVA'}
-                              </div>
-                              <span className="text-[8px] font-mono font-medium text-ink/20 uppercase tracking-widest">REF: {selectedProp.id}</span>
-                            </div>
-                            
-                            <div className="py-0.5">
-                              <h3 className={`font-black tracking-tight text-ink leading-[1.1] uppercase transition-all max-w-2xl ${
-                                selectedProp.direccion.length > 100 ? 'text-xs lg:text-sm' : 
-                                selectedProp.direccion.length > 70 ? 'text-sm lg:text-base' : 
-                                selectedProp.direccion.length > 40 ? 'text-base lg:text-lg' : 
-                                'text-lg lg:text-xl'
-                              }`}>
-                                {selectedProp.direccion}
-                              </h3>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between lg:justify-end w-full lg:w-auto gap-6 pt-2 lg:pt-0 border-t lg:border-t-0 border-border/5">
-                          <div className="text-right">
-                             <p className="text-[8px] text-muted font-bold uppercase tracking-widest mb-0.5 opacity-60">VALORIZACIÓN</p>
-                             <p className="text-xl lg:text-2xl font-black text-primary leading-none tracking-tighter">
-                               {formatMoney(selectedProp.valor, selectedProp.tipoMonto)}
-                             </p>
-                          </div>
-                          <button onClick={() => { setFormData(selectedProp); setIsAdding(true); }} className="w-10 h-10 bg-gray-50 hover:bg-gray-100 text-ink rounded-xl border border-border/40 transition-all flex items-center justify-center shadow-sm group">
-                             <Pencil size={16} className="group-hover:scale-110 transition-transform duration-500" />
-                          </button>
-                        </div>
-                      </div>
-                      
-                      <div className="flex flex-wrap items-center gap-3">
-                        <div className="flex flex-wrap items-center gap-3 bg-red-50/40 p-2 lg:px-4 lg:py-2 rounded-[16px] border border-red-100/50 shadow-sm flex-1 lg:flex-none">
-                           <div className="flex items-center gap-4">
-                             <div className="w-8 h-8 bg-white rounded-lg shadow-sm border border-red-100/50 flex items-center justify-center">
-                               <CalendarDays className="w-4 h-4 text-red-600" />
-                             </div>
-                             <div className="flex items-center gap-6">
-                               <div className="text-center sm:text-left">
-                                 <span className="text-[7px] font-black uppercase tracking-[0.15em] text-red-600/50 block mb-0.5 leading-none">Inicio Contrato</span>
-                                 <span className="text-[11px] font-black text-ink tracking-tight leading-none">{formatDateDMY(selectedProp.f_ini)}</span>
-                               </div>
-                               <div className="w-px h-6 bg-red-100/30" />
-                               <div className="text-center sm:text-left">
-                                 <span className="text-[7px] font-black uppercase tracking-[0.15em] text-red-600/50 block mb-0.5 leading-none">Vencimiento</span>
-                                 <span className="text-[11px] font-black text-ink tracking-tight leading-none">{formatDateDMY(selectedProp.termino) || 'Indef'}</span>
-                               </div>
-                             </div>
-                           </div>
-                           
-                           <div className="hidden sm:block w-px h-6 bg-red-100/30 mx-1.5" />
-                           
-                           <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
-                             <div className="flex flex-col items-center">
-                               <span className="text-[6px] font-bold text-red-600/40 uppercase tracking-widest mb-0.5 leading-none">Plazo</span>
-                               <span className="text-[8px] font-black text-red-700 bg-white px-1.5 py-0.5 rounded border border-red-50 shadow-sm leading-none">{selectedProp.duracion || '12M'}</span>
-                             </div>
-                             <button onClick={renewContract} className="bg-ink text-white px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center gap-1.5 shadow-sm active:scale-95">
-                               <RefreshCw className="w-3 h-3" /> Renovar
-                             </button>
-                           </div>
-                        </div>
-
-                        {/* Historial de Renovaciones */}
-                        {selectedProp.renewalHistory && selectedProp.renewalHistory.length > 0 && (
-                          <div className="bg-slate-50 border border-border/60 rounded-2xl p-3 mt-1">
-                            <p className="text-[8px] font-black uppercase tracking-widest text-muted mb-2 flex items-center gap-1.5">
-                              📋 Historial de Renovaciones ({selectedProp.renewalHistory.length})
-                            </p>
-                            <div className="flex flex-col gap-1 max-h-[80px] overflow-y-auto custom-scrollbar">
-                              {[...selectedProp.renewalHistory].reverse().map((entry, idx) => (
-                                <div key={`renewal-${idx}`} className="flex items-center gap-2 text-[9px]">
-                                  <span className="text-muted font-mono font-bold">{formatDateDMY(entry.date)}</span>
-                                  <span className="text-muted">:</span>
-                                  <span className="font-bold text-red-600/70">{formatDateDMY(entry.oldTermino)}</span>
-                                  <span className="text-muted">→</span>
-                                  <span className="font-bold text-green-700">{formatDateDMY(entry.newTermino)}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        
-                        <button 
-                            onClick={() => viewContract(selectedProp.pdf, selectedProp.arrendatario)}
-                            className="px-4 py-2 bg-white border border-border/60 rounded-2xl flex items-center gap-2 transition-all hover:bg-gray-50 hover:border-border shadow-sm h-full self-stretch lg:self-auto group"
-                        >
-                          <FileText className="w-4 h-4 text-ink/70 group-hover:text-primary transition-colors" />
-                          <span className="text-[9px] font-black uppercase tracking-widest text-ink">Ver Contrato PDF</span>
-                        </button>
-                      </div>
-                      
-                      {/* Integrated Tabs Selector */}
-                      <div className="border-t border-border/10 pt-3 flex justify-center">
-                        <div className="flex bg-gray-100/60 p-1 rounded-full border border-border/30">
-                          {[
-                            { id: 'legal', label: 'Identidad', icon: Users },
-                            { id: 'finances', label: 'Gastos', icon: Receipt },
-                            { id: 'document', label: 'Contrato', icon: ShieldCheck }
-                          ].map(tab => (
-                            <button 
-                              key={tab.id}
-                              onClick={() => {
-                                  setActiveTab(tab.id as any);
-                                  document.getElementById('property-details-container')?.scrollTo({ top: 0, behavior: 'auto' });
-                              }}
-                              className={`py-1.5 px-4 lg:px-6 rounded-full font-black uppercase text-[9px] tracking-widest transition-all flex items-center gap-1.5 ${
-                                activeTab === tab.id 
-                                  ? 'bg-ink text-white shadow-sm scale-105 z-10' 
-                                  : 'text-muted hover:text-ink hover:bg-white/40'
-                              }`}
-                            >
-                              <tab.icon size={11} className={activeTab === tab.id ? 'text-white' : 'opacity-40'} />
-                              <span>{tab.label}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div id="details-scroll-area" className="flex-1 p-6 bg-gray-50/40">
-                    {activeTab === 'legal' && (
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-6">
-                        
-                        {/* PROFILE: OWNER */}
-                        <div className="bg-white p-6 rounded-2xl border border-border/60 shadow-sm flex flex-col relative overflow-hidden transition-all hover:shadow-md min-h-[220px]">
-                          {(() => {
-                            const names = (selectedProp.dueno || '').split(',').map((s: string) => s.trim()).filter(Boolean);
-                            const ruts = (selectedProp.rutDue || '').split(',').map((s: string) => s.trim()).filter(Boolean);
-                            const tels = (selectedProp.telD || '').split(',').map((s: string) => s.trim()).filter(Boolean);
-                            const splittedEmails = (selectedProp.mailD || '').split(',').map((s: string) => s.trim()).filter(Boolean);
-
-                            return (
-                              <div className="h-full flex flex-col">
-                                <div className="flex items-center gap-2.5 mb-5 relative z-10 shrink-0">
-                                  <div className="w-8 h-8 bg-white border border-border rounded-lg flex items-center justify-center shrink-0 shadow-sm">
-                                      <UserIcon className="w-3.5 h-3.5 text-ink" />
-                                  </div>
-                                  <span className="text-[11px] font-bold text-ink uppercase tracking-widest">{getSectionTitle(names, 'dueno')}</span>
-                                </div>
-                                
-                                {names.length === 0 && (
-                                  <div className="flex-1 flex items-center justify-center py-6">
-                                    <p className="text-xs font-medium text-gray-400">Sin Registro</p>
-                                  </div>
-                                )}
-                                
-                                {names.length > 0 && (
-                                  <div className="flex flex-col flex-1">
-                                    {/* Names vertical list matching h-auto height vibe */}
-                                    <div className="h-auto min-h-[80px] flex flex-col justify-center py-1 overflow-visible relative z-10">
-                                      {names.map((name, i) => (
-                                        <p key={`${name}-${i}`} className={`font-extrabold text-ink leading-tight uppercase break-words px-1 py-0.5 ${
-                                          names.length > 2 ? 'text-[9px]' : names.length > 1 ? 'text-[10px]' : 'text-xs'
-                                        }`} title={name}>
-                                          {`${i + 1}. `}{name}
-                                        </p>
-                                      ))}
-                                    </div>
-                                    {/* Shared structured section details */}
-                                    <div className="space-y-3 mt-auto border-t border-border/50 pt-4 px-1 relative z-10">
-                                      {/* RUT Row */}
-                                      <div className="flex items-start justify-between gap-1">
-                                        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest shrink-0">RUT</span>
-                                        <div className="text-right space-y-0.5 min-w-0 flex-1">
-                                          {ruts.length > 0 ? (
-                                            ruts.map((rut, idx) => (
-                                              <span key={idx} className="text-[10px] font-bold text-ink tracking-tight block truncate" title={rut}>
-                                                <span className="text-gray-400 font-medium text-[8px] mr-1">#{idx + 1}</span>
-                                                {formatRut(rut)}
-                                              </span>
-                                            ))
-                                          ) : (
-                                            <span className="text-[10px] font-bold text-gray-400 block">N/A</span>
-                                          )}
-                                        </div>
-                                      </div>
-
-                                      {/* TEL Row */}
-                                      <div className="flex items-start justify-between gap-1">
-                                        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest shrink-0">TEL</span>
-                                        <div className="text-right space-y-0.5 min-w-0 flex-1">
-                                          {tels.length > 0 ? (
-                                            tels.map((tel, idx) => (
-                                              <span key={idx} className="text-[10px] font-bold text-ink tracking-tight block truncate" title={tel}>
-                                                {tels.length > 1 ? <span className="text-gray-400 font-medium text-[8px] mr-1">#{idx + 1}</span> : null}
-                                                {tel}
-                                              </span>
-                                            ))
-                                          ) : (
-                                            <span className="text-[10px] font-bold text-gray-400 block">N/A</span>
-                                          )}
-                                        </div>
-                                      </div>
-
-                                      {/* EMAIL Row */}
-                                      <div className="flex items-start justify-between gap-1">
-                                        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest shrink-0">EMAIL</span>
-                                        <div className="text-right space-y-0.5 min-w-0 flex-1">
-                                          {splittedEmails.length > 0 ? (
-                                            splittedEmails.map((email, idx) => (
-                                              <span key={idx} className="text-[10px] font-bold text-ink hover:text-primary transition-colors cursor-pointer block truncate lowercase selection:bg-accent/20" title={email}>
-                                                {splittedEmails.length > 1 ? <span className="text-gray-400 font-medium text-[8px] mr-1">#{idx + 1}</span> : null}
-                                                {email}
-                                              </span>
-                                            ))
-                                          ) : (
-                                            <span className="text-[10px] font-bold text-gray-400 block">N/A</span>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })()}
-                        </div>
-
-                        {/* PROFILE: TENANT */}
-                        <div className="bg-white p-6 rounded-2xl border border-border/60 shadow-sm flex flex-col relative overflow-hidden transition-all hover:shadow-md min-h-[220px]">
-                          {(() => {
-                            const names = (selectedProp.arrendatario || '').split(',').map((s: string) => s.trim()).filter(Boolean);
-                            const ruts = (selectedProp.rutArr || '').split(',').map((s: string) => s.trim()).filter(Boolean);
-                            const tels = (selectedProp.telA || '').split(',').map((s: string) => s.trim()).filter(Boolean);
-                            const splittedEmails = (selectedProp.mailA || '').split(',').map((s: string) => s.trim()).filter(Boolean);
-
-                            return (
-                              <div className="h-full flex flex-col">
-                                <div className="flex items-center gap-2.5 mb-5 relative z-10 shrink-0">
-                                  <div className="w-8 h-8 bg-white border border-border rounded-lg flex items-center justify-center shrink-0 shadow-sm">
-                                      <Users className="w-3.5 h-3.5 text-green-600" />
-                                  </div>
-                                  <span className="text-[9px] font-bold text-green-600 uppercase tracking-widest">{getSectionTitle(names, 'arrendatario')}</span>
-                                </div>
-                                
-                                {names.length === 0 && (
-                                  <div className="flex-1 flex items-center justify-center py-6">
-                                    <p className="text-xs font-medium text-gray-400">Sin Registro</p>
-                                  </div>
-                                )}
-                                
-                                {names.length > 0 && (
-                                  <div className="flex flex-col flex-1">
-                                    {/* Names vertical list matching h-auto height vibe */}
-                                    <div className="h-auto min-h-[80px] flex flex-col justify-center py-1 overflow-visible relative z-10">
-                                      {names.map((name, i) => (
-                                        <p key={`${name}-${i}`} className={`font-extrabold text-ink leading-tight uppercase break-words px-1 py-0.5 ${
-                                          names.length > 2 ? 'text-[9px]' : names.length > 1 ? 'text-[10px]' : 'text-xs'
-                                        }`} title={name}>
-                                          {`${i + 1}. `}{name}
-                                        </p>
-                                      ))}
-                                    </div>
-                                    {/* Shared structured section details */}
-                                    <div className="space-y-3 mt-auto border-t border-border/50 pt-4 px-1 relative z-10">
-                                      {/* RUT Row */}
-                                      <div className="flex items-start justify-between gap-1">
-                                        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest shrink-0">RUT</span>
-                                        <div className="text-right space-y-0.5 min-w-0 flex-1">
-                                          {ruts.length > 0 ? (
-                                            ruts.map((rut, idx) => (
-                                              <span key={idx} className="text-[10px] font-bold text-ink tracking-tight block truncate" title={rut}>
-                                                <span className="text-gray-400 font-medium text-[8px] mr-1">#{idx + 1}</span>
-                                                {formatRut(rut)}
-                                              </span>
-                                            ))
-                                          ) : (
-                                            <span className="text-[10px] font-bold text-gray-400 block">N/A</span>
-                                          )}
-                                        </div>
-                                      </div>
-
-                                      {/* TEL Row */}
-                                      <div className="flex items-start justify-between gap-1">
-                                        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest shrink-0">TEL</span>
-                                        <div className="text-right space-y-0.5 min-w-0 flex-1">
-                                          {tels.length > 0 ? (
-                                            tels.map((tel, idx) => (
-                                              <span key={idx} className="text-[10px] font-bold text-ink tracking-tight block truncate" title={tel}>
-                                                {tels.length > 1 ? <span className="text-gray-400 font-medium text-[8px] mr-1">#{idx + 1}</span> : null}
-                                                {tel}
-                                              </span>
-                                            ))
-                                          ) : (
-                                            <span className="text-[10px] font-bold text-gray-400 block">N/A</span>
-                                          )}
-                                        </div>
-                                      </div>
-
-                                      {/* EMAIL Row */}
-                                      <div className="flex items-start justify-between gap-1">
-                                        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest shrink-0">EMAIL</span>
-                                        <div className="text-right space-y-0.5 min-w-0 flex-1">
-                                          {splittedEmails.length > 0 ? (
-                                            splittedEmails.map((email, idx) => (
-                                              <span key={idx} className="text-[10px] font-bold text-ink hover:text-primary transition-colors cursor-pointer block truncate lowercase selection:bg-accent/20" title={email}>
-                                                {splittedEmails.length > 1 ? <span className="text-gray-400 font-medium text-[8px] mr-1">#{idx + 1}</span> : null}
-                                                {email}
-                                              </span>
-                                            ))
-                                          ) : (
-                                            <span className="text-[10px] font-bold text-gray-400 block">N/A</span>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })()}
-                        </div>
-
-                        {/* PROFILE: GUARANTOR */}
-                        <div className="bg-white p-6 rounded-2xl border border-border/60 shadow-sm flex flex-col relative overflow-hidden transition-all hover:shadow-md min-h-[220px]">
-                          <div className="flex items-center gap-2.5 mb-5 relative z-10">
-                            <div className="w-8 h-8 bg-white border border-border rounded-lg flex items-center justify-center shrink-0 shadow-sm">
-                                <ShieldCheck className="w-3.5 h-3.5 text-orange-500" />
-                            </div>
-                            <span className="text-[9px] font-bold text-orange-500 uppercase tracking-widest">AVAL / CODEUDOR</span>
-                          </div>
-                          
-                          <div className="h-auto min-h-[80px] flex items-center py-2">
-                            <p className="font-bold tracking-tight text-ink leading-tight relative z-10 transition-all text-sm break-words">
-                              {selectedProp.aval || 'Sin Registro'}
-                            </p>
-                          </div>
-                          
-                          <div className="space-y-3 mt-auto border-t border-border/50 pt-4 px-1 relative z-10">
-                            <div className="flex items-center justify-between">
-                                <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">RUT</span>
-                                <span className="text-[10px] font-bold text-ink tracking-tight">{selectedProp.rutAval || 'N/A'}</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">TEL</span>
-                                <span className="text-[10px] font-bold text-ink tracking-tight">{selectedProp.telAval || 'N/A'}</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">EMAIL</span>
-                                <span className="text-[10px] font-bold text-ink hover:text-primary transition-colors cursor-pointer truncate max-w-[140px] lowercase selection:bg-accent/20">{selectedProp.mailAval || 'N/A'}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                      </div>
-                    )}
-                          {activeTab === 'finances' && (
-                            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 pb-4 duration-500">
-                              <AnimatePresence>
-                                {showExpenseForm && (
-                                  <motion.div 
-                                    initial={{ height: 0, opacity: 0, y: -10, scale: 0.98 }} 
-                                    animate={{ height: 'auto', opacity: 1, y: 0, scale: 1 }} 
-                                    exit={{ height: 0, opacity: 0, y: -10, scale: 0.98 }}
-                                    className="bg-white p-4 rounded-xl border border-border/60 grid grid-cols-1 md:grid-cols-12 gap-3 items-end mb-4 shadow-sm relative overflow-visible"
-                                  >
-                                     <div className="md:col-span-2">
-                                       <CustomSelect 
-                                         label="Categoría"
-                                         value={expenseForm.tipo}
-                                         onChange={(val) => setExpenseForm({...expenseForm, tipo: val})}
-                                         options={EXPENSE_TYPES}
-                                       />
-                                     </div>
-                                     <div className="md:col-span-3">
-                                       <CustomSelect 
-                                         label="Mes Fiscal"
-                                         value={expenseForm.mes}
-                                         onChange={(val) => setExpenseForm({...expenseForm, mes: val})}
-                                         options={MONTHS_WITH_YEAR}
-                                       />
-                                     </div>
-                                     <div className="md:col-span-2">
-                                      <div className="bg-gray-50 border border-border/50 rounded-xl px-3 py-1.5 focus-within:border-ink/20 focus-within:ring-2 ring-ink/5 transition-all shadow-sm group">
-                                        <label className="text-[9px] font-bold text-muted group-hover:text-ink uppercase mb-1 block tracking-widest transition-colors">Monto</label>
-                                        <div className="flex items-center gap-3">
-                                           <span className="text-muted font-bold text-base leading-none">$</span>
-                                           <input 
-                                            type="number" 
-                                            value={expenseForm.monto}
-                                            onChange={(e) => setExpenseForm({...expenseForm, monto: e.target.value})}
-                                            onKeyDown={(e) => { if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault(); }}
-                                            className="w-full bg-transparent text-base font-black outline-none text-ink placeholder:text-muted/50"
-                                            placeholder="0"
-                                          />
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="md:col-span-2">
-                                      <div className="bg-gray-50 border border-border/50 rounded-xl px-3 py-1.5 focus-within:border-ink/20 focus-within:ring-2 ring-ink/5 transition-all shadow-sm group">
-                                        <label className="text-[9px] font-bold text-muted group-hover:text-ink uppercase mb-1 block tracking-widest transition-colors">Comprobante</label>
-                                        <div className="flex items-center gap-2">
-                                          <label className="flex items-center gap-1.5 justify-center w-full bg-white border border-border/40 hover:bg-gray-50 rounded-lg px-2.5 py-1.5 text-[9px] font-black uppercase tracking-wider text-ink/70 cursor-pointer shadow-sm transition-all active:scale-95 truncate">
-                                            <Upload className="w-3.5 h-3.5 text-primary shrink-0" />
-                                            <span className="truncate">{expenseForm.file ? (expenseForm.file as File).name : 'Subir Archivo'}</span>
-                                            <input 
-                                              type="file" 
-                                              accept="application/pdf,image/*" 
-                                              className="hidden" 
-                                              onChange={(e) => {
-                                                const uploadedFile = e.target.files?.[0] || null;
-                                                setExpenseForm({...expenseForm, file: uploadedFile});
-                                              }} 
-                                            />
-                                          </label>
-                                          {expenseForm.file && (
-                                            <button 
-                                              onClick={() => setExpenseForm({...expenseForm, file: null})} 
-                                              className="p-1 hover:text-red-500 text-muted transition-colors rounded hover:bg-gray-100 shrink-0"
-                                              title="Eliminar archivo"
-                                              type="button"
-                                            >
-                                              <X className="w-3.5 h-3.5" />
-                                            </button>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="md:col-span-3">
-                                      <button 
-                                        onClick={async () => {
-                                          await addExpense();
-                                          setShowExpenseForm(false);
-                                        }}
-                                        className="w-full bg-ink text-white h-[46px] rounded-lg font-bold uppercase text-[10px] tracking-widest hover:bg-black shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 group border-none"
-                                      >
-                                        {loading && loadingStatus.includes('comprobante') ? (
-                                          <div className="flex items-center gap-2">
-                                             <div className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" />
-                                             <div className="w-1.5 h-1.5 bg-white rounded-full animate-bounce [animation-delay:-0.15s]" />
-                                             <div className="w-1.5 h-1.5 bg-white rounded-full animate-bounce [animation-delay:-0.3s]" />
-                                          </div>
-                                        ) : (
-                                          <span>Registrar Pago</span>
-                                        )}
-                                      </button>
-                                    </div>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-
-                              <div className="bg-white rounded-2xl border border-border/60 shadow-sm overflow-hidden flex flex-col">
-                                <div className="py-1.5 px-4 border-b border-border/50 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 bg-white relative z-10">
-                                  <div>
-                                     <h4 className="text-[8px] leading-[11px] font-bold uppercase tracking-widest text-muted mb-0.5">Métricas Financieras</h4>
-                                     <p className="text-sm font-bold text-ink uppercase tracking-tight">Cuentas y Pagos</p>
-                                  </div>
-                                  <button 
-                                    onClick={() => setShowExpenseForm(!showExpenseForm)} 
-                                    className={`px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${showExpenseForm ? 'bg-gray-100 text-ink shadow-sm' : 'bg-ink text-white shadow-md hover:bg-black active:scale-95'}`}
-                                  >
-                                    {showExpenseForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                                    {showExpenseForm ? 'Cerrar' : 'Nueva Transacción'}
-                                  </button>
-                                </div>
-                                <div className="overflow-x-auto">
-                                  <table className="w-full">
-                                  <thead>
-                                    <tr className="text-left text-muted border-b border-border bg-gray-50 uppercase tracking-widest text-[9px] font-bold">
-                                      <th className="p-4 pl-6">Tipo de Transacción</th>
-                                      <th className="p-4">Mes</th>
-                                      <th className="p-4 text-ink">Monto</th>
-                                      <th className="p-4 text-right pr-6">Controles</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-border/50">
-                                    {selectedProp.expenses?.length > 0 ? selectedProp.expenses.map((exp: any, idx: number) => (
-                                      <tr key={`expense-${selectedProp.id || 'current'}-${idx}`} className="hover:bg-gray-50/80 transition-all group duration-300">
-                                        <td className="p-4 pl-6">
-                                          <div className="flex items-center gap-3">
-                                             <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                                             <span className="font-bold text-xs text-ink">{exp.tipo}</span>
-                                          </div>
-                                        </td>
-                                        <td className="p-4">
-                                          <div className="bg-white px-2.5 py-1 rounded-lg border border-border/80 inline-block shadow-sm">
-                                             <span className="text-ink/70 font-bold uppercase text-[9px] tracking-widest">{exp.mes}</span>
-                                          </div>
-                                        </td>
-                                        <td className="p-4">
-                                          <span className="font-black text-ink text-sm tracking-tight">{formatMoney(exp.monto)}</span>
-                                        </td>
-                                        <td className="p-4 text-right pr-6">
-                                          <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300">
-                                            {exp.link && exp.link !== '#' && (
-                                              <button 
-                                                onClick={() => window.open(exp.link, '_blank')}
-                                                className="w-8 h-8 bg-white border border-border/80 text-muted hover:text-ink hover:border-ink/30 rounded-lg flex items-center justify-center transition-all shadow-sm hover:shadow-md"
-                                              >
-                                                <ExternalLink className="w-3.5 h-3.5" />
-                                              </button>
-                                            )}
-                                            <button 
-                                              onClick={() => setShowConfirmDelete({ type: 'expense', id: selectedProp.id, index: idx })}
-                                              className="w-8 h-8 bg-gray-50 text-muted hover:text-red-500 hover:bg-red-50 rounded-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95"
-                                            >
-                                              <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    )) : (
-                                      <tr>
-                                        <td colSpan={4} className="p-12 text-center">
-                                           <div className="max-w-xs mx-auto">
-                                             <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-sm border border-border/50">
-                                                <Receipt className="w-5 h-5 text-muted" />
-                                             </div>
-                                             <p className="text-[10px] font-bold uppercase tracking-widest text-muted mb-2">Sin Registros</p>
-                                             <p className="text-[11px] text-ink/40 leading-relaxed">Agregue pagos o cuentas para mantener el historial financiero de esta propiedad.</p>
-                                           </div>
-                                        </td>
-                                      </tr>
-                                    )}
-                                  </tbody>
-                                </table>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {activeTab === 'document' && (
-                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8 flex flex-col items-center">
-
-                              <div className="w-full bg-white rounded-3xl border border-border/60 p-6 lg:p-8 flex flex-col md:flex-row items-center justify-between shadow-sm relative overflow-hidden gap-8">
-                                <div className="flex flex-col md:flex-row items-center gap-6 md:gap-8">
-                                  <div className="w-24 h-32 bg-gray-50 rounded-2xl shadow-sm flex flex-col items-center justify-center border border-border/50 shrink-0 hover:scale-105 hover:-rotate-2 transition-transform duration-300 group cursor-pointer">
-                                     <FileText className="w-8 h-8 text-muted group-hover:text-ink transition-colors" />
-                                  </div>
-                                  
-                                  <div className="text-center md:text-left">
-                                     <h5 className="text-lg font-bold text-ink uppercase tracking-tight mb-2">Contrato de Arriendo</h5>
-                                     <p className="text-xs text-muted max-w-md mb-6 leading-relaxed">
-                                       Documento legal actual. Puedes revisarlo en una nueva pestaña o exportar una copia física de ser necesario.
-                                     </p>
-                                     
-                                     <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
-                                       <button 
-                                          onClick={() => viewContract(selectedProp.pdf, selectedProp.arrendatario)}
-                                          className="h-10 px-6 bg-ink text-white rounded-xl font-bold uppercase text-[10px] tracking-widest shadow-md hover:bg-black transition-all flex items-center gap-2.5 active:scale-95"
-                                       >
-                                         <Eye className="w-3.5 h-3.5" /> Ver Contrato
-                                       </button>
-                                       <button className="h-10 px-6 bg-white border border-border/80 text-ink rounded-xl font-bold uppercase text-[10px] tracking-widest hover:bg-gray-50 transition-all flex items-center gap-2.5 shadow-sm hover:border-ink/20">
-                                         <Download className="w-3.5 h-3.5" /> Descargar PDF
-                                       </button>
-                                     </div>
-                                  </div>
-                                </div>
-                                
-                                <div className="flex md:flex-col items-center md:items-end gap-6 md:gap-5 md:border-l border-border/50 md:pl-8 pt-6 md:pt-0 border-t md:border-t-0 w-full md:w-auto mt-2 md:mt-0">
-                                   <div className="text-center md:text-right flex-1 md:flex-none">
-                                      <p className="text-[9px] font-bold text-muted uppercase tracking-widest mb-1.5">Inicio Vigencia</p>
-                                      <p className="text-sm font-bold text-ink tracking-tight">{formatDateDMY(selectedProp.f_ini) || 'No registrado'}</p>
-                                   </div>
-                                   <div className="text-center md:text-right flex-1 md:flex-none">
-                                      <p className="text-[9px] font-bold text-muted uppercase tracking-widest mb-1.5">Estado Operativo</p>
-                                      <div className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-2.5 py-1 rounded-md border border-green-200 shadow-sm">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-                                        <p className="text-[9px] font-bold uppercase tracking-widest">Activo</p>
-                                      </div>
-                                   </div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                      {/* Property Footer - SOPHISTICATED MINIMALISM */}
-                      <div className="mt-auto px-10 py-8 border-t border-border/10 bg-white/50 backdrop-blur-sm flex justify-between items-center h-24">
-                        <div className="flex items-center gap-6">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-                            <p className="text-[10px] font-black text-ink/20 uppercase tracking-[0.3em] font-mono">Operations Active</p>
-                          </div>
-                          <div className="w-px h-4 bg-border/20" />
-                          <p className="text-[10px] font-medium text-ink/10 uppercase tracking-widest italic">Document Engineering by PNT</p>
-                        </div>
-                        
-                        <button 
-                          onClick={() => setShowConfirmDelete({ type: 'property', id: selectedProp.id })}
-                          className="group flex items-center gap-3 px-6 py-3 rounded-2xl border border-danger/5 text-danger/20 hover:text-danger hover:border-danger hover:bg-danger/5 transition-all text-[11px] font-black uppercase tracking-[0.2em] shadow-sm hover:shadow-xl active:scale-95"
-                        >
-                          <Trash2 className="w-4 h-4 transition-transform group-hover:rotate-12" /> 
-                          <span>Decommission Asset</span>
-                        </button>
-                      </div>
-                    </div>
+              {selectedProp && !showExpiryModal ? (
+                renderPropertyDetailsContent()
               ) : (
                 <div className="h-full bento-card border-dashed flex flex-col items-center justify-center text-muted p-20 text-center animate-pulse">
                   <Building2 className="w-20 h-20 mb-8 opacity-5" />
@@ -3782,9 +3794,7 @@ export default function App() {
                                   <button
                                     onClick={() => {
                                       setSelectedProp(p);
-                                      setActiveModule('properties');
-                                      setActiveTab('legal');
-                                      setReturnToVencimientos(true);
+                                      setShowExpiryModal(true);
                                     }}
                                     className="px-4 py-2 bg-ink hover:bg-black text-white text-[8px] font-black uppercase tracking-wider rounded-xl transition-all active:scale-95 cursor-pointer"
                                   >
@@ -6104,7 +6114,36 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      
       <AnimatePresence>
+        {showExpiryModal && selectedProp && (
+          <div className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-md flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-300">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-bg rounded-[32px] w-full max-w-6xl h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-border/40 relative"
+            >
+              {/* Boton de Cierre de la Modal */}
+              <button 
+                onClick={() => {
+                  setSelectedProp(null);
+                  setShowExpiryModal(false);
+                }}
+                className="absolute top-5 right-5 z-[1010] bg-white border border-border/60 text-ink rounded-full p-2 hover:bg-gray-100 transition-all shadow-md cursor-pointer active:scale-95 flex items-center justify-center"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-1">
+                {renderPropertyDetailsContent()}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+<AnimatePresence>
         {loading && (
           <div className="fixed inset-0 z-[1200] bg-white/90 backdrop-blur-xl flex flex-col items-center justify-center p-8">
             <div className="relative w-32 h-32 mb-8">
