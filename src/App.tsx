@@ -1505,8 +1505,8 @@ export default function App() {
     const baseDate = new Date(baseDateStr + 'T00:00:00');
     
     // Extraer meses del plazo
-    let months = selectedProp.duracionMeses || 0;
-    if (!months && selectedProp.duracion) {
+    let months = 0;
+    if (selectedProp.duracion) {
       const match = selectedProp.duracion.match(/(\d+)/);
       if (match) {
         const num = parseInt(match[1]);
@@ -1517,6 +1517,9 @@ export default function App() {
           months = num;
         }
       }
+    }
+    if (!months && selectedProp.duracionMeses) {
+      months = selectedProp.duracionMeses;
     }
     if (!months || months <= 0) {
       showToast('No se pudo determinar el plazo de renovación. Verifica la duración del contrato.', 'error');
