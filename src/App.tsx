@@ -1497,7 +1497,9 @@ export default function App() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    const currentTermino = new Date(selectedProp.termino + 'T00:00:00');
+    // Basarnos en f_ini para mantener el ciclo correcto (si no existe, usamos termino)
+    const baseDateStr = selectedProp.f_ini || selectedProp.termino;
+    const baseDate = new Date(baseDateStr + 'T00:00:00');
     
     // Extraer meses del plazo
     let months = selectedProp.duracionMeses || 0;
@@ -1505,7 +1507,8 @@ export default function App() {
       const match = selectedProp.duracion.match(/(\d+)/);
       if (match) {
         const num = parseInt(match[1]);
-        if (selectedProp.duracion.toLowerCase().includes('año')) {
+        const durLower = selectedProp.duracion.toLowerCase();
+        if (durLower.includes('año') || durLower.includes('ano')) {
           months = num * 12;
         } else {
           months = num;
@@ -1517,16 +1520,18 @@ export default function App() {
       return;
     }
     
-    // Si el contrato aún no venció, no renovar
+    const currentTermino = new Date(selectedProp.termino + 'T00:00:00');
+    // Si el contrato aún no venció en su fecha de término actual, no renovar
     if (currentTermino > today) {
       showToast('El contrato aún no está vencido. Vence el ' + formatDateDMY(selectedProp.termino), 'error');
       return;
     }
     
-    // Sumar plazo repetidamente hasta superar hoy
-    let newTermino = new Date(currentTermino);
+    // Sumar plazo repetidamente desde baseDate (f_ini) en incrementos de 'months'
+    // hasta encontrar el primer ciclo de renovación que sea estrictamente posterior a hoy.
+    let newTermino = new Date(baseDate);
     let iterations = 0;
-    while (newTermino <= today && iterations < 100) {
+    while (newTermino <= today && iterations < 150) {
       newTermino.setMonth(newTermino.getMonth() + months);
       iterations++;
     }
