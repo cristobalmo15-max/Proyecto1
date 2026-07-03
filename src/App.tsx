@@ -423,7 +423,7 @@ export default function App() {
       console.error('Error logging activity:', e);
     }
   };
-  const [selectedYearFilter, setSelectedYearFilter] = useState<string>('all');
+  const [selectedMonthFilter, setSelectedMonthFilter] = useState<string>('all');
   const [selectedReportsYear, setSelectedReportsYear] = useState<string>('all');
   const [isAdding, setIsAdding] = useState(false);
   const [isBulk, setIsBulk] = useState(false);
@@ -2780,23 +2780,14 @@ if (!isAuthReady) return null;
     return 0;
   });
 
-  const availableYears = Array.from(new Set(
-    properties
-      .map(p => {
-        if (!p.f_ini) return null;
-        const parts = p.f_ini.split('-');
-        return parts[0];
-      })
-      .filter(Boolean)
-  ))
-  .sort((a, b) => String(b!).localeCompare(String(a!)));
-
   const filteredSidebarProps = filterProperties(properties, propSearch)
     .filter(p => !onlyFlagged || !!p.flagged)
     .filter(p => {
-      if (selectedYearFilter === 'all') return true;
-      if (!p.f_ini) return false;
-      return p.f_ini.startsWith(selectedYearFilter);
+      if (selectedMonthFilter === 'all') return true;
+      if (!p.termino) return false;
+      const parts = p.termino.split('-');
+      if (parts.length < 2) return false;
+      return parts[1] === selectedMonthFilter;
     });
   
   return (
@@ -3185,38 +3176,47 @@ if (!isAuthReady) return null;
                       onChange={(e) => setPropSearch(e.target.value)}
                     />
                     {propSearch.length > 0 && (
-                         <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-border rounded-xl shadow-xl z-50 overflow-hidden max-h-[80vh] overflow-y-auto">
+                         <div className="absolute top-full left-0 w-[320px] lg:w-[480px] mt-2 bg-white/95 backdrop-blur-md border border-border/80 rounded-2xl shadow-2xl z-[150] overflow-hidden max-h-[70vh] overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
                             <div className="px-4 py-2 text-[9px] font-black text-muted uppercase bg-gray-50 border-b border-border">Propiedades</div>
                             {filteredSidebarProps.slice(0, 5).map(p => (
-                                <button key={`prop-search-result-${p.id}`} className="w-full text-left px-4 py-2 hover:bg-primary/5 text-[11px] font-bold text-ink" onClick={() => { setSelectedProp(p); setPropSearch(''); }}>
+                                <button key={`prop-search-result-${p.id}`} className="w-full text-left px-4 py-2.5 hover:bg-primary/5 text-[11px] font-bold text-ink transition-colors" onClick={() => { setSelectedProp(p); setPropSearch(''); }}>
                                     {p.direccion}
                                 </button>
                             ))}
                             <div className="px-4 py-2 text-[9px] font-black text-muted uppercase bg-gray-50 border-b border-border border-t">Participantes</div>
                             {filteredSidebarProps.slice(0, 5).map(p => (
                                 <div key={`prop-search-participants-${p.id}`} className="w-full text-left px-4 py-2 hover:bg-primary/5 text-[11px] font-bold text-ink">
-                                    {p.dueno && <div className="cursor-pointer py-1" onClick={() => { setPropSearch(''); setSelectedProp(p); }}>Dueño: {p.dueno}</div>}
-                                    {p.arrendatario && <div className="cursor-pointer py-1" onClick={() => { setPropSearch(''); setSelectedProp(p); }}>Arrendatario: {p.arrendatario}</div>}
-                                    {p.aval && <div className="cursor-pointer py-1" onClick={() => { setPropSearch(''); setSelectedProp(p); }}>Aval: {p.aval}</div>}
+                                    {p.dueno && <div className="cursor-pointer py-1 hover:text-primary transition-colors" onClick={() => { setPropSearch(''); setSelectedProp(p); }}>Dueño: {p.dueno}</div>}
+                                    {p.arrendatario && <div className="cursor-pointer py-1 hover:text-primary transition-colors" onClick={() => { setPropSearch(''); setSelectedProp(p); }}>Arrendatario: {p.arrendatario}</div>}
+                                    {p.aval && <div className="cursor-pointer py-1 hover:text-primary transition-colors" onClick={() => { setPropSearch(''); setSelectedProp(p); }}>Aval: {p.aval}</div>}
                                 </div>
                             ))}
                          </div>
                     )}
                   </div>
-                  {/* Year Filter Dropdown */}
+                  {/* Month Filter Dropdown */}
                   <select
-                    value={selectedYearFilter}
-                    onChange={(e) => setSelectedYearFilter(e.target.value)}
+                    value={selectedMonthFilter}
+                    onChange={(e) => setSelectedMonthFilter(e.target.value)}
                     className={`h-10 px-2 rounded-xl border bg-white text-[10px] font-black uppercase tracking-wider outline-none cursor-pointer transition-all shrink-0 ${
-                      selectedYearFilter !== 'all' 
+                      selectedMonthFilter !== 'all' 
                         ? 'border-primary text-primary bg-red-50/30' 
                         : 'border-border/70 text-muted hover:border-primary'
                     }`}
                   >
-                    <option value="all">Año: Todos</option>
-                    {availableYears.map(yr => (
-                      <option key={yr} value={yr}>{yr}</option>
-                    ))}
+                    <option value="all">Mes: Todos</option>
+                    <option value="01">Enero</option>
+                    <option value="02">Febrero</option>
+                    <option value="03">Marzo</option>
+                    <option value="04">Abril</option>
+                    <option value="05">Mayo</option>
+                    <option value="06">Junio</option>
+                    <option value="07">Julio</option>
+                    <option value="08">Agosto</option>
+                    <option value="09">Septiembre</option>
+                    <option value="10">Octubre</option>
+                    <option value="11">Noviembre</option>
+                    <option value="12">Diciembre</option>
                   </select>
 
                   <button 
