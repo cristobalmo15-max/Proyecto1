@@ -385,6 +385,7 @@ export default function App() {
   const [reportsTab, setReportsTab] = useState<'details' | 'preview'>('details');
   const [reportsSubModule, setReportsSubModule] = useState<'expenses' | 'expiries'>('expenses');
   const [expiryFilter, setExpiryFilter] = useState<'all' | 'expired' | 'upcoming'>('all');
+  const [returnToVencimientos, setReturnToVencimientos] = useState(false);
 
 
   const logActivity = async (actionText: string, isMass = false, details = null) => {
@@ -2677,13 +2678,28 @@ export default function App() {
                   <div className="py-3 lg:py-4 px-6 lg:px-10 border-b border-border/10 bg-white shadow-sm shrink-0">
                     <div className="flex flex-col gap-4">
                       {/* Responsive Back Button */}
-                      <button 
-                        onClick={() => setSelectedProp(null)}
-                        className="lg:hidden flex items-center gap-1.5 self-start text-[10px] font-black uppercase tracking-widest text-ink/70 hover:text-ink transition-all bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-lg border border-border/10 mb-1"
-                      >
-                        <ArrowLeft className="w-3.5 h-3.5" />
-                        Volver al Listado
-                      </button>
+                      {returnToVencimientos ? (
+                        <button 
+                          onClick={() => {
+                            setSelectedProp(null);
+                            setActiveModule('reports');
+                            setReportsSubModule('expiries');
+                            setReturnToVencimientos(false);
+                          }}
+                          className="flex items-center gap-1.5 self-start text-[10px] font-black uppercase tracking-widest text-white bg-red-600 hover:bg-red-700 px-4.5 py-2.5 rounded-xl shadow-md mb-2 cursor-pointer active:scale-95 transition-all"
+                        >
+                          <ArrowLeft className="w-4 h-4" />
+                          Volver a Vencimientos
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => setSelectedProp(null)}
+                          className="lg:hidden flex items-center gap-1.5 self-start text-[10px] font-black uppercase tracking-widest text-ink/70 hover:text-ink transition-all bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-lg border border-border/10 mb-1"
+                        >
+                          <ArrowLeft className="w-3.5 h-3.5" />
+                          Volver al Listado
+                        </button>
+                      )}
                       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
                         <div className="flex items-center gap-4 min-w-0 w-full lg:w-auto">
                           <div className="w-12 h-12 bg-[#1a1a1a] text-white rounded-[14px] flex items-center justify-center shrink-0 shadow-md">
@@ -3768,6 +3784,7 @@ export default function App() {
                                       setSelectedProp(p);
                                       setActiveModule('properties');
                                       setActiveTab('legal');
+                                      setReturnToVencimientos(true);
                                     }}
                                     className="px-4 py-2 bg-ink hover:bg-black text-white text-[8px] font-black uppercase tracking-wider rounded-xl transition-all active:scale-95 cursor-pointer"
                                   >
