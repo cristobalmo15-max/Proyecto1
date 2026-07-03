@@ -165,23 +165,9 @@ const formatRut = (rut: string): string => {
 
 // Helper para formatear fecha YYYY-MM-DD → DD-MM-YYYY
 const formatDateDMY = (dateStr?: string): string => {
-  if (!dateStr) return '';
+  if (!dateStr) return 'N/A';
   const parts = dateStr.split('-');
   if (parts.length === 3) {
-    return `${parts[2]}-${parts[1]}-${parts[0]}`;
-  }
-  return dateStr;
-};
-
-// Convierte DD-MM-YYYY → YYYY-MM-DD
-const parseDateDMYToYMD = (dateStr: string): string => {
-  if (!dateStr) return '';
-  const clean = dateStr.replace(/\//g, '-');
-  const parts = clean.split('-');
-  if (parts.length === 3) {
-    // Si ya viene YYYY-MM-DD
-    if (parts[0].length === 4) return clean;
-    // Si viene DD-MM-YYYY
     return `${parts[2]}-${parts[1]}-${parts[0]}`;
   }
   return dateStr;
@@ -3165,77 +3151,83 @@ if (!isAuthReady) return null;
               }`}
             >
               <div className="flex flex-col gap-4 p-6 mt-4">
-                <div className="flex gap-2 relative">
-                  <div className="relative group flex-1">
+                <div className="flex flex-col gap-3 w-full">
+                  {/* Fila 1: Buscador */}
+                  <div className="relative group w-full">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted/50 transition-colors" />
                     <input 
                       type="text" 
                       placeholder="Buscar por dirección, dueño, arrendatario..." 
-                      className="w-full bg-white border border-border/70 rounded-xl py-2.5 pr-4 pl-10 text-[11px] font-bold tracking-wide outline-none focus:border-primary focus:ring-4 ring-primary/5 transition-all shadow-sm text-ink placeholder:text-muted/50"
+                      className="w-full bg-white border border-border/70 rounded-xl py-3 pr-4 pl-10 text-[11px] font-bold tracking-wide outline-none focus:border-primary focus:ring-4 ring-primary/5 transition-all shadow-sm text-ink placeholder:text-muted/50"
                       value={propSearch}
                       onChange={(e) => setPropSearch(e.target.value)}
                     />
                     {propSearch.length > 0 && (
-                         <div className="absolute top-full left-0 w-[320px] lg:w-[480px] mt-2 bg-white/95 backdrop-blur-md border border-border/80 rounded-2xl shadow-2xl z-[150] overflow-hidden max-h-[70vh] overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
+                         <div className="absolute top-full left-0 right-0 mt-2 bg-white/95 backdrop-blur-md border border-border/80 rounded-2xl shadow-2xl z-[150] overflow-hidden max-h-[60vh] overflow-y-auto w-full">
                             <div className="px-4 py-2 text-[9px] font-black text-muted uppercase bg-gray-50 border-b border-border">Propiedades</div>
                             {filteredSidebarProps.slice(0, 5).map(p => (
-                                <button key={`prop-search-result-${p.id}`} className="w-full text-left px-4 py-2.5 hover:bg-primary/5 text-[11px] font-bold text-ink transition-colors" onClick={() => { setSelectedProp(p); setPropSearch(''); }}>
+                                <button key={`prop-search-result-${p.id}`} className="w-full text-left px-4 py-3 hover:bg-primary/5 text-[11px] font-bold text-ink transition-colors whitespace-normal break-words leading-tight" onClick={() => { setSelectedProp(p); setPropSearch(''); }}>
                                     {p.direccion}
                                 </button>
                             ))}
                             <div className="px-4 py-2 text-[9px] font-black text-muted uppercase bg-gray-50 border-b border-border border-t">Participantes</div>
                             {filteredSidebarProps.slice(0, 5).map(p => (
-                                <div key={`prop-search-participants-${p.id}`} className="w-full text-left px-4 py-2 hover:bg-primary/5 text-[11px] font-bold text-ink">
-                                    {p.dueno && <div className="cursor-pointer py-1 hover:text-primary transition-colors" onClick={() => { setPropSearch(''); setSelectedProp(p); }}>Dueño: {p.dueno}</div>}
-                                    {p.arrendatario && <div className="cursor-pointer py-1 hover:text-primary transition-colors" onClick={() => { setPropSearch(''); setSelectedProp(p); }}>Arrendatario: {p.arrendatario}</div>}
-                                    {p.aval && <div className="cursor-pointer py-1 hover:text-primary transition-colors" onClick={() => { setPropSearch(''); setSelectedProp(p); }}>Aval: {p.aval}</div>}
+                                <div key={`prop-search-participants-${p.id}`} className="w-full text-left px-4 py-3 hover:bg-primary/5 text-[11px] font-bold text-ink whitespace-normal break-words leading-tight flex flex-col gap-1.5">
+                                    {p.dueno && <div className="cursor-pointer hover:text-primary transition-colors py-0.5" onClick={() => { setPropSearch(''); setSelectedProp(p); }}>Dueño: {p.dueno}</div>}
+                                    {p.arrendatario && <div className="cursor-pointer hover:text-primary transition-colors py-0.5" onClick={() => { setPropSearch(''); setSelectedProp(p); }}>Arrendatario: {p.arrendatario}</div>}
+                                    {p.aval && <div className="cursor-pointer hover:text-primary transition-colors py-0.5" onClick={() => { setPropSearch(''); setSelectedProp(p); }}>Aval: {p.aval}</div>}
                                 </div>
                             ))}
                          </div>
                     )}
                   </div>
-                  {/* Month Filter Dropdown */}
-                  <select
-                    value={selectedMonthFilter}
-                    onChange={(e) => setSelectedMonthFilter(e.target.value)}
-                    className={`h-10 px-2 rounded-xl border bg-white text-[10px] font-black uppercase tracking-wider outline-none cursor-pointer transition-all shrink-0 ${
-                      selectedMonthFilter !== 'all' 
-                        ? 'border-primary text-primary bg-red-50/30' 
-                        : 'border-border/70 text-muted hover:border-primary'
-                    }`}
-                  >
-                    <option value="all">Mes: Todos</option>
-                    <option value="01">Enero</option>
-                    <option value="02">Febrero</option>
-                    <option value="03">Marzo</option>
-                    <option value="04">Abril</option>
-                    <option value="05">Mayo</option>
-                    <option value="06">Junio</option>
-                    <option value="07">Julio</option>
-                    <option value="08">Agosto</option>
-                    <option value="09">Septiembre</option>
-                    <option value="10">Octubre</option>
-                    <option value="11">Noviembre</option>
-                    <option value="12">Diciembre</option>
-                  </select>
+                  
+                  {/* Fila 2: Filtros */}
+                  <div className="flex items-center gap-2 w-full">
+                    <div className="flex-1">
+                      <select
+                        value={selectedMonthFilter}
+                        onChange={(e) => setSelectedMonthFilter(e.target.value)}
+                        className={`h-10 w-full px-3 rounded-xl border bg-white text-[10px] font-black uppercase tracking-wider outline-none cursor-pointer transition-all ${
+                          selectedMonthFilter !== 'all' 
+                            ? 'border-primary text-primary bg-red-50/30' 
+                            : 'border-border/70 text-muted hover:border-primary'
+                        }`}
+                      >
+                        <option value="all">Mes: Todos</option>
+                        <option value="01">Enero</option>
+                        <option value="02">Febrero</option>
+                        <option value="03">Marzo</option>
+                        <option value="04">Abril</option>
+                        <option value="05">Mayo</option>
+                        <option value="06">Junio</option>
+                        <option value="07">Julio</option>
+                        <option value="08">Agosto</option>
+                        <option value="09">Septiembre</option>
+                        <option value="10">Octubre</option>
+                        <option value="11">Noviembre</option>
+                        <option value="12">Diciembre</option>
+                      </select>
+                    </div>
 
-                  <button 
-                    onClick={() => setOnlyFlagged(!onlyFlagged)}
-                    className={`w-10 h-10 rounded-xl transition-all border flex items-center justify-center shrink-0 ${
-                      onlyFlagged 
-                        ? 'bg-red-50 text-red-500 border-red-200' 
-                        : 'bg-white text-[#d1d5db] border-border/70 hover:text-red-500'
-                    }`}
-                    title={onlyFlagged ? "Mostrar todas" : "Mostrar destacadas (banderita)"}
-                  >
-                    <Flag className={`w-4 h-4 ${onlyFlagged ? 'fill-current' : ''}`} />
-                  </button>
-                  <button 
-                    onClick={() => { setFormData({}); setIsAdding(true); }}
-                    className="w-10 h-10 bg-primary text-white rounded-xl hover:bg-red-600 transition-all shadow-md flex items-center justify-center shrink-0"
-                  >
-                    <Plus className="w-5 h-5" />
-                  </button>
+                    <button 
+                      onClick={() => setOnlyFlagged(!onlyFlagged)}
+                      className={`w-10 h-10 rounded-xl transition-all border flex items-center justify-center shrink-0 ${
+                        onlyFlagged 
+                          ? 'bg-red-50 text-red-500 border-red-200' 
+                          : 'bg-white text-[#d1d5db] border-border/70 hover:text-red-500'
+                      }`}
+                      title={onlyFlagged ? "Mostrar todas" : "Mostrar destacadas (banderita)"}
+                    >
+                      <Flag className={`w-4 h-4 ${onlyFlagged ? 'fill-current' : ''}`} />
+                    </button>
+                    <button 
+                      onClick={() => { setFormData({}); setIsAdding(true); }}
+                      className="w-10 h-10 bg-primary text-white rounded-xl hover:bg-red-600 transition-all shadow-md flex items-center justify-center shrink-0"
+                    >
+                      <Plus className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
                 
                 <div className="flex justify-between items-end px-2 mt-4 mb-2">
@@ -5679,15 +5671,13 @@ if (!isAuthReady) return null;
                         <div className="grid grid-cols-2 gap-4 pb-1.5 border-b border-border/5">
                           <div>
                             <label className="text-[7px] font-black text-ink/20 uppercase mb-1.5 block font-mono">
-                              Inicio Ciclo (DD-MM-AAAA)
+                              Inicio Ciclo {formData.f_ini && <span className="text-primary font-bold ml-1">({formatDateDMY(formData.f_ini)})</span>}
                             </label>
                             <input 
-                              type="text"
-                              placeholder="DD-MM-YYYY"
-                              value={formatDateDMY(formData.f_ini) || ''}
+                              type="date" 
+                              value={formData.f_ini || ''}
                               onChange={(e) => {
-                                const rawVal = e.target.value;
-                                const newStart = parseDateDMYToYMD(rawVal);
+                                const newStart = e.target.value;
                                 const months = Number(formData.duracionMeses) || 12;
                                 setFormData({
                                   ...formData, 
@@ -5728,16 +5718,12 @@ if (!isAuthReady) return null;
 
                         <div>
                           <label className="text-[7px] font-black text-ink/20 uppercase mb-1.5 block font-mono">
-                            Término Ciclo (Recalculado) (DD-MM-AAAA)
+                            Término Ciclo (Recalculado) {formData.termino && <span className="text-primary font-bold ml-1">({formatDateDMY(formData.termino)})</span>}
                           </label>
                           <input 
-                            type="text" 
-                            placeholder="DD-MM-YYYY"
-                            value={formatDateDMY(formData.termino) || ''}
-                            onChange={(e) => {
-                              const rawVal = e.target.value;
-                              setFormData({...formData, termino: parseDateDMYToYMD(rawVal)});
-                            }}
+                            type="date" 
+                            value={formData.termino || ''}
+                            onChange={(e) => setFormData({...formData, termino: e.target.value})}
                             className="w-full bg-transparent text-[10px] font-bold outline-none text-ink/70 pb-1 border-b border-border/5"
                           />
                         </div>
