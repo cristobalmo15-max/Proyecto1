@@ -557,6 +557,7 @@ export default function App() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const currentUploadPromise = useRef<Promise<string> | null>(null);
+  const demoCreationTriggered = useRef(false);
 
   // Form states
   const [formData, setFormData] = useState<Partial<Property>>({});
@@ -691,6 +692,83 @@ export default function App() {
     });
   }, []);
 
+  const createDemoProperties = async (uid: string) => {
+    if (demoCreationTriggered.current) return;
+    demoCreationTriggered.current = true;
+    try {
+      console.log('[DEBUG] Generating 2 demo properties for new user:', uid);
+      
+      const demo1 = {
+        direccion: "Avenida Vitacura 3568, Depto 902, Vitacura",
+        valor: 850000,
+        tipoMonto: "pesos",
+        duracionMeses: 12,
+        duracion: "12 meses (1 año)",
+        f_ini: "2025-05-01",
+        termino: "2026-05-01",
+        dueno: "Andrés Hurtado Silva",
+        rutDue: "8.765.432-1",
+        telD: "912345678",
+        mailD: "andres.hurtado@example.com",
+        arrendatario: "Mariana Paz Donoso",
+        rutArr: "15.432.987-K",
+        telA: "987654321",
+        mailA: "mariana.donoso@example.com",
+        aval: "Carlos Donoso Rojas",
+        rutAval: "9.876.543-2",
+        telAval: "933445566",
+        mailAval: "carlos.donoso@example.com",
+        ownerUid: uid,
+        expenses: [
+          { tipo: "Gasto Común", mes: "Julio 2026", monto: 120000, link: "#" },
+          { tipo: "Renta Mensual", mes: "Julio 2026", monto: 850000, link: "#" }
+        ],
+        pdf: "#",
+        flagged: false,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      const demo2 = {
+        direccion: "Hernando de Aguirre 1044, Providencia",
+        valor: 1200000,
+        tipoMonto: "pesos",
+        duracionMeses: 24,
+        duracion: "24 meses (2 años)",
+        f_ini: "2025-01-15",
+        termino: "2027-01-15",
+        dueno: "Clara Vergara Vial",
+        rutDue: "7.112.233-4",
+        telD: "955667788",
+        mailD: "clara.vergara@example.com",
+        arrendatario: "José Luis Valenzuela",
+        rutArr: "12.345.678-9",
+        telA: "944556677",
+        mailA: "jose.valenzuela@example.com",
+        aval: "Sucesión Valenzuela Ltda.",
+        rutAval: "76.452.980-3",
+        telAval: "922334455",
+        mailAval: "contacto@sucesionvalenzuela.cl",
+        ownerUid: uid,
+        expenses: [
+          { tipo: "Reparación Calefactor", mes: "Junio 2026", monto: 75000, link: "#" },
+          { tipo: "Renta Mensual", mes: "Julio 2026", monto: 1200000, link: "#" }
+        ],
+        pdf: "#",
+        flagged: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      await addDoc(collection(db, 'properties'), demo1);
+      await addDoc(collection(db, 'properties'), demo2);
+      
+      console.log('[DEBUG] Demo properties generated successfully');
+    } catch (e) {
+      console.error('Error creating demo properties:', e);
+    }
+  };
+
   useEffect(() => {
     console.log('[DEBUG] user updated:', user ? user.email : 'null');
     if (!user || !user.uid) {
@@ -714,6 +792,13 @@ export default function App() {
       console.log('[DEBUG-PROPS] Snapshot received, docs:', snapshot.docs.length);
       const props = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any;
       console.log('[DEBUG] Props loaded:', props.length);
+      
+      // Auto-generación de demos si el nuevo usuario no tiene ninguna propiedad
+      if (props.length === 0 && !isAdmin && !impersonatedUid && !demoCreationTriggered.current) {
+        createDemoProperties(activeUid);
+        return;
+      }
+
       setProperties(props);
       
       // Sincronizar propiedad seleccionada si existe
