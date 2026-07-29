@@ -32,7 +32,7 @@ service cloud.firestore {
     }
 
     match /properties/{propertyId} {
-      allow read: if isAuthenticated() && (resource.data.ownerUid == request.auth.uid || isAdmin());
+      allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidProperty(request.resource.data);
       allow update: if isAuthenticated() && isDocOwner() && isValidProperty(request.resource.data);
       allow delete: if isAuthenticated() && (isDocOwner() || isAdmin());
