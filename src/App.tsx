@@ -4391,6 +4391,7 @@ if (!isAuthReady) return null;
             currentImpersonatedUid={impersonatedUid} 
             appSettings={appSettings}
             updateAppSettings={updateAppSettings}
+            properties={properties}
           />
         )}
 
