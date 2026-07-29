@@ -409,7 +409,7 @@ export default function App() {
       console.error('Error logging activity:', e);
     }
   };
-  const [selectedMonthFilter, setSelectedMonthFilter] = useState<string>('all');
+  const [selectedYearFilter, setSelectedYearFilter] = useState<string>('all');
   const [selectedReportsYear, setSelectedReportsYear] = useState<string>('all');
   const [isAdding, setIsAdding] = useState(false);
   const [isBulk, setIsBulk] = useState(false);
@@ -557,7 +557,6 @@ export default function App() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const currentUploadPromise = useRef<Promise<string> | null>(null);
-  const demoCreationTriggered = useRef(false);
 
   // Form states
   const [formData, setFormData] = useState<Partial<Property>>({});
@@ -692,83 +691,6 @@ export default function App() {
     });
   }, []);
 
-  const createDemoProperties = async (uid: string) => {
-    if (demoCreationTriggered.current) return;
-    demoCreationTriggered.current = true;
-    try {
-      console.log('[DEBUG] Generating 2 demo properties for new user:', uid);
-      
-      const demo1 = {
-        direccion: "Avenida Vitacura 3568, Depto 902, Vitacura",
-        valor: 850000,
-        tipoMonto: "pesos",
-        duracionMeses: 12,
-        duracion: "12 meses (1 año)",
-        f_ini: "2025-05-01",
-        termino: "2026-05-01",
-        dueno: "Andrés Hurtado Silva",
-        rutDue: "8.765.432-1",
-        telD: "912345678",
-        mailD: "andres.hurtado@example.com",
-        arrendatario: "Mariana Paz Donoso",
-        rutArr: "15.432.987-K",
-        telA: "987654321",
-        mailA: "mariana.donoso@example.com",
-        aval: "Carlos Donoso Rojas",
-        rutAval: "9.876.543-2",
-        telAval: "933445566",
-        mailAval: "carlos.donoso@example.com",
-        ownerUid: uid,
-        expenses: [
-          { tipo: "Gasto Común", mes: "Julio 2026", monto: 120000, link: "#" },
-          { tipo: "Renta Mensual", mes: "Julio 2026", monto: 850000, link: "#" }
-        ],
-        pdf: "#",
-        flagged: false,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      };
-
-      const demo2 = {
-        direccion: "Hernando de Aguirre 1044, Providencia",
-        valor: 1200000,
-        tipoMonto: "pesos",
-        duracionMeses: 24,
-        duracion: "24 meses (2 años)",
-        f_ini: "2025-01-15",
-        termino: "2027-01-15",
-        dueno: "Clara Vergara Vial",
-        rutDue: "7.112.233-4",
-        telD: "955667788",
-        mailD: "clara.vergara@example.com",
-        arrendatario: "José Luis Valenzuela",
-        rutArr: "12.345.678-9",
-        telA: "944556677",
-        mailA: "jose.valenzuela@example.com",
-        aval: "Sucesión Valenzuela Ltda.",
-        rutAval: "76.452.980-3",
-        telAval: "922334455",
-        mailAval: "contacto@sucesionvalenzuela.cl",
-        ownerUid: uid,
-        expenses: [
-          { tipo: "Reparación Calefactor", mes: "Junio 2026", monto: 75000, link: "#" },
-          { tipo: "Renta Mensual", mes: "Julio 2026", monto: 1200000, link: "#" }
-        ],
-        pdf: "#",
-        flagged: true,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      };
-
-      await addDoc(collection(db, 'properties'), demo1);
-      await addDoc(collection(db, 'properties'), demo2);
-      
-      console.log('[DEBUG] Demo properties generated successfully');
-    } catch (e) {
-      console.error('Error creating demo properties:', e);
-    }
-  };
-
   useEffect(() => {
     console.log('[DEBUG] user updated:', user ? user.email : 'null');
     if (!user || !user.uid) {
@@ -779,25 +701,19 @@ export default function App() {
     const activeUid = impersonatedUid || user.uid;
     console.log('[DEBUG-PROPS] user updated properties loading, activeUid:', activeUid, 'isAdmin:', isAdmin, 'impersonatedUid:', impersonatedUid);
     
-    const q = query(collection(db, 'properties'));
+    let q;
+    if (isAdmin && !impersonatedUid) {
+        console.log('[DEBUG-PROPS] Querying ALL properties as admin');
+        q = query(collection(db, 'properties'));
+    } else {
+        console.log('[DEBUG-PROPS] Querying properties for ownerUid:', activeUid);
+        q = query(collection(db, 'properties'), where('ownerUid', '==', activeUid));
+    }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       console.log('[DEBUG-PROPS] Snapshot received, docs:', snapshot.docs.length);
-      const allProps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any;
-      
-      // Filtrado inteligente:
-      // Si eres admin, por defecto solo ves tus propiedades (donde ownerUid sea el tuyo o no tenga ownerUid)
-      // Si eres un usuario común, solo ves estrictamente tus propiedades (coincidencia de ownerUid)
-      let props = allProps;
-      if (isAdmin && !impersonatedUid) {
-        // Por defecto filtramos las del admin (propietario master)
-        props = allProps.filter((p: any) => p.ownerUid === activeUid || !p.ownerUid || p.ownerUid === 'oU8w9h5h7lZ9mN6rK7aN1P1G1B12');
-      } else {
-        // Para otras cuentas (como Juan Muñoz), solo mostramos las asociadas a su UID
-        props = allProps.filter((p: any) => p.ownerUid === activeUid);
-      }
-
-      console.log('[DEBUG] Props loaded and filtered:', props.length);
+      const props = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any;
+      console.log('[DEBUG] Props loaded:', props.length);
       setProperties(props);
       
       // Sincronizar propiedad seleccionada si existe
@@ -2850,14 +2766,23 @@ if (!isAuthReady) return null;
     return 0;
   });
 
+  const availableYears = Array.from(new Set(
+    properties
+      .map(p => {
+        if (!p.f_ini) return null;
+        const parts = p.f_ini.split('-');
+        return parts[0];
+      })
+      .filter(Boolean)
+  ))
+  .sort((a, b) => String(b!).localeCompare(String(a!)));
+
   const filteredSidebarProps = filterProperties(properties, propSearch)
     .filter(p => !onlyFlagged || !!p.flagged)
     .filter(p => {
-      if (selectedMonthFilter === 'all') return true;
-      if (!p.termino) return false;
-      const parts = p.termino.split('-');
-      if (parts.length < 2) return false;
-      return parts[1] === selectedMonthFilter;
+      if (selectedYearFilter === 'all') return true;
+      if (!p.f_ini) return false;
+      return p.f_ini.startsWith(selectedYearFilter);
     });
   
   return (
@@ -3235,83 +3160,68 @@ if (!isAuthReady) return null;
               }`}
             >
               <div className="flex flex-col gap-4 p-6 mt-4">
-                <div className="flex flex-col gap-3 w-full">
-                  {/* Fila 1: Buscador */}
-                  <div className="relative group w-full">
+                <div className="flex gap-2 relative">
+                  <div className="relative group flex-1">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted/50 transition-colors" />
                     <input 
                       type="text" 
                       placeholder="Buscar por dirección, dueño, arrendatario..." 
-                      className="w-full bg-white border border-border/70 rounded-xl py-3 pr-4 pl-10 text-[11px] font-bold tracking-wide outline-none focus:border-primary focus:ring-4 ring-primary/5 transition-all shadow-sm text-ink placeholder:text-muted/50"
+                      className="w-full bg-white border border-border/70 rounded-xl py-2.5 pr-4 pl-10 text-[11px] font-bold tracking-wide outline-none focus:border-primary focus:ring-4 ring-primary/5 transition-all shadow-sm text-ink placeholder:text-muted/50"
                       value={propSearch}
                       onChange={(e) => setPropSearch(e.target.value)}
                     />
                     {propSearch.length > 0 && (
-                         <div className="absolute top-full left-0 right-0 mt-2 bg-white/95 backdrop-blur-md border border-border/80 rounded-2xl shadow-2xl z-[150] overflow-hidden max-h-[60vh] overflow-y-auto w-full">
+                         <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-border rounded-xl shadow-xl z-50 overflow-hidden max-h-[80vh] overflow-y-auto">
                             <div className="px-4 py-2 text-[9px] font-black text-muted uppercase bg-gray-50 border-b border-border">Propiedades</div>
                             {filteredSidebarProps.slice(0, 5).map(p => (
-                                <button key={`prop-search-result-${p.id}`} className="w-full text-left px-4 py-3 hover:bg-primary/5 text-[11px] font-bold text-ink transition-colors whitespace-normal break-words leading-tight" onClick={() => { setSelectedProp(p); setPropSearch(''); }}>
+                                <button key={`prop-search-result-${p.id}`} className="w-full text-left px-4 py-2 hover:bg-primary/5 text-[11px] font-bold text-ink" onClick={() => { setSelectedProp(p); setPropSearch(''); }}>
                                     {p.direccion}
                                 </button>
                             ))}
                             <div className="px-4 py-2 text-[9px] font-black text-muted uppercase bg-gray-50 border-b border-border border-t">Participantes</div>
                             {filteredSidebarProps.slice(0, 5).map(p => (
-                                <div key={`prop-search-participants-${p.id}`} className="w-full text-left px-4 py-3 hover:bg-primary/5 text-[11px] font-bold text-ink whitespace-normal break-words leading-tight flex flex-col gap-1.5">
-                                    {p.dueno && <div className="cursor-pointer hover:text-primary transition-colors py-0.5" onClick={() => { setPropSearch(''); setSelectedProp(p); }}>Dueño: {p.dueno}</div>}
-                                    {p.arrendatario && <div className="cursor-pointer hover:text-primary transition-colors py-0.5" onClick={() => { setPropSearch(''); setSelectedProp(p); }}>Arrendatario: {p.arrendatario}</div>}
-                                    {p.aval && <div className="cursor-pointer hover:text-primary transition-colors py-0.5" onClick={() => { setPropSearch(''); setSelectedProp(p); }}>Aval: {p.aval}</div>}
+                                <div key={`prop-search-participants-${p.id}`} className="w-full text-left px-4 py-2 hover:bg-primary/5 text-[11px] font-bold text-ink">
+                                    {p.dueno && <div className="cursor-pointer py-1" onClick={() => { setPropSearch(''); setSelectedProp(p); }}>Dueño: {p.dueno}</div>}
+                                    {p.arrendatario && <div className="cursor-pointer py-1" onClick={() => { setPropSearch(''); setSelectedProp(p); }}>Arrendatario: {p.arrendatario}</div>}
+                                    {p.aval && <div className="cursor-pointer py-1" onClick={() => { setPropSearch(''); setSelectedProp(p); }}>Aval: {p.aval}</div>}
                                 </div>
                             ))}
                          </div>
                     )}
                   </div>
-                  
-                  {/* Fila 2: Filtros */}
-                  <div className="flex items-center gap-2 w-full">
-                    <div className="flex-1">
-                      <select
-                        value={selectedMonthFilter}
-                        onChange={(e) => setSelectedMonthFilter(e.target.value)}
-                        className={`h-10 w-full px-3 rounded-xl border bg-white text-[10px] font-black uppercase tracking-wider outline-none cursor-pointer transition-all ${
-                          selectedMonthFilter !== 'all' 
-                            ? 'border-primary text-primary bg-red-50/30' 
-                            : 'border-border/70 text-muted hover:border-primary'
-                        }`}
-                      >
-                        <option value="all">Mes: Todos</option>
-                        <option value="01">Enero</option>
-                        <option value="02">Febrero</option>
-                        <option value="03">Marzo</option>
-                        <option value="04">Abril</option>
-                        <option value="05">Mayo</option>
-                        <option value="06">Junio</option>
-                        <option value="07">Julio</option>
-                        <option value="08">Agosto</option>
-                        <option value="09">Septiembre</option>
-                        <option value="10">Octubre</option>
-                        <option value="11">Noviembre</option>
-                        <option value="12">Diciembre</option>
-                      </select>
-                    </div>
+                  {/* Year Filter Dropdown */}
+                  <select
+                    value={selectedYearFilter}
+                    onChange={(e) => setSelectedYearFilter(e.target.value)}
+                    className={`h-10 px-2 rounded-xl border bg-white text-[10px] font-black uppercase tracking-wider outline-none cursor-pointer transition-all shrink-0 ${
+                      selectedYearFilter !== 'all' 
+                        ? 'border-primary text-primary bg-red-50/30' 
+                        : 'border-border/70 text-muted hover:border-primary'
+                    }`}
+                  >
+                    <option value="all">Año: Todos</option>
+                    {availableYears.map(yr => (
+                      <option key={yr} value={yr}>{yr}</option>
+                    ))}
+                  </select>
 
-                    <button 
-                      onClick={() => setOnlyFlagged(!onlyFlagged)}
-                      className={`w-10 h-10 rounded-xl transition-all border flex items-center justify-center shrink-0 ${
-                        onlyFlagged 
-                          ? 'bg-red-50 text-red-500 border-red-200' 
-                          : 'bg-white text-[#d1d5db] border-border/70 hover:text-red-500'
-                      }`}
-                      title={onlyFlagged ? "Mostrar todas" : "Mostrar destacadas (banderita)"}
-                    >
-                      <Flag className={`w-4 h-4 ${onlyFlagged ? 'fill-current' : ''}`} />
-                    </button>
-                    <button 
-                      onClick={() => { setFormData({}); setIsAdding(true); }}
-                      className="w-10 h-10 bg-primary text-white rounded-xl hover:bg-red-600 transition-all shadow-md flex items-center justify-center shrink-0"
-                    >
-                      <Plus className="w-5 h-5" />
-                    </button>
-                  </div>
+                  <button 
+                    onClick={() => setOnlyFlagged(!onlyFlagged)}
+                    className={`w-10 h-10 rounded-xl transition-all border flex items-center justify-center shrink-0 ${
+                      onlyFlagged 
+                        ? 'bg-red-50 text-red-500 border-red-200' 
+                        : 'bg-white text-[#d1d5db] border-border/70 hover:text-red-500'
+                    }`}
+                    title={onlyFlagged ? "Mostrar todas" : "Mostrar destacadas (banderita)"}
+                  >
+                    <Flag className={`w-4 h-4 ${onlyFlagged ? 'fill-current' : ''}`} />
+                  </button>
+                  <button 
+                    onClick={() => { setFormData({}); setIsAdding(true); }}
+                    className="w-10 h-10 bg-primary text-white rounded-xl hover:bg-red-600 transition-all shadow-md flex items-center justify-center shrink-0"
+                  >
+                    <Plus className="w-5 h-5" />
+                  </button>
                 </div>
                 
                 <div className="flex justify-between items-end px-2 mt-4 mb-2">
