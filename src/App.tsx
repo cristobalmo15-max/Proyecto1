@@ -4391,7 +4391,7 @@ if (!isAuthReady) return null;
             currentImpersonatedUid={impersonatedUid} 
             appSettings={appSettings}
             updateAppSettings={updateAppSettings}
-            properties={properties}
+            properties={properties.filter((p: any) => !p.ownerUid || p.ownerUid === user?.uid || p.ownerUid === 'oU8w9h5h7lZ9mN6rK7aN1P1G1B12')}
           />
         )}
 
