@@ -779,19 +779,19 @@ export default function App() {
     const activeUid = impersonatedUid || user.uid;
     console.log('[DEBUG-PROPS] user updated properties loading, activeUid:', activeUid, 'isAdmin:', isAdmin, 'impersonatedUid:', impersonatedUid);
     
-    let q;
-    if (isAdmin && !impersonatedUid) {
-        console.log('[DEBUG-PROPS] Querying ALL properties as admin');
-        q = query(collection(db, 'properties'));
-    } else {
-        console.log('[DEBUG-PROPS] Querying properties for ownerUid:', activeUid);
-        q = query(collection(db, 'properties'), where('ownerUid', '==', activeUid));
-    }
+    const q = query(collection(db, 'properties'));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       console.log('[DEBUG-PROPS] Snapshot received, docs:', snapshot.docs.length);
-      const props = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any;
-      console.log('[DEBUG] Props loaded:', props.length);
+      const allProps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any;
+      
+      // Filtrar en memoria para admitir propiedades huérfanas/antiguas
+      let props = allProps;
+      if (!isAdmin || impersonatedUid) {
+        props = allProps.filter((p: any) => p.ownerUid === activeUid || !p.ownerUid);
+      }
+
+      console.log('[DEBUG] Props loaded and filtered:', props.length);
       
       // Auto-generación de demos si el nuevo usuario no tiene ninguna propiedad
       if (props.length === 0 && !isAdmin && !impersonatedUid && !demoCreationTriggered.current) {
