@@ -218,12 +218,26 @@ export const AdminPanel = ({
         <div className="space-y-4">
           {users.map((user) => (
             <div key={user.uid} className="flex items-center gap-4 p-4 border border-border rounded-xl">
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-bold text-muted uppercase">{user.email}</p>
+              <div className="flex-1 min-w-0 space-y-2">
+                {user.email === 'Sin email' || !user.email ? (
+                  <div>
+                    <label className="block text-[9px] font-black text-amber-600 uppercase tracking-widest">Asociar Correo Electrónico</label>
+                    <input 
+                      type="email"
+                      placeholder="correo@ejemplo.com"
+                      className="w-full bg-amber-50/20 border border-amber-200 rounded-lg p-2 text-xs text-ink outline-none mt-1"
+                      value={user.email === 'Sin email' ? '' : user.email}
+                      onChange={(e) => setUsers(users.map(u => u.uid === user.uid ? { ...u, email: e.target.value } : u))}
+                    />
+                  </div>
+                ) : (
+                  <p className="text-[10px] font-bold text-muted uppercase">{user.email}</p>
+                )}
+                
                 <input 
                   type="text"
                   placeholder="Nombre de usuario"
-                  className="w-full bg-gray-50 border border-border/50 rounded-lg p-2 text-xs text-ink outline-none mt-1"
+                  className="w-full bg-gray-50 border border-border/50 rounded-lg p-2 text-xs text-ink outline-none"
                   value={user.name}
                   onChange={(e) => setUsers(users.map(u => u.uid === user.uid ? { ...u, name: e.target.value } : u))}
                 />
@@ -231,7 +245,7 @@ export const AdminPanel = ({
               <button 
                 className="p-2 text-primary hover:bg-primary/10 rounded-lg"
                 onClick={() => saveName(user.uid, user.name, user.email)}
-                title="Guardar nombre"
+                title="Guardar cambios"
               >
                 <Save className="w-4 h-4" />
               </button>
