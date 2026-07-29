@@ -7,12 +7,14 @@ export const AdminPanel = ({
   setImpersonatedUid, 
   currentImpersonatedUid,
   appSettings,
-  updateAppSettings
+  updateAppSettings,
+  properties
 }: { 
   setImpersonatedUid: (uid: string | null) => void, 
   currentImpersonatedUid: string | null,
   appSettings: any,
-  updateAppSettings: (settings: any) => Promise<void>
+  updateAppSettings: (settings: any) => Promise<void>,
+  properties: any[]
 }) => {
   const [reportEmail, setReportEmail] = useState(appSettings.reportEmail || '');
   const [smtpHost, setSmtpHost] = useState(appSettings.smtpHost || '');
@@ -78,56 +80,45 @@ export const AdminPanel = ({
     }
   }
 
-  const [targetEmailToLink, setTargetEmailToLink] = useState('');
   const [isLinking, setIsLinking] = useState(false);
 
-  const vincularInmueblesMasivo = async () => {
-    if (!targetEmailToLink.trim()) {
-      alert("Por favor, ingresa el correo de destino.");
+  const vincularPropiedadesA = async (targetUid: string, targetEmail: string, currentProperties: any[]) => {
+    if (!targetUid || !targetEmail) {
+      alert("Por favor, guarda el correo electrónico primero.");
       return;
     }
-    const cleanEmail = targetEmailToLink.trim().toLowerCase();
-    
-    // 1. Encontrar el usuario en la lista local para obtener su UID
-    const foundUser = users.find(u => u.email.toLowerCase().trim() === cleanEmail);
-    if (!foundUser) {
-      alert(`No se encontró ningún usuario con el correo "${cleanEmail}" registrado en el sistema. Asegúrate de que el usuario haya iniciado sesión al menos una vez.`);
-      return;
-    }
+    const cleanEmail = targetEmail.trim().toLowerCase();
+    const count = currentProperties.length;
 
-    const confirmed = confirm(`¿Estás seguro de que quieres asignar e importar TODAS las propiedades huérfanas o sin dueño al usuario ${foundUser.email} (UID: ${foundUser.uid})?`);
+    const confirmed = confirm(`¿Estás seguro de asignar las ${count} propiedades que ves en pantalla al usuario ${cleanEmail} (UID: ${targetUid})?`);
     if (!confirmed) return;
 
     try {
       setIsLinking(true);
-      const querySnapshot = await getDocs(collection(db, 'properties'));
-      let linkedCount = 0;
-      
       const { writeBatch } = await import('firebase/firestore');
       const batch = writeBatch(db);
+      let updatedCount = 0;
 
-      for (const docSnapshot of querySnapshot.docs) {
-        const data = docSnapshot.data();
-        // Si no tiene ownerUid (huérfana)
-        if (!data.ownerUid) {
-          const docRef = doc(db, 'properties', docSnapshot.id);
+      for (const prop of currentProperties) {
+        if (prop.id) {
+          const docRef = doc(db, 'properties', prop.id);
           batch.update(docRef, { 
-            ownerUid: foundUser.uid,
-            ownerEmail: foundUser.email
+            ownerUid: targetUid,
+            ownerEmail: cleanEmail
           });
-          linkedCount++;
+          updatedCount++;
         }
       }
 
-      if (linkedCount > 0) {
+      if (updatedCount > 0) {
         await batch.commit();
-        alert(`¡Asociación Exitosa! Se vincularon ${linkedCount} propiedades al correo ${foundUser.email}.`);
+        alert(`¡Traspaso exitoso! Se asignaron las ${updatedCount} propiedades a la cuenta ${cleanEmail}.`);
       } else {
-        alert("No se encontraron propiedades sin dueño en la base de datos.");
+        alert("No hay propiedades para transferir.");
       }
     } catch (e: any) {
       console.error(e);
-      alert(`Error al vincular propiedades: ${e.message}`);
+      alert(`Error al traspasar propiedades: ${e.message}`);
     } finally {
       setIsLinking(false);
     }
@@ -222,29 +213,6 @@ export const AdminPanel = ({
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-2xl border border-amber-200 bg-amber-50/10 shadow-sm space-y-4">
-        <h3 className="text-sm font-bold text-amber-700 flex items-center gap-2">⚠️ Traspaso y Vinculación Masiva de Propiedades</h3>
-        <p className="text-[10.5px] text-muted font-medium leading-relaxed">
-          Usa esta herramienta para asociar de inmediato todas las propiedades del historial previo (que no tienen dueño asignado) al correo de un usuario específico.
-        </p>
-        <div className="flex gap-4">
-          <input
-            type="email"
-            value={targetEmailToLink}
-            onChange={(e) => setTargetEmailToLink(e.target.value)}
-            className="flex-1 bg-white border border-border rounded-xl px-4 py-3 text-xs"
-            placeholder="Ingresa el correo del corredor/usuario (ej: jmcontacto.propiedades@gmail.com)"
-          />
-          <button 
-            onClick={vincularInmueblesMasivo} 
-            disabled={isLinking}
-            className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-wider transition-all disabled:opacity-50"
-          >
-            {isLinking ? "Vinculando..." : "Asociar Propiedades"}
-          </button>
-        </div>
-      </div>
-
       <div className="bg-white p-6 rounded-2xl border border-border shadow-sm">
         <h3 className="text-sm font-bold text-ink mb-4">Administración General de Usuarios</h3>
         <div className="space-y-4">
@@ -263,9 +231,20 @@ export const AdminPanel = ({
               <button 
                 className="p-2 text-primary hover:bg-primary/10 rounded-lg"
                 onClick={() => saveName(user.uid, user.name, user.email)}
+                title="Guardar nombre"
               >
                 <Save className="w-4 h-4" />
               </button>
+              
+              {/* Botón específico para traspasar propiedades visibles al usuario de esta fila */}
+              <button
+                className="bg-amber-50 hover:bg-amber-100 text-amber-700 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all"
+                onClick={() => vincularPropiedadesA(user.uid, user.email, properties)}
+                title={`Asignar las ${properties.length} propiedades en pantalla a este usuario`}
+              >
+                Traspasar ({properties.length})
+              </button>
+
               <button 
                 className={`px-3 py-1.5 rounded-lg text-[10px] font-bold ${currentImpersonatedUid === user.uid ? 'bg-primary text-white' : 'bg-gray-100'}`}
                 onClick={() => setImpersonatedUid(user.uid === currentImpersonatedUid ? null : user.uid)}
