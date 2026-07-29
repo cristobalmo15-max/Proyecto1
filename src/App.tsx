@@ -783,9 +783,21 @@ export default function App() {
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       console.log('[DEBUG-PROPS] Snapshot received, docs:', snapshot.docs.length);
-      const props = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any;
-      console.log('[DEBUG] Props loaded:', props.length);
+      const allProps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any;
       
+      // Filtrado inteligente:
+      // Si eres admin, por defecto solo ves tus propiedades (donde ownerUid sea el tuyo o no tenga ownerUid)
+      // Si eres un usuario común, solo ves estrictamente tus propiedades (coincidencia de ownerUid)
+      let props = allProps;
+      if (isAdmin && !impersonatedUid) {
+        // Por defecto filtramos las del admin (propietario master)
+        props = allProps.filter((p: any) => p.ownerUid === activeUid || !p.ownerUid || p.ownerUid === 'oU8w9h5h7lZ9mN6rK7aN1P1G1B12');
+      } else {
+        // Para otras cuentas (como Juan Muñoz), solo mostramos las asociadas a su UID
+        props = allProps.filter((p: any) => p.ownerUid === activeUid);
+      }
+
+      console.log('[DEBUG] Props loaded and filtered:', props.length);
       setProperties(props);
       
       // Sincronizar propiedad seleccionada si existe
