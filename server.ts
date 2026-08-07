@@ -612,23 +612,24 @@ const handleMonthlyExpiry = async (req: express.Request, res: express.Response) 
 
       const badgeBg = isExpired ? '#fef2f2' : '#fffbeb';
       const badgeColor = isExpired ? '#991b1b' : '#b45309';
+      const badgeBorder = isExpired ? '#fecaca' : '#fde68a';
       const badgeText = isExpired ? 'VENCIDO' : 'POR VENCER';
 
       tableRows += `
         <tr style="${borderStyle}">
-          <td style="padding: 16px; vertical-align: top;">
-            <div style="font-size: 13px; font-weight: 800; color: #0f172a; text-transform: uppercase; margin-bottom: 2px;">${p.direccion || 'Sin Dirección'}</div>
+          <td width="32%" align="left" style="padding: 16px; vertical-align: middle;">
+            <div style="font-size: 13px; font-weight: 800; color: #0f172a; text-transform: uppercase; margin-bottom: 3px; word-break: break-word;">${p.direccion || 'Sin Dirección'}</div>
             <div style="font-size: 10px; font-weight: 600; color: #94a3b8;">Plazo: ${p.duracion || '12 meses'}</div>
           </td>
-          <td style="padding: 16px; vertical-align: top;">
-            <div style="font-size: 11px; font-weight: 700; color: #334155; margin-bottom: 2px;"><span style="color: #94a3b8; font-weight: 500;">Dueño:</span> ${p.dueno || 'N/A'}</div>
+          <td width="30%" align="left" style="padding: 16px; vertical-align: middle;">
+            <div style="font-size: 11px; font-weight: 700; color: #334155; margin-bottom: 3px;"><span style="color: #94a3b8; font-weight: 500;">Dueño:</span> ${p.dueno || 'N/A'}</div>
             <div style="font-size: 11px; font-weight: 700; color: #dc2626;"><span style="color: #94a3b8; font-weight: 500;">Inquilino:</span> ${p.arrendatario || 'N/A'}</div>
           </td>
-          <td style="padding: 16px; vertical-align: top;">
+          <td width="18%" align="center" style="padding: 16px 12px; vertical-align: middle;">
             <div style="font-size: 14px; font-weight: 900; color: #0f172a; font-family: monospace;">${p.valor || 'N/A'}</div>
           </td>
-          <td align="right" style="padding: 16px; vertical-align: top;">
-            <div style="display: inline-block; background-color: ${badgeBg}; color: ${badgeColor}; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; padding: 4px 10px; border-radius: 20px; margin-bottom: 4px;">
+          <td width="20%" align="right" style="padding: 16px; vertical-align: middle;">
+            <div style="display: inline-block; background-color: ${badgeBg}; color: ${badgeColor}; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; padding: 4px 10px; border-radius: 20px; margin-bottom: 4px; border: 1px solid ${badgeBorder};">
               ${badgeText}
             </div>
             <div style="font-size: 11px; font-weight: 800; color: #334155; font-family: monospace;">${formattedDate}</div>
@@ -716,13 +717,13 @@ const handleMonthlyExpiry = async (req: express.Request, res: express.Response) 
           <!-- DATA TABLE -->
           <tr>
             <td style="padding: 0 40px 32px 40px;">
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse: separate; border-spacing: 0; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="table-layout: fixed; width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
                 <thead>
                   <tr style="background-color: #f8fafc;">
-                    <th align="left" style="padding: 14px 16px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #e2e8f0;">Propiedad / Dirección</th>
-                    <th align="left" style="padding: 14px 16px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #e2e8f0;">Involucrados</th>
-                    <th align="left" style="padding: 14px 16px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #e2e8f0;">Canon Renta</th>
-                    <th align="right" style="padding: 14px 16px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #e2e8f0;">Vencimiento</th>
+                    <th width="32%" align="left" style="padding: 14px 16px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; vertical-align: middle;">Propiedad</th>
+                    <th width="30%" align="left" style="padding: 14px 16px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; vertical-align: middle;">Involucrados</th>
+                    <th width="18%" align="center" style="padding: 14px 12px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; vertical-align: middle;">Canon Renta</th>
+                    <th width="20%" align="right" style="padding: 14px 16px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; vertical-align: middle;">Vencimiento</th>
                   </tr>
                 </thead>
                 <tbody>
