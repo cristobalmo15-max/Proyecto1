@@ -1,5 +1,4 @@
 import express from 'express';
-import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
@@ -55,10 +54,24 @@ const DATA_FILE = path.join(process.cwd(), 'data.json');
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
-app.use('/uploads', express.static(UPLOADS_DIR));
 
-if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR);
-if (!fs.existsSync(DATA_FILE)) fs.writeFileSync(DATA_FILE, JSON.stringify({ properties: [] }));
+try {
+  app.use('/uploads', express.static(UPLOADS_DIR));
+} catch (e) {
+  // Ignore static upload serve errors on read-only environments
+}
+
+try {
+  if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+} catch (e) {
+  console.warn('[Storage] Read-only filesystem detected for uploads directory:', e);
+}
+
+try {
+  if (!fs.existsSync(DATA_FILE)) fs.writeFileSync(DATA_FILE, JSON.stringify({ properties: [] }));
+} catch (e) {
+  console.warn('[Storage] Read-only filesystem detected for data.json:', e);
+}
 
 const diskStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOADS_DIR),
@@ -67,9 +80,25 @@ const diskStorage = multer.diskStorage({
 const upload = multer({ storage: diskStorage });
 const memoryUpload = multer({ storage: multer.memoryStorage() });
 
-// Data helpers
-const getData = () => JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
-const saveData = (data: any) => fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+// Data helpers with safe fallback for read-only environments
+const getData = () => {
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      return JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
+    }
+  } catch (e) {
+    console.warn('[Data] Error reading data.json:', e);
+  }
+  return { properties: [] };
+};
+
+const saveData = (data: any) => {
+  try {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+  } catch (e) {
+    console.warn('[Data] Could not save data.json (read-only filesystem):', e);
+  }
+};
 
 // Parser de fechas flexible que instancia a mediodía (12:00:00) para evitar desfasajes de zona horaria (UTC-4)
 const parseExpiryDate = (terminoStr: string): Date | null => {
@@ -686,6 +715,7 @@ app.use('/uploads', (req, res) => {
 
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
