@@ -133,6 +133,23 @@ export const AdminPanel = ({
     }
   };
 
+  const testMonthlyExpiryCron = async () => {
+    try {
+      const target = reportEmail || smtpUser;
+      const url = `/api/cron/monthly-expiry${target ? `?email=${encodeURIComponent(target)}` : ''}`;
+      const response = await fetch(url);
+      const data = await response.json();
+      if (response.ok && data.success) {
+        alert(`¡Éxito! ${data.message || 'Reporte de vencimientos procesado.'}`);
+      } else {
+        alert(`Respuesta del servidor: ${data.message || data.error || 'No se pudo enviar la alerta de vencimientos.'}`);
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(`Error al ejecutar cron de vencimientos: ${err.message}`);
+    }
+  };
+
   const sendTestEmail = async () => {
     if (!reportEmail) {
       alert('Por favor, primero guarda un correo de recepción.');
@@ -289,7 +306,14 @@ export const AdminPanel = ({
           <input type="text" value={smtpUser} onChange={(e) => setSmtpUser(e.target.value)} className="bg-gray-50 border border-border rounded-xl px-4 py-3" placeholder="SMTP Usuario" />
           <input type="password" value={smtpPass} onChange={(e) => setSmtpPass(e.target.value)} className="bg-gray-50 border border-border rounded-xl px-4 py-3" placeholder="SMTP Contraseña" />
         </div>
-        <div className="flex justify-end gap-3">
+        <div className="flex flex-wrap justify-end gap-3">
+          <button
+            onClick={testMonthlyExpiryCron}
+            className="bg-amber-50 text-amber-800 border border-amber-300 px-5 py-3 rounded-xl font-black uppercase text-xs hover:bg-amber-100 transition-all flex items-center gap-2"
+            title="Probar el cron de alerta de contratos vencidos o por vencer"
+          >
+             Probar Alerta Vencimientos
+          </button>
           <button
             onClick={sendTestEmail}
             className="bg-white text-primary border border-primary px-6 py-3 rounded-xl font-black uppercase text-xs hover:bg-gray-50 transition-all flex items-center gap-2"
