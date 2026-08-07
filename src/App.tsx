@@ -3725,12 +3725,19 @@ if (!isAuthReady) return null;
                         try {
                           showToast('Ejecutando prueba de alerta de vencimientos...', 'success');
                           const target = appSettings.reportEmail || appSettings.smtpUser;
-                          const res = await fetch(`/api/cron/monthly-expiry${target ? `?email=${encodeURIComponent(target)}` : ''}`);
-                          const data = await res.json();
+                          const res = await fetch(`/api/cron/monthly-expiry?action=monthly-expiry${target ? `&email=${encodeURIComponent(target)}` : ''}`);
+                          const text = await res.text();
+                          let data: any;
+                          try {
+                            data = JSON.parse(text);
+                          } catch (jsonErr) {
+                            showToast(`Error de Servidor (${res.status}): ${text.replace(/<[^>]*>/g, '').substring(0, 100)}`, 'error');
+                            return;
+                          }
                           if (res.ok && data.success) {
                             showToast(`✓ ${data.message || 'Reporte de vencimientos procesado.'}`, 'success');
                           } else {
-                            showToast(`Error: ${data.message || data.error || 'No se pudo enviar.'}`, 'error');
+                            showToast(`Error: ${data.message || data.error || data.details || 'No se pudo enviar.'}`, 'error');
                           }
                         } catch (err: any) {
                           showToast(`Error de servidor: ${err.message}`, 'error');
