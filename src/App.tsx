@@ -601,6 +601,7 @@ export default function App() {
   const [smtpPort, setSmtpPort] = useState('587');
   const [smtpUser, setSmtpUser] = useState('');
   const [smtpPass, setSmtpPass] = useState('');
+  const [reportEmail, setReportEmail] = useState('');
   const [testEmailDest, setTestEmailDest] = useState('');
 
   useEffect(() => {
@@ -609,8 +610,9 @@ export default function App() {
       setSmtpPort(appSettings.smtpPort || '587');
       setSmtpUser(appSettings.smtpUser || '');
       setSmtpPass(appSettings.smtpPass || '');
+      setReportEmail(appSettings.reportEmail || '');
     }
-  }, [appSettings.smtpHost, appSettings.smtpPort, appSettings.smtpUser, appSettings.smtpPass]);
+  }, [appSettings.smtpHost, appSettings.smtpPort, appSettings.smtpUser, appSettings.smtpPass, appSettings.reportEmail]);
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketCategory, setTicketCategory] = useState('Lector IA');
   const [ticketPriority, setTicketPriority] = useState('Alta');
@@ -4314,104 +4316,185 @@ if (!isAuthReady) return null;
         {activeModule === 'settings' && (
           <div className="max-w-7xl mx-auto py-2 animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
             {/* Header / Intro Card */}
-            <div className="mb-4 bg-white p-6 rounded-[28px] border border-border shadow-sm">
-              <h3 className="text-lg font-bold text-ink flex items-center gap-2">
-                <span className="p-1.5 bg-accent/10 text-accent rounded-lg flex items-center justify-center">
-                  <Mail className="w-5 h-5" />
-                </span>
-                Configuración del Correo Emisor (SMTP)
-              </h3>
-              <p className="text-xs text-muted font-semibold mt-1 max-w-3xl leading-relaxed">
-                Define las credenciales del servidor SMTP desde el cual se enviarán los reportes mensuales de gastos y avisos de reuniones de forma directa y personalizada a tus dueños o arrendatarios.
-              </p>
+            <div className="bg-white p-6 md:p-8 rounded-[28px] border border-border shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="space-y-1">
+                <h3 className="text-xl font-black text-ink uppercase tracking-tight flex items-center gap-3">
+                  <span className="p-2 bg-primary/10 text-primary rounded-xl flex items-center justify-center">
+                    <Mail className="w-6 h-6" />
+                  </span>
+                  Centro de Notificaciones & Correo Electrónico
+                </h3>
+                <p className="text-xs text-muted font-medium max-w-3xl leading-relaxed">
+                  Configura tus servidores de envío (salida) a clientes y administra la casilla donde recibirás los informes de vencimientos de contratos.
+                </p>
+              </div>
+
+              <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                Sistema de Alertas Activo
+              </span>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              {/* Left Column: Form Settings */}
-              <div className="lg:col-span-7 bg-white p-6 md:p-8 rounded-[28px] border border-border shadow-sm space-y-5">
-                <div>
-                  <h4 className="text-xs font-black uppercase text-primary mb-1 tracking-wider">Credenciales SMTP</h4>
-                  <p className="text-[10px] text-muted font-bold leading-tight">Introduce los datos de tu cuenta de correo corporativa o personal.</p>
+              {/* Left Column: Form Settings (Salida + Entrada) */}
+              <div className="lg:col-span-7 bg-white p-6 md:p-8 rounded-[28px] border border-border shadow-sm space-y-6">
+                
+                {/* BLOQUE 1: RECEPCION DE ALERTAS */}
+                <div className="space-y-4 pb-6 border-b border-border">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 bg-amber-50 text-amber-700 rounded-lg flex items-center justify-center font-black text-xs">1</div>
+                    <div>
+                      <h4 className="text-xs font-black uppercase text-primary tracking-wider">Recepción de Alertas de Vencimiento</h4>
+                      <p className="text-[10px] text-muted font-bold leading-tight">Casilla donde recibirás el consolidado de contratos por vencer (Entrada).</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Correo Electrónico de Recepción</label>
+                    <input
+                      type="email"
+                      placeholder="Ej: tu-correo-personal@gmail.com o contacto@tudominio.cl"
+                      value={reportEmail}
+                      onChange={(e) => setReportEmail(e.target.value)}
+                      className="w-full bg-amber-50/40 border border-amber-200/80 rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-amber-400 transition-all text-amber-900"
+                    />
+                    <p className="text-[9px] text-amber-700/80 font-semibold mt-1">
+                      💡 Las alertas predictivas automáticas de contratos vencidos llegarán directamente a esta casilla sin requerir contraseña adicional.
+                    </p>
+                  </div>
                 </div>
 
-                <div className="space-y-4 font-medium text-xs">
-                  <div>
-                    <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Host del Servidor SMTP</label>
-                    <input
-                      type="text"
-                      placeholder="Ej: smtp.gmail.com o smtp.office365.com"
-                      value={smtpHost}
-                      onChange={(e) => setSmtpHost(e.target.value)}
-                      className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all"
-                    />
+                {/* BLOQUE 2: CREDANCIALES SMTP DE SALIDA */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 bg-primary/10 text-primary rounded-lg flex items-center justify-center font-black text-xs">2</div>
+                    <div>
+                      <h4 className="text-xs font-black uppercase text-primary tracking-wider">Credenciales del Servidor Emisor (SMTP)</h4>
+                      <p className="text-[10px] text-muted font-bold leading-tight">Datos del servidor con el que la app envía correos a dueños e inquilinos (Salida).</p>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-4 font-medium text-xs">
                     <div>
-                      <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Puerto SMTP</label>
+                      <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Host del Servidor SMTP</label>
                       <input
                         type="text"
-                        placeholder="Ej: 587 o 465"
-                        value={smtpPort}
-                        onChange={(e) => setSmtpPort(e.target.value)}
+                        placeholder="Ej: smtp.gmail.com o smtp.office365.com"
+                        value={smtpHost}
+                        onChange={(e) => setSmtpHost(e.target.value)}
                         className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all"
                       />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Puerto SMTP</label>
+                        <input
+                          type="text"
+                          placeholder="Ej: 587 o 465"
+                          value={smtpPort}
+                          onChange={(e) => setSmtpPort(e.target.value)}
+                          className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Usuario / Correo Emisor</label>
+                        <input
+                          type="email"
+                          placeholder="Ej: corredor@puntopropiedades.cl"
+                          value={smtpUser}
+                          onChange={(e) => setSmtpUser(e.target.value)}
+                          className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all"
+                        />
+                      </div>
                     </div>
 
                     <div>
-                      <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Usuario / Correo Electrónico</label>
+                      <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Contraseña o Clave de Aplicación</label>
                       <input
-                        type="email"
-                        placeholder="Ej: contacto@tudominio.com"
-                        value={smtpUser}
-                        onChange={(e) => setSmtpUser(e.target.value)}
-                        className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all"
+                        type="password"
+                        placeholder="••••••••••••••••"
+                        value={smtpPass}
+                        onChange={(e) => setSmtpPass(e.target.value)}
+                        className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all font-mono"
                       />
                     </div>
                   </div>
+                </div>
 
-                  <div>
-                    <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Contraseña o Clave de Aplicación</label>
-                    <input
-                      type="password"
-                      placeholder="••••••••••••••••"
-                      value={smtpPass}
-                      onChange={(e) => setSmtpPass(e.target.value)}
-                      className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all font-mono"
-                    />
-                  </div>
-
-                  <div className="pt-4 border-t border-border">
-                    <button
-                      onClick={async () => {
-                        const updatedSettings = {
-                          ...appSettings,
-                          smtpHost,
-                          smtpPort,
-                          smtpUser,
-                          smtpPass
-                        };
-                        setAppSettings(updatedSettings);
-                        await updateAppSettings(updatedSettings);
-                      }}
-                      className="w-full bg-primary hover:bg-black text-white font-black uppercase text-[10px] tracking-widest py-4 rounded-xl transition-all shadow-md active:scale-[0.98] cursor-pointer"
-                    >
-                      Guardar Configuración de Correo
-                    </button>
-                  </div>
+                <div className="pt-4 border-t border-border">
+                  <button
+                    onClick={async () => {
+                      const updatedSettings = {
+                        ...appSettings,
+                        smtpHost,
+                        smtpPort,
+                        smtpUser,
+                        smtpPass,
+                        reportEmail: reportEmail || smtpUser
+                      };
+                      setAppSettings(updatedSettings);
+                      await updateAppSettings(updatedSettings);
+                      showToast('✓ Configuración de notificaciones guardada con éxito', 'success');
+                    }}
+                    className="w-full bg-primary hover:bg-black text-white font-black uppercase text-[10px] tracking-widest py-4 rounded-xl transition-all shadow-md active:scale-[0.98] cursor-pointer"
+                  >
+                    💾 Guardar Toda la Configuración de Notificaciones
+                  </button>
                 </div>
               </div>
 
-              {/* Right Column: Connection Test */}
-              <div className="lg:col-span-5 bg-white p-6 md:p-8 rounded-[28px] border border-border shadow-sm space-y-5">
+              {/* Right Column: Connection & Alert Testing */}
+              <div className="lg:col-span-5 bg-white p-6 md:p-8 rounded-[28px] border border-border shadow-sm space-y-6">
                 <div>
-                  <h4 className="text-xs font-black uppercase text-primary mb-1 tracking-wider">Prueba de Conexión</h4>
-                  <p className="text-[10px] text-muted font-bold leading-tight">Verifica si tus credenciales SMTP son válidas realizando un envío de prueba.</p>
+                  <h4 className="text-xs font-black uppercase text-primary mb-1 tracking-wider">Centro de Pruebas Rápidas</h4>
+                  <p className="text-[10px] text-muted font-bold leading-tight">Verifica el funcionamiento del servidor SMTP y prueba el envío de alertas.</p>
                 </div>
 
-                <div className="space-y-4 font-medium text-xs">
+                {/* PRUEBA 1: ALERTA DE VENCIMIENTOS */}
+                <div className="bg-amber-50/50 p-5 rounded-2xl border border-amber-200/80 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🚨</span>
+                    <div>
+                      <h5 className="text-[11px] font-black text-amber-900 uppercase tracking-tight">Prueba de Alerta de Vencimientos</h5>
+                      <p className="text-[9.5px] text-amber-800/80 font-bold">Envía inmediatamente el informe consolidado a tu casilla receptor.</p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={async () => {
+                      try {
+                        showToast('Ejecutando prueba de alerta de vencimientos...', 'success');
+                        const target = reportEmail || smtpUser;
+                        const res = await fetch(`/api/cron/monthly-expiry?action=monthly-expiry${target ? `&email=${encodeURIComponent(target)}` : ''}`);
+                        const text = await res.text();
+                        let data: any;
+                        try {
+                          data = JSON.parse(text);
+                        } catch (jsonErr) {
+                          showToast(`Error de Servidor (${res.status}): ${text.replace(/<[^>]*>/g, '').substring(0, 100)}`, 'error');
+                          return;
+                        }
+                        if (res.ok && data.success) {
+                          showToast(`✓ ${data.message || 'Reporte de vencimientos procesado.'}`, 'success');
+                        } else {
+                          showToast(`Error: ${data.message || data.error || data.details || 'No se pudo enviar.'}`, 'error');
+                        }
+                      } catch (err: any) {
+                        showToast(`Error de servidor: ${err.message}`, 'error');
+                      }
+                    }}
+                    className="w-full bg-amber-600 hover:bg-amber-700 text-white font-black uppercase text-[9.5px] tracking-wider py-3 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    📧 Probar Alerta de Vencimientos Ahora
+                  </button>
+                </div>
+
+                {/* PRUEBA 2: ENVÍO SMTP DE PRUEBA */}
+                <div className="space-y-4 pt-2 border-t border-border">
                   <div>
-                    <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Enviar Correo de Prueba a:</label>
+                    <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Enviar Correo de Prueba SMTP a:</label>
                     <input
                       type="email"
                       placeholder="ejemplo@correo.com"
@@ -4445,22 +4528,29 @@ if (!isAuthReady) return null;
                             }
                           })
                         });
-                        const data = await res.json();
-                        if (res.ok && data.success) {
-                          showToast('Correo de prueba enviado con éxito', 'success');
-                        } else {
-                          showToast('Error al enviar: ' + (data.details || data.error || 'error desconocido'), 'error');
+                        const text = await res.text();
+                        let data: any;
+                        try {
+                          data = JSON.parse(text);
+                        } catch (e) {
+                          showToast(`Respuesta (${res.status}): ${text.substring(0, 80)}`, 'error');
+                          return;
                         }
-                      } catch (err) {
-                        console.error(err);
-                        showToast('Error de red al enviar correo de prueba', 'error');
+                        if (res.ok && data.success) {
+                          showToast('✓ Correo de prueba enviado con éxito', 'success');
+                        } else {
+                          showToast(`Error: ${data.message || data.error || 'Fallo en la prueba.'}`, 'error');
+                        }
+                      } catch (err: any) {
+                        showToast(`Error al enviar: ${err.message}`, 'error');
                       } finally {
                         setLoading(false);
                       }
                     }}
-                    className="w-full border border-border hover:border-accent hover:text-accent font-black uppercase text-[10px] tracking-widest py-4 rounded-xl transition-all active:scale-[0.98] cursor-pointer"
+                    disabled={loading}
+                    className="w-full bg-slate-900 hover:bg-black text-white font-black uppercase text-[9.5px] tracking-wider py-3.5 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                   >
-                    ✓ Enviar Correo de Prueba
+                    ✓ Enviar Correo de Prueba SMTP
                   </button>
 
                   <div className="p-4 bg-slate-50 border border-border rounded-2xl text-[10px] text-muted leading-relaxed font-semibold">
@@ -4472,6 +4562,7 @@ if (!isAuthReady) return null;
                     </ul>
                   </div>
                 </div>
+
               </div>
             </div>
           </div>
