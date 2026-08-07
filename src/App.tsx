@@ -436,7 +436,31 @@ export default function App() {
     if (!terminoStr) return { isExpiryCandidate: false, isExpired: false, daysRemaining: 0 };
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const expiryDate = new Date(terminoStr + 'T00:00:00');
+
+    let expiryDate: Date | null = null;
+    if (terminoStr.includes('/')) {
+      const parts = terminoStr.split('/');
+      if (parts.length === 3) {
+        expiryDate = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10), 12, 0, 0);
+      }
+    } else if (terminoStr.includes('-')) {
+      const parts = terminoStr.split('-');
+      if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          expiryDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 12, 0, 0);
+        } else {
+          expiryDate = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10), 12, 0, 0);
+        }
+      }
+    }
+
+    if (!expiryDate || isNaN(expiryDate.getTime())) {
+      expiryDate = new Date(terminoStr);
+    }
+
+    if (isNaN(expiryDate.getTime())) {
+      return { isExpiryCandidate: false, isExpired: false, daysRemaining: 0 };
+    }
     
     // Candidatos: vencidos o que vencen hasta el fin del próximo mes
     const maxDate = new Date(today.getFullYear(), today.getMonth() + 2, 0); // último día del próximo mes
@@ -3591,632 +3615,693 @@ if (!isAuthReady) return null;
         )}
 
         {activeModule === 'reports' && (() => {
-          const reportsAvailableYears = Array.from(new Set(
-            properties
-              .map(p => {
-                if (!p.f_ini) return null;
-                const parts = p.f_ini.split('-');
-                return parts[0];
+          try {
+            const safeProperties = properties || [];
+            const reportsAvailableYears = Array.from(new Set(
+              safeProperties
+                .map(p => {
+                  if (!p || !p.f_ini) return null;
+                  const parts = String(p.f_ini).split('-');
+                  return parts[0];
+                })
+                .filter(Boolean)
+            ))
+            .sort((a, b) => String(b!).localeCompare(String(a!)));
+
+            const propertiesWithExpenses = safeProperties
+              .filter(p => p && p.f_ini && p.expenses && Array.isArray(p.expenses) && p.expenses.length > 0)
+              .filter(p => {
+                if (selectedReportsYear === 'all') return true;
+                return String(p.f_ini || '').startsWith(selectedReportsYear);
               })
-              .filter(Boolean)
-          ))
-          .sort((a, b) => String(b!).localeCompare(String(a!)));
+              .sort((a, b) => {
+                const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
+                const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
+                return (isNaN(dateB) ? 0 : dateB) - (isNaN(dateA) ? 0 : dateA);
+              });
 
-          const propertiesWithExpenses = properties
-            .filter(p => p.f_ini && p.expenses && p.expenses.length > 0)
-            .filter(p => {
-              if (selectedReportsYear === 'all') return true;
-              return p.f_ini!.startsWith(selectedReportsYear);
-            })
-            .sort((a, b) => {
-              const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
-              const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
-              return dateB - dateA;
+            const selectedProp = safeProperties.find(p => p && p.id === selectedReportPropId) || null;
+            
+            const parseMonto = (val: any): number => parseFloat(String(val || '0').replace(/[^\d.-]/g, '')) || 0;
+            
+            const isMatchingMonth = (eMes: string, targetMonth: string) => {
+              if (!eMes || !targetMonth) return false;
+              const normE = String(eMes || '').trim().toLowerCase();
+              const normT = String(targetMonth || '').trim().toLowerCase();
+              return normE === normT || (!normE.includes(' ') && `${normE} ${new Date().getFullYear()}` === normT);
+            };
+            
+            const getMonthTotal = (prop: Property | null, month: string) => {
+              if (!prop || !prop.expenses || !Array.isArray(prop.expenses)) return 0;
+              return prop.expenses.filter(e => e && isMatchingMonth(e.mes, month)).reduce((sum, e) => {
+                return sum + parseMonto(e.monto);
+              }, 0);
+            };
+
+            const getYearTotal = (prop: Property | null, year: string) => {
+              if (!prop || !prop.expenses || !Array.isArray(prop.expenses)) return 0;
+              return prop.expenses.filter(e => {
+                if (!e) return false;
+                const eMes = String(e.mes || '').toLowerCase();
+                return eMes.includes(year) || (!eMes.includes(' ') && year === new Date().getFullYear().toString());
+              }).reduce((sum, e) => sum + parseMonto(e.monto), 0);
+            };
+
+            const getYearCategories = (prop: Property | null, year: string) => {
+              const catTotals: Record<string, number> = {};
+              if (!prop || !prop.expenses || !Array.isArray(prop.expenses)) return catTotals;
+              prop.expenses.filter(e => {
+                if (!e) return false;
+                const eMes = String(e.mes || '').toLowerCase();
+                return eMes.includes(year) || (!eMes.includes(' ') && year === new Date().getFullYear().toString());
+              }).forEach(e => {
+                 const val = parseMonto(e.monto);
+                 const catName = String(e.tipo || 'OTROS');
+                 catTotals[catName] = (catTotals[catName] || 0) + val;
+              });
+              return catTotals;
+            };
+
+            const formatCurrency = (val: number) => {
+               return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(isNaN(val) ? 0 : val);
+            };
+
+            const safeReportMonth = selectedReportMonth || MONTHS_WITH_YEAR[0] || 'Enero 2026';
+            const monthExpenses = (selectedProp && selectedProp.expenses && Array.isArray(selectedProp.expenses)) ? selectedProp.expenses.filter(e => e && isMatchingMonth(e.mes, safeReportMonth)) : [];
+            const totalMonthExp = monthExpenses.reduce((sum, e) => sum + parseMonto(e.monto), 0);
+            
+            const txCount = monthExpenses.length;
+            
+            const monthCatTotals: Record<string, number> = {};
+            monthExpenses.forEach(e => {
+              const val = parseMonto(e.monto);
+              const catName = String(e.tipo || 'OTROS');
+              monthCatTotals[catName] = (monthCatTotals[catName] || 0) + val;
             });
-
-          const selectedProp = properties.find(p => p.id === selectedReportPropId) || null;
-          
-          const isMatchingMonth = (eMes: string, targetMonth: string) => {
-            const normE = (eMes || '').trim().toLowerCase();
-            const normT = (targetMonth || '').trim().toLowerCase();
-            return normE === normT || (!normE.includes(' ') && `${normE} ${new Date().getFullYear()}` === normT);
-          };
-          
-          const getMonthTotal = (prop: Property, month: string) => {
-            if (!prop.expenses) return 0;
-            return prop.expenses.filter(e => isMatchingMonth(e.mes, month)).reduce((sum, e) => {
-              const val = parseFloat(e.monto.replace(/[^\d.-]/g, '')) || 0;
-              return sum + val;
-            }, 0);
-          };
-
-          const getYearTotal = (prop: Property, year: string) => {
-            if (!prop.expenses) return 0;
-            return prop.expenses.filter(e => {
-              const eMes = (e.mes || '').toLowerCase();
-              return eMes.includes(year) || (!eMes.includes(' ') && year === new Date().getFullYear().toString());
-            }).reduce((sum, e) => sum + (parseFloat(e.monto.replace(/[^\d.-]/g, '')) || 0), 0);
-          };
-
-          const getYearCategories = (prop: Property, year: string) => {
-            const catTotals: Record<string, number> = {};
-            if (!prop.expenses) return catTotals;
-            prop.expenses.filter(e => {
-              const eMes = (e.mes || '').toLowerCase();
-              return eMes.includes(year) || (!eMes.includes(' ') && year === new Date().getFullYear().toString());
-            }).forEach(e => {
-               const val = parseFloat(e.monto.replace(/[^\d.-]/g, '')) || 0;
-               catTotals[e.tipo] = (catTotals[e.tipo] || 0) + val;
+            
+            let highestCatName = '-';
+            let highestCatVal = 0;
+            Object.entries(monthCatTotals).forEach(([cat, val]) => {
+              if (val > highestCatVal) {
+                highestCatVal = val;
+                highestCatName = cat;
+              }
             });
-            return catTotals;
-          };
-
-          const formatCurrency = (val: number) => {
-             return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(val);
-          };
-
-          const monthExpenses = selectedProp ? (selectedProp.expenses?.filter(e => isMatchingMonth(e.mes, selectedReportMonth)) || []) : [];
-          const totalMonthExp = monthExpenses.reduce((sum, e) => sum + (parseFloat(e.monto.replace(/[^\d.-]/g, '')) || 0), 0);
-          
-          const txCount = monthExpenses.length;
-          
-          const monthCatTotals: Record<string, number> = {};
-          monthExpenses.forEach(e => {
-            const val = parseFloat(e.monto.replace(/[^\d.-]/g, '')) || 0;
-            monthCatTotals[e.tipo] = (monthCatTotals[e.tipo] || 0) + val;
-          });
-          
-          let highestCatName = '-';
-          let highestCatVal = 0;
-          Object.entries(monthCatTotals).forEach(([cat, val]) => {
-            if (val > highestCatVal) {
-              highestCatVal = val;
-              highestCatName = cat;
-            }
-          });
-          
-          return (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-6 duration-700 max-w-7xl mx-auto py-4">
-              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 mb-4">
-                <div className="space-y-2">
-                   <h4 className="text-[10px] font-bold uppercase tracking-widest text-accent">Centro de Notificaciones</h4>
-                   <p className="text-4xl lg:text-5xl font-bold text-ink uppercase tracking-tight">
-                      Reportes <span className="opacity-30">Mensuales</span>
-                   </p>
-                </div>
-
-                {/* Submodule Switcher */}
-                <div className="flex bg-gray-100 p-1 rounded-2xl border border-border shrink-0 self-stretch sm:self-auto">
-                  <button
-                    onClick={() => setReportsSubModule('expenses')}
-                    className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${
-                      reportsSubModule === 'expenses'
-                        ? 'bg-white text-primary shadow-sm'
-                        : 'text-muted hover:text-ink'
-                    }`}
-                  >
-                    Registro de Gastos
-                  </button>
-                  <button
-                    onClick={() => setReportsSubModule('expiries')}
-                    className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${
-                      reportsSubModule === 'expiries'
-                        ? 'bg-white text-primary shadow-sm'
-                        : 'text-muted hover:text-ink'
-                    }`}
-                  >
-                    Vencimientos ({expiringProperties.length})
-                  </button>
-                </div>
-              </div>
-
-              {reportsSubModule === 'expiries' ? (
-                /* SECCION VENCIMIENTOS DE ARRIENDO */
-                <div className="bg-white rounded-3xl border border-border shadow-sm p-8 space-y-6 animate-in fade-in duration-500">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-border/60">
-                    <div>
-                      <h3 className="text-lg font-black uppercase tracking-tight text-ink">Arriendos que vencen este mes y el próximo</h3>
-                      <p className="text-[10px] text-muted font-bold mt-1">Control predictivo de finalizaciones de contratos de arrendamiento.</p>
-                    </div>
-
-                    {/* Filter por Estado */}
-                    <div className="flex bg-gray-100 p-1 rounded-xl border border-border self-stretch sm:self-auto">
-                      {(['all', 'expired', 'upcoming'] as const).map((filterVal) => (
-                        <button
-                          key={filterVal}
-                          onClick={() => setExpiryFilter(filterVal)}
-                          className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
-                            expiryFilter === filterVal
-                              ? 'bg-white text-primary shadow-xs'
-                              : 'text-muted hover:text-ink'
-                          }`}
-                        >
-                          {filterVal === 'all' && 'Todos'}
-                          {filterVal === 'expired' && 'Vencidos'}
-                          {filterVal === 'upcoming' && 'Por Vencer'}
-                        </button>
-                      ))}
-                    </div>
+            
+            return (
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-6 duration-700 max-w-7xl mx-auto py-4">
+                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 mb-4">
+                  <div className="space-y-2">
+                     <h4 className="text-[10px] font-bold uppercase tracking-widest text-accent">Centro de Notificaciones</h4>
+                     <p className="text-4xl lg:text-5xl font-bold text-ink uppercase tracking-tight">
+                        Reportes <span className="opacity-30">Mensuales</span>
+                     </p>
                   </div>
 
-                  {(() => {
-                    const filteredExpiries = expiringProperties.filter(p => {
-                      const { isExpired } = getExpiryStatus(p.termino);
-                      if (expiryFilter === 'expired') return isExpired;
-                      if (expiryFilter === 'upcoming') return !isExpired;
-                      return true;
-                    });
+                  <div className="flex flex-wrap items-center gap-3">
+                    {/* Botón rápido para probar la alerta de vencimientos por correo */}
+                    <button
+                      onClick={async () => {
+                        try {
+                          showToast('Ejecutando prueba de alerta de vencimientos...', 'success');
+                          const target = appSettings.reportEmail || appSettings.smtpUser;
+                          const res = await fetch(`/api/cron/monthly-expiry${target ? `?email=${encodeURIComponent(target)}` : ''}`);
+                          const data = await res.json();
+                          if (res.ok && data.success) {
+                            showToast(`✓ ${data.message || 'Reporte de vencimientos procesado.'}`, 'success');
+                          } else {
+                            showToast(`Error: ${data.message || data.error || 'No se pudo enviar.'}`, 'error');
+                          }
+                        } catch (err: any) {
+                          showToast(`Error de servidor: ${err.message}`, 'error');
+                        }
+                      }}
+                      className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-xs active:scale-95"
+                      title="Ejecutar prueba instantánea del correo de vencimientos de contrato"
+                    >
+                      📧 Probar Alerta Vencimientos
+                    </button>
 
-                    if (filteredExpiries.length === 0) {
+                    {/* Submodule Switcher */}
+                    <div className="flex bg-gray-100 p-1 rounded-2xl border border-border shrink-0 self-stretch sm:self-auto">
+                      <button
+                        onClick={() => setReportsSubModule('expenses')}
+                        className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${
+                          reportsSubModule === 'expenses'
+                            ? 'bg-white text-primary shadow-sm'
+                            : 'text-muted hover:text-ink'
+                        }`}
+                      >
+                        Registro de Gastos
+                      </button>
+                      <button
+                        onClick={() => setReportsSubModule('expiries')}
+                        className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${
+                          reportsSubModule === 'expiries'
+                            ? 'bg-white text-primary shadow-sm'
+                            : 'text-muted hover:text-ink'
+                        }`}
+                      >
+                        Vencimientos ({expiringProperties.length})
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {reportsSubModule === 'expiries' ? (
+                  /* SECCION VENCIMIENTOS DE ARRIENDO */
+                  <div className="bg-white rounded-3xl border border-border shadow-sm p-8 space-y-6 animate-in fade-in duration-500">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-border/60">
+                      <div>
+                        <h3 className="text-lg font-black uppercase tracking-tight text-ink">Arriendos que vencen este mes y el próximo</h3>
+                        <p className="text-[10px] text-muted font-bold mt-1">Control predictivo de finalizaciones de contratos de arrendamiento.</p>
+                      </div>
+
+                      {/* Filter por Estado */}
+                      <div className="flex bg-gray-100 p-1 rounded-xl border border-border self-stretch sm:self-auto">
+                        {(['all', 'expired', 'upcoming'] as const).map((filterVal) => (
+                          <button
+                            key={filterVal}
+                            onClick={() => setExpiryFilter(filterVal)}
+                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+                              expiryFilter === filterVal
+                                ? 'bg-white text-primary shadow-xs'
+                                : 'text-muted hover:text-ink'
+                            }`}
+                          >
+                            {filterVal === 'all' && 'Todos'}
+                            {filterVal === 'expired' && 'Vencidos'}
+                            {filterVal === 'upcoming' && 'Por Vencer'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {(() => {
+                      const filteredExpiries = (expiringProperties || []).filter(p => {
+                        if (!p) return false;
+                        const { isExpired } = getExpiryStatus(p.termino);
+                        if (expiryFilter === 'expired') return isExpired;
+                        if (expiryFilter === 'upcoming') return !isExpired;
+                        return true;
+                      });
+
+                      if (filteredExpiries.length === 0) {
+                        return (
+                          <div className="text-center py-20 bg-gray-50/50 rounded-2xl border border-dashed border-border/60">
+                            <FileText className="w-10 h-10 text-muted/30 mx-auto mb-4" />
+                            <p className="text-xs font-bold uppercase tracking-widest text-muted">Sin registros para este filtro</p>
+                          </div>
+                        );
+                      }
+
                       return (
-                        <div className="text-center py-20 bg-gray-50/50 rounded-2xl border border-dashed border-border/60">
-                          <FileText className="w-10 h-10 text-muted/30 mx-auto mb-4" />
-                          <p className="text-xs font-bold uppercase tracking-widest text-muted">Sin registros para este filtro</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {filteredExpiries.map((p, idx) => {
+                            if (!p) return null;
+                            const { isExpired, daysRemaining } = getExpiryStatus(p.termino);
+                            return (
+                              <div key={p.id || idx} className="bg-white p-6 rounded-[28px] border border-border/80 hover:border-red-200/50 hover:shadow-lg transition-all duration-300 flex flex-col justify-between gap-6 relative group">
+                                <div className="space-y-4">
+                                  <div className="flex justify-between items-start">
+                                    <span className={`text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full ${
+                                      isExpired ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-amber-50 text-amber-600 border border-amber-200'
+                                    }`}>
+                                      {isExpired ? 'Vencido' : `Vence en ${daysRemaining} días`}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-ink font-mono">{formatDateDMY(p.termino)}</span>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    <h4 className="text-sm font-black text-ink uppercase tracking-tight line-clamp-2 leading-snug group-hover:text-red-600 transition-colors">{p.direccion}</h4>
+                                    <div className="text-[10.5px] text-muted space-y-1">
+                                      <p>Propietario: <span className="font-extrabold text-slate-700">{p.dueno || 'Sin Registrar'}</span></p>
+                                      <p>Inquilino: <span className="font-extrabold text-slate-700">{p.arrendatario || 'Sin Registrar'}</span></p>
+                                      <p>Plazo Contrato: <span className="font-bold">{p.duracion || 'N/A'}</span></p>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="pt-4 border-t border-dashed border-border/60 flex items-center justify-between">
+                                  <div className="flex flex-col">
+                                    <span className="text-[8px] font-bold text-muted uppercase tracking-widest">Renta Mensual</span>
+                                    <span className="text-sm font-black text-primary">{p.valor}</span>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => viewContract(p.pdf, p.arrendatario)}
+                                      className="px-3 py-2 bg-white border border-border/80 hover:bg-gray-50 text-ink text-[8px] font-black uppercase tracking-wider rounded-xl transition-all active:scale-95 cursor-pointer shadow-sm"
+                                    >
+                                      Ver Contrato
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setSelectedProp(p);
+                                        setShowExpiryModal(true);
+                                      }}
+                                      className="px-4 py-2 bg-ink hover:bg-black text-white text-[8px] font-black uppercase tracking-wider rounded-xl transition-all active:scale-95 cursor-pointer"
+                                    >
+                                      Ver Ficha
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       );
-                    }
-
-                    return (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {filteredExpiries.map((p, idx) => {
-                          const { isExpired, daysRemaining } = getExpiryStatus(p.termino);
-                          return (
-                            <div key={p.id || idx} className="bg-white p-6 rounded-[28px] border border-border/80 hover:border-red-200/50 hover:shadow-lg transition-all duration-300 flex flex-col justify-between gap-6 relative group">
-                              <div className="space-y-4">
-                                <div className="flex justify-between items-start">
-                                  <span className={`text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full ${
-                                    isExpired ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-amber-50 text-amber-600 border border-amber-200'
-                                  }`}>
-                                    {isExpired ? 'Vencido' : `Vence en ${daysRemaining} días`}
-                                  </span>
-                                  <span className="text-[10px] font-bold text-ink font-mono">{formatDateDMY(p.termino)}</span>
-                                </div>
-
-                                <div className="space-y-2">
-                                  <h4 className="text-sm font-black text-ink uppercase tracking-tight line-clamp-2 leading-snug group-hover:text-red-600 transition-colors">{p.direccion}</h4>
-                                  <div className="text-[10.5px] text-muted space-y-1">
-                                    <p>Propietario: <span className="font-extrabold text-slate-700">{p.dueno || 'Sin Registrar'}</span></p>
-                                    <p>Inquilino: <span className="font-extrabold text-slate-700">{p.arrendatario || 'Sin Registrar'}</span></p>
-                                    <p>Plazo Contrato: <span className="font-bold">{p.duracion || 'N/A'}</span></p>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="pt-4 border-t border-dashed border-border/60 flex items-center justify-between">
-                                <div className="flex flex-col">
-                                  <span className="text-[8px] font-bold text-muted uppercase tracking-widest">Renta Mensual</span>
-                                  <span className="text-sm font-black text-primary">{p.valor}</span>
-                                </div>
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => viewContract(p.pdf, p.arrendatario)}
-                                    className="px-3 py-2 bg-white border border-border/80 hover:bg-gray-50 text-ink text-[8px] font-black uppercase tracking-wider rounded-xl transition-all active:scale-95 cursor-pointer shadow-sm"
-                                  >
-                                    Ver Contrato
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setSelectedProp(p);
-                                      setShowExpiryModal(true);
-                                    }}
-                                    className="px-4 py-2 bg-ink hover:bg-black text-white text-[8px] font-black uppercase tracking-wider rounded-xl transition-all active:scale-95 cursor-pointer"
-                                  >
-                                    Ver Ficha
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })()}
-                </div>
-              ) : (
-                /* SECCION TRADICIONAL DE GASTOS */
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                
-                {/* LEFT COLUMN: Property List */}
-                <div className="lg:col-span-4 flex flex-col gap-4">
-                  <div className="bg-white p-6 rounded-3xl border border-border shadow-sm flex flex-col min-h-[500px]">
-                    <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
-                      <h3 className="text-[10px] font-bold text-muted uppercase tracking-widest">Registro de Gastos</h3>
-                      
-                      {/* Year Filter Dropdown select */}
-                      <select
-                        value={selectedReportsYear}
-                        onChange={(e) => setSelectedReportsYear(e.target.value)}
-                        className="bg-gray-50 border border-border text-[9px] font-black uppercase tracking-wider rounded-lg p-1 outline-none text-ink cursor-pointer shrink-0"
-                      >
-                        <option value="all">Año: Todos</option>
-                        {reportsAvailableYears.map(yr => (
-                          <option key={yr} value={yr}>{yr}</option>
-                        ))}
-                      </select>
-                    </div>
-                    
-                    <div className="flex flex-col gap-3 overflow-y-auto pr-2 custom-scrollbar flex-1 max-h-[calc(100vh-230px)]">
-                      {propertiesWithExpenses.length === 0 ? (
-                        <div className="text-center py-10 opacity-50">
-                          <p className="text-xs font-bold uppercase tracking-widest text-muted">No hay gastos</p>
-                        </div>
-                      ) : (
-                        propertiesWithExpenses.map(p => {
-                          const isSel = selectedReportPropId === p.id;
-                          const reportYear = selectedReportMonth.split(' ').pop() || new Date().getFullYear().toString();
-                          const propYearTotal = getYearTotal(p, reportYear);
-                          const propYearCats = getYearCategories(p, reportYear);
-                          return (
-                            <button
-                              key={p.id}
-                              onClick={() => setSelectedReportPropId(p.id!)}
-                              className={`p-4 rounded-2xl flex flex-col items-start gap-2 text-left transition-all duration-300 relative border smooth-transition ${
-                                isSel 
-                                  ? 'bg-gradient-to-tr from-primary to-slate-900 border-primary shadow-lg shadow-primary/20 scale-[1.02] transform' 
-                                  : 'bg-bg border-transparent hover:border-border hover:bg-gray-50'
-                              }`}
-                            >
-                              <div className="flex justify-between items-center w-full mb-1">
-                                <span className={`text-[7px] font-bold uppercase ${isSel ? 'text-white/50' : 'text-slate-400'}`}>Contrato</span>
-                                {p.f_ini && (
-                                  <span className={`text-[10px] font-extrabold font-mono tracking-wider ${
-                                    isSel ? 'text-red-300' : 'text-red-600'
-                                  }`}>
-                                    {formatDateDMY(p.f_ini)}
-                                  </span>
-                                )}
-                              </div>
-                              
-                              <div className="flex items-start justify-between gap-3 mb-1 w-full text-left font-sans">
-                                <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                                  <div className={`text-[10px] font-black uppercase tracking-tight truncate ${isSel ? 'text-white' : 'text-slate-700'}`} title={p.dueno || 'Sin Dueño'}>
-                                    {p.dueno || 'Sin Dueño'}
-                                  </div>
-                                  <div className={`text-[9px] font-bold uppercase italic ${isSel ? 'text-white/40' : 'text-slate-400'}`}>vs</div>
-                                  <div className={`text-[10px] font-black uppercase tracking-tight truncate ${isSel ? 'text-accent' : 'text-red-700'}`} title={p.arrendatario || 'Sin Inquilino'}>
-                                    {p.arrendatario || 'Sin Inquilino'}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <p className={`text-[9px] font-semibold truncate w-full uppercase tracking-tight ${isSel ? 'text-white/80' : 'text-ink/70'} mb-2 text-left`}>
-                                {p.direccion}
-                              </p>
-                              
-                               <div className={`w-full mt-2 pt-2 border-t ${isSel ? 'border-white/10' : 'border-border/60'}`}>
-                                 <p className={`text-[9px] uppercase tracking-widest font-bold mb-1 ${isSel ? 'text-white/40' : 'text-muted/50'}`}>Gastos Anuales ({reportYear})</p>
-                                 <p className={`text-base font-black tracking-tight w-full mb-2 ${isSel ? 'text-accent' : 'text-primary'}`}>
-                                   {formatCurrency(propYearTotal)}
-                                 </p>
-                                 <div className="flex gap-1 flex-wrap">
-                                    {Object.entries(propYearCats).sort((a,b)=>b[1]-a[1]).slice(0, 3).map(([cat, val]) => (
-                                      <span key={cat} className={`text-[8px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 uppercase tracking-widest ${isSel ? 'bg-white/10 text-white/80' : 'bg-gray-100 text-muted'}`}>
-                                         <div className={`w-1.5 h-1.5 rounded-full ${getCategoryColor(cat)}`} />
-                                         {cat}
-                                      </span>
-                                    ))}
-                                    {Object.entries(propYearCats).length > 3 && (
-                                       <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 uppercase tracking-widest ${isSel ? 'bg-white/5 text-white/50' : 'bg-transparent text-muted/50'}`}>
-                                          +{Object.entries(propYearCats).length - 3}
-                                       </span>
-                                    )}
-                                 </div>
-                               </div>
-                            </button>
-                          );
-                        })
-                      )}
-                    </div>
+                    })()}
                   </div>
-                </div>
-
-                {/* RIGHT COLUMN: Analytics & Sending */}
-                <div className="lg:col-span-8 flex flex-col">
-                  {!selectedProp ? (
-                    <div className="bg-white rounded-3xl border border-border flex flex-col items-center justify-center p-12 min-h-[500px] shadow-sm text-center">
-                      <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-6">
-                        <FileText className="w-8 h-8 text-muted" />
-                      </div>
-                      <h3 className="text-xl font-black text-ink uppercase tracking-tight mb-2">Seleccione una Propiedad</h3>
-                      <p className="text-sm font-medium text-muted max-w-sm">Elija una propiedad de la lista para previsualizar los gastos y generar el reporte mensual.</p>
-                    </div>
-                  ) : (
-                    <div className="bg-white rounded-3xl border border-border shadow-sm p-8 flex flex-col animate-in fade-in zoom-in-95 duration-500">
-                      
-                      {/* Header & Navigation Tabs */}
-                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 pb-6 border-b border-border/60">
-                        <div>
-                          <h2 className="text-2xl font-black text-ink uppercase tracking-tight mb-1">{selectedProp.direccion}</h2>
-                          <div className="flex items-center gap-3">
-                            <span className="text-[10px] bg-gray-100 text-muted px-2 py-1 rounded font-mono uppercase tracking-widest">
-                              {selectedProp.dueno || 'Sin Doc.'}
-                            </span>
-                            <span className="text-[10px] text-muted font-mono">{selectedProp.mailD || 'Sin email'}</span>
-                          </div>
-                        </div>
+                ) : (
+                  /* SECCION TRADICIONAL DE GASTOS */
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                  
+                  {/* LEFT COLUMN: Property List */}
+                  <div className="lg:col-span-4 flex flex-col gap-4">
+                    <div className="bg-white p-6 rounded-3xl border border-border shadow-sm flex flex-col min-h-[500px]">
+                      <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
+                        <h3 className="text-[10px] font-bold text-muted uppercase tracking-widest">Registro de Gastos</h3>
                         
-                        {/* Tab Switcher */}
-                        <div className="flex bg-gray-100 p-1 rounded-xl border border-border mt-4 md:mt-0">
-                          <button
-                            onClick={() => setReportsTab('details')}
-                            className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${
-                              reportsTab === 'details'
-                                ? 'bg-white text-primary shadow-sm'
-                                : 'text-muted hover:text-ink'
-                            }`}
-                          >
-                            Detalle de Gastos
-                          </button>
-                          <button
-                            onClick={() => setReportsTab('preview')}
-                            className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${
-                              reportsTab === 'preview'
-                                ? 'bg-white text-primary shadow-sm'
-                                : 'text-muted hover:text-ink'
-                            }`}
-                          >
-                            Previsualizar Informe
-                          </button>
-                        </div>
+                        {/* Year Filter Dropdown select */}
+                        <select
+                          value={selectedReportsYear}
+                          onChange={(e) => setSelectedReportsYear(e.target.value)}
+                          className="bg-gray-50 border border-border text-[9px] font-black uppercase tracking-wider rounded-lg p-1 outline-none text-ink cursor-pointer shrink-0"
+                        >
+                          <option value="all">Año: Todos</option>
+                          {reportsAvailableYears.map(yr => (
+                            <option key={yr} value={yr}>{yr}</option>
+                          ))}
+                        </select>
                       </div>
-
-                      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
-                        {/* Subcolumna Izquierda: Historial Anual (común para ambas vistas) */}
-                        <div className="xl:col-span-5 flex flex-col">
-                           <h4 className="text-[10px] font-bold text-muted uppercase tracking-widest mb-6 border-b border-border/60 pb-2">
-                             Historial Anual de Gastos {new Date().getFullYear()}
-                           </h4>
-                           <div className="flex flex-col gap-1">
-                              {MONTHS_WITH_YEAR.filter(m => m.endsWith(new Date().getFullYear().toString())).reverse().map((m) => {
-                                 const mTotal = getMonthTotal(selectedProp, m);
-                                 const mExps = selectedProp.expenses?.filter(e => isMatchingMonth(e.mes, m)) || [];
-                                 
-                                 // agrupar por categoría
-                                 const catTotals: Record<string, number> = {};
-                                 mExps.forEach(e => {
-                                    const val = parseFloat(e.monto.replace(/[^\d.-]/g, '')) || 0;
-                                    catTotals[e.tipo] = (catTotals[e.tipo] || 0) + val;
-                                 });
-
-                                 const isSel = selectedReportMonth === m;
-
-                                 return (
-                                   <button 
-                                      key={m}
-                                      onClick={() => setSelectedReportMonth(m)}
-                                      className={`w-full flex items-center p-3 rounded-xl cursor-pointer smooth-transition border text-left ${
-                                        isSel ? 'bg-gray-50 border-border shadow-sm ring-1 ring-border relative z-10' : 'bg-transparent border-transparent hover:bg-gray-50/50'
-                                      }`}
-                                   >
-                                     <div className={`w-16 font-bold text-[10px] uppercase tracking-widest shrink-0 ${isSel ? 'text-ink' : 'text-muted'}`}>
-                                       {m.split(' ')[0]}
-                                     </div>
-                                     
-                                     <div className="flex-1 px-3 flex items-center h-2">
-                                        {mTotal > 0 ? (
-                                          <div className="w-full h-full bg-gray-100 rounded-full overflow-hidden flex shadow-inner">
-                                             {Object.entries(catTotals).map(([cat, val], i) => (
-                                                <div 
-                                                   key={i} 
-                                                   title={`${cat}: ${formatCurrency(val)}`}
-                                                   className={`h-full ${getCategoryColor(cat)}`} 
-                                                   style={{ width: `${(val / mTotal) * 100}%` }} 
-                                                />
-                                             ))}
-                                          </div>
-                                        ) : (
-                                          <div className="w-full h-[1px] border-t border-dashed border-border/60" />
-                                        )}
-                                     </div>
-
-                                     <div className={`w-16 text-right font-black text-[10px] tracking-tight shrink-0 ${mTotal > 0 ? 'text-ink' : 'text-muted/40'}`}>
-                                        {mTotal > 0 ? formatCurrency(mTotal) : '-'}
-                                     </div>
-                                   </button>
-                                 );
-                              })}
-                           </div>
-                        </div>
-
-                        {/* Subcolumna Derecha: Detalle de Gastos o Previsualización */}
-                        <div className="xl:col-span-7 flex flex-col">
-                          {reportsTab === 'details' ? (
-                            <div className="flex flex-col bg-bg/50 p-6 rounded-3xl border border-border/80 relative h-full">
-                               <div className="mb-6 flex justify-between items-end">
-                                  <div>
-                                     <h4 className="text-[10px] font-bold text-accent uppercase tracking-widest mb-1">Detalle del Mes</h4>
-                                     <h3 className="text-xl font-black text-ink uppercase tracking-tight">{selectedReportMonth}</h3>
+                      
+                      <div className="flex flex-col gap-3 overflow-y-auto pr-2 custom-scrollbar flex-1 max-h-[calc(100vh-230px)]">
+                        {propertiesWithExpenses.length === 0 ? (
+                          <div className="text-center py-10 opacity-50">
+                            <p className="text-xs font-bold uppercase tracking-widest text-muted">No hay gastos</p>
+                          </div>
+                        ) : (
+                          propertiesWithExpenses.map(p => {
+                            if (!p) return null;
+                            const isSel = selectedReportPropId === p.id;
+                            const reportYear = (safeReportMonth || '').split(' ').pop() || new Date().getFullYear().toString();
+                            const propYearTotal = getYearTotal(p, reportYear);
+                            const propYearCats = getYearCategories(p, reportYear);
+                            return (
+                              <button
+                                key={p.id}
+                                onClick={() => setSelectedReportPropId(p.id!)}
+                                className={`p-4 rounded-2xl flex flex-col items-start gap-2 text-left transition-all duration-300 relative border smooth-transition ${
+                                  isSel 
+                                    ? 'bg-gradient-to-tr from-primary to-slate-900 border-primary shadow-lg shadow-primary/20 scale-[1.02] transform' 
+                                    : 'bg-bg border-transparent hover:border-border hover:bg-gray-50'
+                                }`}
+                              >
+                                <div className="flex justify-between items-center w-full mb-1">
+                                  <span className={`text-[7px] font-bold uppercase ${isSel ? 'text-white/50' : 'text-slate-400'}`}>Contrato</span>
+                                  {p.f_ini && (
+                                    <span className={`text-[10px] font-extrabold font-mono tracking-wider ${
+                                      isSel ? 'text-red-300' : 'text-red-600'
+                                    }`}>
+                                      {formatDateDMY(p.f_ini)}
+                                    </span>
+                                  )}
+                                </div>
+                                
+                                <div className="flex items-start justify-between gap-3 mb-1 w-full text-left font-sans">
+                                  <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                                    <div className={`text-[10px] font-black uppercase tracking-tight truncate ${isSel ? 'text-white' : 'text-slate-700'}`} title={p.dueno || 'Sin Dueño'}>
+                                      {p.dueno || 'Sin Dueño'}
+                                    </div>
+                                    <div className={`text-[9px] font-bold uppercase italic ${isSel ? 'text-white/40' : 'text-slate-400'}`}>vs</div>
+                                    <div className={`text-[10px] font-black uppercase tracking-tight truncate ${isSel ? 'text-accent' : 'text-red-700'}`} title={p.arrendatario || 'Sin Inquilino'}>
+                                      {p.arrendatario || 'Sin Inquilino'}
+                                    </div>
                                   </div>
-                                  <div className="text-right">
-                                     <p className="text-[9px] font-bold text-muted uppercase tracking-widest mb-1">Total</p>
-                                     <p className="text-2xl font-black text-ink tracking-tight leading-none">{formatCurrency(totalMonthExp)}</p>
-                                  </div>
-                               </div>
-
-                               {/* High-level Metric Cards */}
-                               <div className="grid grid-cols-3 gap-3 mb-6">
-                                 <div className="bg-white p-3 rounded-2xl border border-border shadow-sm">
-                                   <p className="text-[8px] font-bold text-muted uppercase tracking-wider mb-1">Total Gastado</p>
-                                   <p className="text-xs font-black text-ink tracking-tight">{formatCurrency(totalMonthExp)}</p>
-                                 </div>
-                                 <div className="bg-white p-3 rounded-2xl border border-border shadow-sm">
-                                   <p className="text-[8px] font-bold text-muted uppercase tracking-wider mb-1">Transacciones</p>
-                                   <p className="text-xs font-black text-ink tracking-tight">{txCount} reg.</p>
-                                 </div>
-                                 <div className="bg-white p-3 rounded-2xl border border-border shadow-sm">
-                                   <p className="text-[8px] font-bold text-muted uppercase tracking-wider mb-1">Mayor Gasto</p>
-                                   <p className="text-[9px] font-black text-primary truncate tracking-tight uppercase" title={highestCatName}>
-                                     {highestCatName !== '-' ? `${highestCatName}: ${formatCurrency(highestCatVal)}` : '-'}
-                                   </p>
-                                 </div>
                                 </div>
 
-                               {/* Category Graph / Progress Bars */}
-                               {monthExpenses.length > 0 && (
-                                 <div className="mb-6 bg-white p-4 rounded-2xl border border-border shadow-sm">
-                                   <p className="text-[9px] font-black uppercase text-muted tracking-widest mb-3 border-b border-border/50 pb-2">Distribución de Gastos</p>
-                                   <div className="space-y-3">
-                                     {Object.entries(monthCatTotals).sort((a,b)=>b[1]-a[1]).map(([cat, val]) => {
-                                       const pct = totalMonthExp > 0 ? (val / totalMonthExp) * 100 : 0;
-                                       return (
-                                         <div key={cat} className="space-y-1">
-                                           <div className="flex justify-between text-[9px] font-bold text-ink uppercase tracking-wider">
-                                             <span className="flex items-center gap-1.5">
-                                               <div className={`w-1.5 h-1.5 rounded-full ${getCategoryColor(cat)}`} />
-                                               {cat}
-                                             </span>
-                                             <span>{formatCurrency(val)} ({pct.toFixed(0)}%)</span>
-                                           </div>
-                                           <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                             <div className={`h-full ${getCategoryColor(cat)}`} style={{ width: `${pct}%` }} />
-                                           </div>
-                                         </div>
-                                       );
-                                     })}
+                                <p className={`text-[9px] font-semibold truncate w-full uppercase tracking-tight ${isSel ? 'text-white/80' : 'text-ink/70'} mb-2 text-left`}>
+                                  {p.direccion}
+                                </p>
+                                
+                                 <div className={`w-full mt-2 pt-2 border-t ${isSel ? 'border-white/10' : 'border-border/60'}`}>
+                                   <p className={`text-[9px] uppercase tracking-widest font-bold mb-1 ${isSel ? 'text-white/40' : 'text-muted/50'}`}>Gastos Anuales ({reportYear})</p>
+                                   <p className={`text-base font-black tracking-tight w-full mb-2 ${isSel ? 'text-accent' : 'text-primary'}`}>
+                                     {formatCurrency(propYearTotal)}
+                                   </p>
+                                   <div className="flex gap-1 flex-wrap">
+                                      {Object.entries(propYearCats).sort((a,b)=>b[1]-a[1]).slice(0, 3).map(([cat, val]) => (
+                                        <span key={cat} className={`text-[8px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 uppercase tracking-widest ${isSel ? 'bg-white/10 text-white/80' : 'bg-gray-100 text-muted'}`}>
+                                           <div className={`w-1.5 h-1.5 rounded-full ${getCategoryColor(cat)}`} />
+                                           {cat}
+                                        </span>
+                                      ))}
+                                      {Object.entries(propYearCats).length > 3 && (
+                                         <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 uppercase tracking-widest ${isSel ? 'bg-white/5 text-white/50' : 'bg-transparent text-muted/50'}`}>
+                                            +{Object.entries(propYearCats).length - 3}
+                                         </span>
+                                      )}
                                    </div>
                                  </div>
-                               )}
-                               
-                               <div className="flex-1 overflow-y-auto mb-6 custom-scrollbar max-h-[300px]">
-                                  {monthExpenses.length === 0 ? (
-                                     <div className="flex flex-col items-center justify-center text-center py-12 text-muted/50">
-                                       <FileText className="w-8 h-8 mb-3 opacity-20" />
-                                       <p className="text-[10px] font-bold uppercase tracking-widest">No hay registros</p>
-                                     </div>
-                                  ) : (
-                                     <div className="space-y-3 pr-2">
-                                        <p className="text-[9px] font-black uppercase text-muted tracking-widest mb-2 border-b border-border/50 pb-2">Transacciones Registradas</p>
-                                        {monthExpenses.map((exp, idx) => (
-                                          <div key={idx} className="bg-white px-4 py-3 rounded-2xl border border-border flex flex-col gap-2 shadow-sm relative overflow-hidden group">
-                                            <div className={`absolute top-0 left-0 w-1 h-full ${getCategoryColor(exp.tipo)}`} />
-                                            <div className="flex justify-between items-start">
-                                               <div className="flex flex-col">
-                                                  <span className="text-[10px] font-black uppercase text-ink tracking-tight mb-0.5">{exp.tipo}</span>
-                                                  <span className="text-[8px] font-bold text-muted uppercase font-mono tracking-widest">Boleta/Folio: {exp.boleta || 'S/N'}</span>
-                                               </div>
-                                               <span className="text-xs font-black text-primary bg-primary/5 px-2 py-1 rounded-md">{exp.monto}</span>
-                                            </div>
-                                            {exp.link && (
-                                              <div className="pt-2 mt-1 border-t border-dashed border-border/60">
-                                                <a href={exp.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-accent hover:text-red-700 transition-colors">
-                                                  <FileText className="w-3 h-3" /> Ver Adjunto PDF
-                                                </a>
-                                              </div>
-                                            )}
-                                          </div>
-                                        ))}
-                                     </div>
-                                  )}
-                               </div>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
-                               {/* Email Section inside the month detail */}
-                               <div className="mt-auto pt-6 border-t border-border/60">
-                                  <p className="text-[9px] font-black text-muted uppercase tracking-widest mb-3">Acciones Rápidas</p>
+                  {/* RIGHT COLUMN: Analytics & Sending */}
+                  <div className="lg:col-span-8 flex flex-col">
+                    {!selectedProp ? (
+                      <div className="bg-white rounded-3xl border border-border flex flex-col items-center justify-center p-12 min-h-[500px] shadow-sm text-center">
+                        <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-6">
+                          <FileText className="w-8 h-8 text-muted" />
+                        </div>
+                        <h3 className="text-xl font-black text-ink uppercase tracking-tight mb-2">Seleccione una Propiedad</h3>
+                        <p className="text-sm font-medium text-muted max-w-sm">Elija una propiedad de la lista para previsualizar los gastos y generar el reporte mensual.</p>
+                      </div>
+                    ) : (
+                      <div className="bg-white rounded-3xl border border-border shadow-sm p-8 flex flex-col animate-in fade-in zoom-in-95 duration-500">
+                        
+                        {/* Header & Navigation Tabs */}
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 pb-6 border-b border-border/60">
+                          <div>
+                            <h2 className="text-2xl font-black text-ink uppercase tracking-tight mb-1">{selectedProp.direccion}</h2>
+                            <div className="flex items-center gap-3">
+                              <span className="text-[10px] bg-gray-100 text-muted px-2 py-1 rounded font-mono uppercase tracking-widest">
+                                {selectedProp.dueno || 'Sin Doc.'}
+                              </span>
+                              <span className="text-[10px] text-muted font-mono">{selectedProp.mailD || 'Sin email'}</span>
+                            </div>
+                          </div>
+                          
+                          {/* Tab Switcher */}
+                          <div className="flex bg-gray-100 p-1 rounded-xl border border-border mt-4 md:mt-0">
+                            <button
+                              onClick={() => setReportsTab('details')}
+                              className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${
+                                reportsTab === 'details'
+                                  ? 'bg-white text-primary shadow-sm'
+                                  : 'text-muted hover:text-ink'
+                              }`}
+                            >
+                              Detalle de Gastos
+                            </button>
+                            <button
+                              onClick={() => setReportsTab('preview')}
+                              className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${
+                                reportsTab === 'preview'
+                                  ? 'bg-white text-primary shadow-sm'
+                                  : 'text-muted hover:text-ink'
+                              }`}
+                            >
+                              Previsualizar Informe
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+                          {/* Subcolumna Izquierda: Historial Anual (común para ambas vistas) */}
+                          <div className="xl:col-span-5 flex flex-col">
+                             <h4 className="text-[10px] font-bold text-muted uppercase tracking-widest mb-6 border-b border-border/60 pb-2">
+                               Historial Anual de Gastos {new Date().getFullYear()}
+                             </h4>
+                             <div className="flex flex-col gap-1">
+                                {MONTHS_WITH_YEAR.filter(m => m.endsWith(new Date().getFullYear().toString())).reverse().map((m) => {
+                                   const mTotal = getMonthTotal(selectedProp, m);
+                                   const mExps = (selectedProp && selectedProp.expenses && Array.isArray(selectedProp.expenses)) ? selectedProp.expenses.filter(e => e && isMatchingMonth(e.mes, m)) : [];
+                                   
+                                   const catTotals: Record<string, number> = {};
+                                   mExps.forEach(e => {
+                                      const val = parseMonto(e.monto);
+                                      const catName = String(e.tipo || 'OTROS');
+                                      catTotals[catName] = (catTotals[catName] || 0) + val;
+                                   });
+
+                                   const isSel = safeReportMonth === m;
+
+                                   return (
+                                     <button 
+                                        key={m}
+                                        onClick={() => setSelectedReportMonth(m)}
+                                        className={`w-full flex items-center p-3 rounded-xl cursor-pointer smooth-transition border text-left ${
+                                          isSel ? 'bg-gray-50 border-border shadow-sm ring-1 ring-border relative z-10' : 'bg-transparent border-transparent hover:bg-gray-50/50'
+                                        }`}
+                                     >
+                                       <div className={`w-16 font-bold text-[10px] uppercase tracking-widest shrink-0 ${isSel ? 'text-ink' : 'text-muted'}`}>
+                                         {m.split(' ')[0]}
+                                       </div>
+                                       
+                                       <div className="flex-1 px-3 flex items-center h-2">
+                                          {mTotal > 0 ? (
+                                            <div className="w-full h-full bg-gray-100 rounded-full overflow-hidden flex shadow-inner">
+                                               {Object.entries(catTotals).map(([cat, val], i) => (
+                                                  <div 
+                                                     key={i} 
+                                                     title={`${cat}: ${formatCurrency(val)}`}
+                                                     className={`h-full ${getCategoryColor(cat)}`} 
+                                                     style={{ width: `${(val / mTotal) * 100}%` }} 
+                                                  />
+                                               ))}
+                                            </div>
+                                          ) : (
+                                            <div className="w-full h-[1px] border-t border-dashed border-border/60" />
+                                          )}
+                                       </div>
+
+                                       <div className={`w-16 text-right font-black text-[10px] tracking-tight shrink-0 ${mTotal > 0 ? 'text-ink' : 'text-muted/40'}`}>
+                                          {mTotal > 0 ? formatCurrency(mTotal) : '-'}
+                                       </div>
+                                     </button>
+                                   );
+                                })}
+                             </div>
+                          </div>
+
+                          {/* Subcolumna Derecha: Detalle de Gastos o Previsualización */}
+                          <div className="xl:col-span-7 flex flex-col">
+                            {reportsTab === 'details' ? (
+                              <div className="flex flex-col bg-bg/50 p-6 rounded-3xl border border-border/80 relative h-full">
+                                 <div className="mb-6 flex justify-between items-end">
+                                    <div>
+                                       <h4 className="text-[10px] font-bold text-accent uppercase tracking-widest mb-1">Detalle del Mes</h4>
+                                       <h3 className="text-xl font-black text-ink uppercase tracking-tight">{safeReportMonth}</h3>
+                                    </div>
+                                    <div className="text-right">
+                                       <p className="text-[9px] font-bold text-muted uppercase tracking-widest mb-1">Total</p>
+                                       <p className="text-2xl font-black text-ink tracking-tight leading-none">{formatCurrency(totalMonthExp)}</p>
+                                    </div>
+                                 </div>
+
+                                 {/* High-level Metric Cards */}
+                                 <div className="grid grid-cols-3 gap-3 mb-6">
+                                   <div className="bg-white p-3 rounded-2xl border border-border shadow-sm">
+                                     <p className="text-[8px] font-bold text-muted uppercase tracking-wider mb-1">Total Gastado</p>
+                                     <p className="text-xs font-black text-ink tracking-tight">{formatCurrency(totalMonthExp)}</p>
+                                   </div>
+                                   <div className="bg-white p-3 rounded-2xl border border-border shadow-sm">
+                                     <p className="text-[8px] font-bold text-muted uppercase tracking-wider mb-1">Transacciones</p>
+                                     <p className="text-xs font-black text-ink tracking-tight">{txCount} reg.</p>
+                                   </div>
+                                   <div className="bg-white p-3 rounded-2xl border border-border shadow-sm">
+                                     <p className="text-[8px] font-bold text-muted uppercase tracking-wider mb-1">Mayor Gasto</p>
+                                     <p className="text-[9px] font-black text-primary truncate tracking-tight uppercase" title={highestCatName}>
+                                       {highestCatName !== '-' ? `${highestCatName}: ${formatCurrency(highestCatVal)}` : '-'}
+                                     </p>
+                                   </div>
+                                  </div>
+
+                                 {/* Category Graph / Progress Bars */}
+                                 {monthExpenses.length > 0 && (
+                                   <div className="mb-6 bg-white p-4 rounded-2xl border border-border shadow-sm">
+                                     <p className="text-[9px] font-black uppercase text-muted tracking-widest mb-3 border-b border-border/50 pb-2">Distribución de Gastos</p>
+                                     <div className="space-y-3">
+                                       {Object.entries(monthCatTotals).sort((a,b)=>b[1]-a[1]).map(([cat, val]) => {
+                                         const pct = totalMonthExp > 0 ? (val / totalMonthExp) * 100 : 0;
+                                         return (
+                                           <div key={cat} className="space-y-1">
+                                             <div className="flex justify-between text-[9px] font-bold text-ink uppercase tracking-wider">
+                                               <span className="flex items-center gap-1.5">
+                                                 <div className={`w-1.5 h-1.5 rounded-full ${getCategoryColor(cat)}`} />
+                                                 {cat}
+                                               </span>
+                                               <span>{formatCurrency(val)} ({pct.toFixed(0)}%)</span>
+                                             </div>
+                                             <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                               <div className={`h-full ${getCategoryColor(cat)}`} style={{ width: `${pct}%` }} />
+                                             </div>
+                                           </div>
+                                         );
+                                       })}
+                                     </div>
+                                   </div>
+                                 )}
+                                 
+                                 <div className="flex-1 overflow-y-auto mb-6 custom-scrollbar max-h-[300px]">
+                                    {monthExpenses.length === 0 ? (
+                                       <div className="flex flex-col items-center justify-center text-center py-12 text-muted/50">
+                                         <FileText className="w-8 h-8 mb-3 opacity-20" />
+                                         <p className="text-[10px] font-bold uppercase tracking-widest">No hay registros</p>
+                                       </div>
+                                    ) : (
+                                       <div className="space-y-3 pr-2">
+                                          <p className="text-[9px] font-black uppercase text-muted tracking-widest mb-2 border-b border-border/50 pb-2">Transacciones Registradas</p>
+                                          {monthExpenses.map((exp, idx) => {
+                                            if (!exp) return null;
+                                            return (
+                                              <div key={idx} className="bg-white px-4 py-3 rounded-2xl border border-border flex flex-col gap-2 shadow-sm relative overflow-hidden group">
+                                                <div className={`absolute top-0 left-0 w-1 h-full ${getCategoryColor(exp.tipo)}`} />
+                                                <div className="flex justify-between items-start">
+                                                   <div className="flex flex-col">
+                                                      <span className="text-[10px] font-black uppercase text-ink tracking-tight mb-0.5">{exp.tipo || 'Gasto'}</span>
+                                                      <span className="text-[8px] font-bold text-muted uppercase font-mono tracking-widest">Boleta/Folio: {exp.boleta || 'S/N'}</span>
+                                                   </div>
+                                                   <span className="text-xs font-black text-primary bg-primary/5 px-2 py-1 rounded-md">{exp.monto}</span>
+                                                </div>
+                                                {exp.link && (
+                                                  <div className="pt-2 mt-1 border-t border-dashed border-border/60">
+                                                    <a href={exp.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-accent hover:text-red-700 transition-colors">
+                                                      <FileText className="w-3 h-3" /> Ver Adjunto PDF
+                                                    </a>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            );
+                                          })}
+                                       </div>
+                                    )}
+                                 </div>
+
+                                 {/* Email Section inside the month detail */}
+                                 <div className="mt-auto pt-6 border-t border-border/60">
+                                    <p className="text-[9px] font-black text-muted uppercase tracking-widest mb-3">Acciones Rápidas</p>
+                                    <button 
+                                       onClick={() => sendReport(selectedProp, safeReportMonth)}
+                                       disabled={loading || monthExpenses.length === 0}
+                                       className={`w-full py-4 rounded-xl font-black uppercase text-[10px] tracking-[0.2em] smooth-transition flex items-center justify-center gap-2 ${
+                                         loading || monthExpenses.length === 0 
+                                           ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none border border-transparent' 
+                                           : 'bg-gradient-to-r from-primary to-slate-900 border border-primary text-white hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-0.5 glow-hover'
+                                       }`}
+                                     >
+                                       <Mail className={`w-4 h-4 ${loading ? 'animate-pulse' : ''}`} /> 
+                                       {loading ? 'Enviando Reporte...' : 'Enviar Reporte al Propietario'}
+                                     </button>
+                                 </div>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col bg-stone-50 p-6 rounded-3xl border border-stone-200 shadow-inner relative font-sans text-stone-800 h-full">
+                                {/* Email Client Header */}
+                                <div className="border-b border-stone-200 pb-4 mb-4 text-[10px] font-semibold text-stone-500 space-y-1">
+                                  <div><span className="font-bold uppercase tracking-wider text-stone-400">De:</span> Punto Propiedades &lt;contacto@puntopropiedades.cl&gt;</div>
+                                  <div><span className="font-bold uppercase tracking-wider text-stone-400">Para:</span> {selectedProp.dueno || 'Sin Dueño'} &lt;{selectedProp.mailD || 'sin-correo@correo.com'}&gt;</div>
+                                  <div><span className="font-bold uppercase tracking-wider text-stone-400">Asunto:</span> <span className="text-stone-800 font-bold">Informe de Gastos - {safeReportMonth} - {selectedProp.direccion}</span></div>
+                                </div>
+                                
+                                {/* Email Body Preview Container */}
+                                <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm flex flex-col gap-4 min-h-[300px] text-xs leading-relaxed text-stone-700 max-h-[400px] overflow-y-auto custom-scrollbar">
+                                  {/* Brand Header */}
+                                  <div className="flex justify-between items-center border-b border-stone-100 pb-4 mb-2">
+                                    <span className="font-black tracking-wider text-primary text-sm uppercase">PUNTO PROPIEDADES</span>
+                                    <span className="text-[9px] font-bold text-stone-400 uppercase tracking-widest">{safeReportMonth}</span>
+                                  </div>
+                                  
+                                  <p>Estimado(a) <strong>{selectedProp.dueno || 'Propietario'}</strong>,</p>
+                                  
+                                  <p>Junto con saludarle de parte de Punto Propiedades, a continuación se detalla el desglose consolidado de los gastos operacionales registrados para su propiedad ubicada en <strong>{selectedProp.direccion}</strong> correspondientes al mes de <strong>{safeReportMonth}</strong>:</p>
+                                  
+                                  {/* Table Mockup */}
+                                  {monthExpenses.length === 0 ? (
+                                    <p className="text-center py-6 text-stone-400 italic">No se registran gastos para este período.</p>
+                                  ) : (
+                                    <div className="border border-stone-100 rounded-xl overflow-hidden my-2 shadow-sm">
+                                      <table className="w-full text-left border-collapse text-[10px]">
+                                        <thead>
+                                          <tr className="bg-stone-50 text-stone-500 font-black uppercase tracking-wider border-b border-stone-100">
+                                            <th className="p-3">Categoría</th>
+                                            <th className="p-3">Boleta/Folio</th>
+                                            <th className="p-3 text-right">Monto</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {monthExpenses.map((exp, idx) => {
+                                            if (!exp) return null;
+                                            return (
+                                              <tr key={idx} className="border-b border-stone-50 hover:bg-stone-50/50">
+                                                <td className="p-3 font-bold uppercase tracking-tight">{exp.tipo || 'Gasto'}</td>
+                                                <td className="p-3 text-stone-500 font-mono">{exp.boleta || 'S/N'}</td>
+                                                <td className="p-3 text-right font-black text-stone-900">{exp.monto}</td>
+                                              </tr>
+                                            );
+                                          })}
+                                          <tr className="bg-stone-50 font-black text-stone-900 border-t border-stone-100">
+                                            <td colSpan={2} className="p-3 text-right uppercase tracking-wider text-[9px] text-stone-500">Monto Total Operacional</td>
+                                            <td className="p-3 text-right text-xs text-primary">{formatCurrency(totalMonthExp)}</td>
+                                          </tr>
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  )}
+                                  
+                                  <p className="mt-2">Quedamos atentos a cualquier duda o comentario que pueda tener respecto a este informe.</p>
+                                  
+                                  <div className="border-t border-stone-100 pt-4 mt-2 text-[9px] text-stone-400">
+                                    <p className="font-bold text-stone-600">Atentamente,</p>
+                                    <p className="font-bold text-primary uppercase">Administración Punto Propiedades</p>
+                                  </div>
+                                </div>
+
+                                {/* Send Email Action Trigger */}
+                                <div className="mt-6 pt-4 border-t border-stone-200 flex flex-col gap-2">
                                   <button 
-                                     onClick={() => sendReport(selectedProp, selectedReportMonth)}
+                                     onClick={() => sendReport(selectedProp, safeReportMonth)}
                                      disabled={loading || monthExpenses.length === 0}
-                                     className={`w-full py-4 rounded-xl font-black uppercase text-[10px] tracking-[0.2em] smooth-transition flex items-center justify-center gap-2 ${
+                                     className={`w-full py-3.5 rounded-xl font-black uppercase text-[10px] tracking-[0.2em] smooth-transition flex items-center justify-center gap-2 ${
                                        loading || monthExpenses.length === 0 
-                                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none border border-transparent' 
-                                         : 'bg-gradient-to-r from-primary to-slate-900 border border-primary text-white hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-0.5 glow-hover'
+                                         ? 'bg-stone-200 text-stone-400 cursor-not-allowed border border-transparent' 
+                                         : 'bg-primary border border-primary text-white hover:bg-red-700 hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-0.5'
                                      }`}
                                    >
-                                     <Mail className={`w-4 h-4 ${loading ? 'animate-pulse' : ''}`} /> 
-                                     {loading ? 'Enviando Reporte...' : 'Enviar Reporte al Propietario'}
+                                     <Send className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> 
+                                     {loading ? 'Enviando Reporte...' : 'Enviar Reporte por Correo'}
                                    </button>
-                               </div>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col bg-stone-50 p-6 rounded-3xl border border-stone-200 shadow-inner relative font-sans text-stone-800 h-full">
-                              {/* Email Client Header */}
-                              <div className="border-b border-stone-200 pb-4 mb-4 text-[10px] font-semibold text-stone-500 space-y-1">
-                                <div><span className="font-bold uppercase tracking-wider text-stone-400">De:</span> Punto Propiedades &lt;contacto@puntopropiedades.cl&gt;</div>
-                                <div><span className="font-bold uppercase tracking-wider text-stone-400">Para:</span> {selectedProp.dueno || 'Sin Dueño'} &lt;{selectedProp.mailD || 'sin-correo@correo.com'}&gt;</div>
-                                <div><span className="font-bold uppercase tracking-wider text-stone-400">Asunto:</span> <span className="text-stone-800 font-bold">Informe de Gastos - {selectedReportMonth} - {selectedProp.direccion}</span></div>
-                              </div>
-                              
-                              {/* Email Body Preview Container */}
-                              <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm flex flex-col gap-4 min-h-[300px] text-xs leading-relaxed text-stone-700 max-h-[400px] overflow-y-auto custom-scrollbar">
-                                {/* Brand Header */}
-                                <div className="flex justify-between items-center border-b border-stone-100 pb-4 mb-2">
-                                  <span className="font-black tracking-wider text-primary text-sm uppercase">PUNTO PROPIEDADES</span>
-                                  <span className="text-[9px] font-bold text-stone-400 uppercase tracking-widest">{selectedReportMonth}</span>
-                                </div>
-                                
-                                <p>Estimado(a) <strong>{selectedProp.dueno || 'Propietario'}</strong>,</p>
-                                
-                                <p>Junto con saludarle de parte de Punto Propiedades, a continuación se detalla el desglose consolidado de los gastos operacionales registrados para su propiedad ubicada en <strong>{selectedProp.direccion}</strong> correspondientes al mes de <strong>{selectedReportMonth}</strong>:</p>
-                                
-                                {/* Table Mockup */}
-                                {monthExpenses.length === 0 ? (
-                                  <p className="text-center py-6 text-stone-400 italic">No se registran gastos para este período.</p>
-                                ) : (
-                                  <div className="border border-stone-100 rounded-xl overflow-hidden my-2 shadow-sm">
-                                    <table className="w-full text-left border-collapse text-[10px]">
-                                      <thead>
-                                        <tr className="bg-stone-50 text-stone-500 font-black uppercase tracking-wider border-b border-stone-100">
-                                          <th className="p-3">Categoría</th>
-                                          <th className="p-3">Boleta/Folio</th>
-                                          <th className="p-3 text-right">Monto</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {monthExpenses.map((exp, idx) => (
-                                          <tr key={idx} className="border-b border-stone-50 hover:bg-stone-50/50">
-                                            <td className="p-3 font-bold uppercase tracking-tight">{exp.tipo}</td>
-                                            <td className="p-3 text-stone-500 font-mono">{exp.boleta || 'S/N'}</td>
-                                            <td className="p-3 text-right font-black text-stone-900">{exp.monto}</td>
-                                          </tr>
-                                        ))}
-                                        <tr className="bg-stone-50 font-black text-stone-900 border-t border-stone-100">
-                                          <td colSpan={2} className="p-3 text-right uppercase tracking-wider text-[9px] text-stone-500">Monto Total Operacional</td>
-                                          <td className="p-3 text-right text-xs text-primary">{formatCurrency(totalMonthExp)}</td>
-                                        </tr>
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                )}
-                                
-                                <p className="mt-2">Quedamos atentos a cualquier duda o comentario que pueda tener respecto a este informe.</p>
-                                
-                                <div className="border-t border-stone-100 pt-4 mt-2 text-[9px] text-stone-400">
-                                  <p className="font-bold text-stone-600">Atentamente,</p>
-                                  <p className="font-bold text-primary uppercase">Administración Punto Propiedades</p>
+                                   {monthExpenses.length === 0 && (
+                                     <p className="text-[9px] text-center text-red-500 font-bold uppercase tracking-widest mt-1">
+                                       * Agregue gastos a esta propiedad en este mes antes de enviar el reporte.
+                                     </p>
+                                   )}
                                 </div>
                               </div>
-
-                              {/* Send Email Action Trigger */}
-                              <div className="mt-6 pt-4 border-t border-stone-200 flex flex-col gap-2">
-                                <button 
-                                   onClick={() => sendReport(selectedProp, selectedReportMonth)}
-                                   disabled={loading || monthExpenses.length === 0}
-                                   className={`w-full py-3.5 rounded-xl font-black uppercase text-[10px] tracking-[0.2em] smooth-transition flex items-center justify-center gap-2 ${
-                                     loading || monthExpenses.length === 0 
-                                       ? 'bg-stone-200 text-stone-400 cursor-not-allowed border border-transparent' 
-                                       : 'bg-primary border border-primary text-white hover:bg-red-700 hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-0.5'
-                                   }`}
-                                 >
-                                   <Send className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> 
-                                   {loading ? 'Enviando Reporte...' : 'Enviar Reporte por Correo'}
-                                 </button>
-                                 {monthExpenses.length === 0 && (
-                                   <p className="text-[9px] text-center text-red-500 font-bold uppercase tracking-widest mt-1">
-                                     * Agregue gastos a esta propiedad en este mes antes de enviar el reporte.
-                                   </p>
-                                 )}
-                              </div>
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </div>
-                      </div>
 
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
                 </div>
+                )}
               </div>
-              )}
-            </div>
-          );
+            );
+          } catch (err: any) {
+            console.error('[Reports Render Error]', err);
+            return (
+              <div className="p-8 bg-red-50 border border-red-200 rounded-3xl text-center space-y-4 max-w-xl mx-auto my-12 shadow-sm">
+                <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-xl">
+                  ⚠️
+                </div>
+                <h3 className="text-lg font-black text-red-700 uppercase tracking-tight">Ocurrió un inconveniente al cargar el reporte</h3>
+                <p className="text-xs text-red-600 font-mono bg-red-100/50 p-3 rounded-xl border border-red-200/50">{err?.message || String(err)}</p>
+                <button
+                  onClick={() => setActiveModule('dashboard')}
+                  className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black uppercase text-xs transition-all shadow-md active:scale-95 cursor-pointer"
+                >
+                  Volver al Dashboard
+                </button>
+              </div>
+            );
+          }
         })()}
 
         {activeModule === 'settings' && (
