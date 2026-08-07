@@ -480,7 +480,7 @@ app.post('/api/send-report', async (req, res) => {
 });
 
 // Cron Job automático mensual para avisar vencimientos de arriendos
-app.all(['/api/cron/monthly-expiry', '/api/server/cron/monthly-expiry', '/cron/monthly-expiry'], async (req, res) => {
+const handleMonthlyExpiry = async (req: express.Request, res: express.Response) => {
   try {
     let properties: any[] = [];
 
@@ -631,6 +631,17 @@ app.all(['/api/cron/monthly-expiry', '/api/server/cron/monthly-expiry', '/cron/m
     console.error('[Cron] Expiry notification error:', err);
     res.status(500).json({ error: 'Error ejecutando el Cron Job de vencimientos', details: err.message });
   }
+};
+
+app.all(['/api/cron/monthly-expiry', '/api/server/cron/monthly-expiry', '/cron/monthly-expiry', '/api/cron-monthly-expiry'], handleMonthlyExpiry);
+
+// Express middleware check for Vercel rewritten requests
+app.use((req, res, next) => {
+  const urlStr = (req.url || '') + (req.originalUrl || '');
+  if (urlStr.includes('monthly-expiry') || req.query.action === 'monthly-expiry') {
+    return handleMonthlyExpiry(req, res);
+  }
+  next();
 });
 
 
