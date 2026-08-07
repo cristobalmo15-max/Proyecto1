@@ -136,9 +136,16 @@ export const AdminPanel = ({
   const testMonthlyExpiryCron = async () => {
     try {
       const target = reportEmail || smtpUser;
-      const url = `/api/cron/monthly-expiry${target ? `?email=${encodeURIComponent(target)}` : ''}`;
+      const url = `/api/cron/monthly-expiry?action=monthly-expiry${target ? `&email=${encodeURIComponent(target)}` : ''}`;
       const response = await fetch(url);
-      const data = await response.json();
+      const text = await response.text();
+      let data: any;
+      try {
+        data = JSON.parse(text);
+      } catch (jsonErr) {
+        alert(`Respuesta del servidor (${response.status}): ${text.replace(/<[^>]*>/g, '').substring(0, 120)}...`);
+        return;
+      }
       if (response.ok && data.success) {
         alert(`¡Éxito! ${data.message || 'Reporte de vencimientos procesado.'}`);
       } else {
