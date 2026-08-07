@@ -70,7 +70,10 @@ export default async function handler(req: any, res: any) {
         host: smtpHost,
         port: smtpPort,
         secure: smtpPort === 465,
-        auth: { user: smtpUser, pass: smtpPass }
+        auth: { user: smtpUser, pass: smtpPass },
+        tls: {
+          rejectUnauthorized: false
+        }
       });
 
       let tableRows = '';
