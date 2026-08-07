@@ -603,47 +603,162 @@ const handleMonthlyExpiry = async (req: express.Request, res: express.Response) 
 
     // Crear contenido HTML
     let tableRows = '';
-    expiringProps.forEach((p: any) => {
+    expiringProps.forEach((p: any, idx: number) => {
       const expiryDate = parseExpiryDate(p.termino);
       const formattedDate = expiryDate ? `${String(expiryDate.getDate()).padStart(2, '0')}-${String(expiryDate.getMonth() + 1).padStart(2, '0')}-${expiryDate.getFullYear()}` : p.termino;
       const isExpired = expiryDate ? expiryDate < today : false;
+      const isLast = idx === expiringProps.length - 1;
+      const borderStyle = isLast ? '' : 'border-bottom: 1px solid #f1f5f9;';
+
+      const badgeBg = isExpired ? '#fef2f2' : '#fffbeb';
+      const badgeColor = isExpired ? '#991b1b' : '#b45309';
+      const badgeText = isExpired ? 'VENCIDO' : 'POR VENCER';
 
       tableRows += `
-        <tr style="border-bottom: 1px solid #e2e8f0;">
-          <td style="padding: 12px; font-weight: bold; color: #0f172a;">${p.direccion || 'N/A'}</td>
-          <td style="padding: 12px; color: #475569;">${p.dueno || 'N/A'}</td>
-          <td style="padding: 12px; color: #475569;">${p.arrendatario || 'N/A'}</td>
-          <td style="padding: 12px; font-family: monospace; color: #b91c1c;">${p.valor || 'N/A'}</td>
-          <td style="padding: 12px; color: #475569;">${p.duracion || 'N/A'}</td>
-          <td style="padding: 12px; font-weight: bold; color: ${isExpired ? '#ef4444' : '#d97706'}">${formattedDate} ${isExpired ? '(Vencido)' : ''}</td>
+        <tr style="${borderStyle}">
+          <td style="padding: 16px; vertical-align: top;">
+            <div style="font-size: 13px; font-weight: 800; color: #0f172a; text-transform: uppercase; margin-bottom: 2px;">${p.direccion || 'Sin Dirección'}</div>
+            <div style="font-size: 10px; font-weight: 600; color: #94a3b8;">Plazo: ${p.duracion || '12 meses'}</div>
+          </td>
+          <td style="padding: 16px; vertical-align: top;">
+            <div style="font-size: 11px; font-weight: 700; color: #334155; margin-bottom: 2px;"><span style="color: #94a3b8; font-weight: 500;">Dueño:</span> ${p.dueno || 'N/A'}</div>
+            <div style="font-size: 11px; font-weight: 700; color: #dc2626;"><span style="color: #94a3b8; font-weight: 500;">Inquilino:</span> ${p.arrendatario || 'N/A'}</div>
+          </td>
+          <td style="padding: 16px; vertical-align: top;">
+            <div style="font-size: 14px; font-weight: 900; color: #0f172a; font-family: monospace;">${p.valor || 'N/A'}</div>
+          </td>
+          <td align="right" style="padding: 16px; vertical-align: top;">
+            <div style="display: inline-block; background-color: ${badgeBg}; color: ${badgeColor}; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; padding: 4px 10px; border-radius: 20px; margin-bottom: 4px;">
+              ${badgeText}
+            </div>
+            <div style="font-size: 11px; font-weight: 800; color: #334155; font-family: monospace;">${formattedDate}</div>
+          </td>
         </tr>
       `;
     });
 
     const emailHtml = `
-      <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 16px;">
-        <h2 style="color: #b91c1c; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid #b91c1c; padding-bottom: 10px;">Aviso de Vencimientos de Arriendos</h2>
-        <p style="color: #475569; font-size: 14px;">Estimado Administrador,</p>
-        <p style="color: #475569; font-size: 14px;">A continuación se presenta el listado consolidado de contratos de arriendo que vencen o se encuentran vencidos durante el mes en curso y el próximo:</p>
-        
-        <table style="width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; text-align: left;">
-          <thead>
-            <tr style="background-color: #f1f5f9; border-bottom: 2px solid #cbd5e1; font-weight: bold; text-transform: uppercase; color: #475569;">
-              <th style="padding: 12px;">Propiedad</th>
-              <th style="padding: 12px;">Propietario</th>
-              <th style="padding: 12px;">Arrendatario</th>
-              <th style="padding: 12px;">Monto</th>
-              <th style="padding: 12px;">Plazo</th>
-              <th style="padding: 12px;">Vencimiento</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${tableRows}
-          </tbody>
-        </table>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alerta de Vencimientos - Punto Propiedades</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 40px 10px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 680px; background-color: #ffffff; border-radius: 24px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01);">
+          
+          <!-- BRAND HEADER -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 32px 40px; text-align: left; border-bottom: 4px solid #dc2626;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td>
+                    <div style="display: inline-block; background-color: #dc2626; color: #ffffff; font-weight: 900; font-size: 14px; width: 36px; height: 36px; line-height: 36px; text-align: center; border-radius: 10px; margin-right: 12px; vertical-align: middle;">P</div>
+                    <span style="font-size: 20px; font-weight: 900; letter-spacing: -0.5px; color: #ffffff; text-transform: uppercase; vertical-align: middle;">PUNTO PROPIEDADES</span>
+                  </td>
+                  <td align="right">
+                    <span style="background-color: rgba(255,255,255,0.1); color: #cbd5e1; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; padding: 6px 14px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.15);">
+                      CONTROL PREDICTIVO
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
 
-        <p style="margin-top: 30px; font-size: 11px; color: #94a3b8; text-align: center;">Este es un mensaje generado automáticamente por el sistema Punto Propiedades.</p>
-      </div>
+          <!-- BANNER HERO -->
+          <tr>
+            <td style="padding: 36px 40px 20px 40px;">
+              <h1 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 800; color: #0f172a; text-transform: uppercase;">
+                🚨 Alerta de Vencimientos de Arriendo
+              </h1>
+              <p style="margin: 0; font-size: 14px; color: #64748b; line-height: 1.5;">
+                Reporte consolidado de contratos que requieren atención, reajuste o renovación en el período actual.
+              </p>
+            </td>
+          </tr>
+
+          <!-- METRIC CARDS GRID -->
+          <tr>
+            <td style="padding: 0 40px 28px 40px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td width="50%" style="padding-right: 8px;">
+                    <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 16px; padding: 16px; text-align: left;">
+                      <div style="font-size: 10px; font-weight: 800; color: #991b1b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Arriendos Afectados</div>
+                      <div style="font-size: 24px; font-weight: 900; color: #dc2626;">${expiringProps.length} Contrato(s)</div>
+                    </div>
+                  </td>
+                  <td width="50%" style="padding-left: 8px;">
+                    <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 16px; padding: 16px; text-align: left;">
+                      <div style="font-size: 10px; font-weight: 800; color: #166534; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Estado del Sistema</div>
+                      <div style="font-size: 24px; font-weight: 900; color: #16a34a;">Al Día (Verificado)</div>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- TABLE TITLE -->
+          <tr>
+            <td style="padding: 0 40px 12px 40px;">
+              <div style="font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.5px; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px;">
+                Detalle de Propiedades y Plazos
+              </div>
+            </td>
+          </tr>
+
+          <!-- DATA TABLE -->
+          <tr>
+            <td style="padding: 0 40px 32px 40px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse: separate; border-spacing: 0; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
+                <thead>
+                  <tr style="background-color: #f8fafc;">
+                    <th align="left" style="padding: 14px 16px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #e2e8f0;">Propiedad / Dirección</th>
+                    <th align="left" style="padding: 14px 16px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #e2e8f0;">Involucrados</th>
+                    <th align="left" style="padding: 14px 16px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #e2e8f0;">Canon Renta</th>
+                    <th align="right" style="padding: 14px 16px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #e2e8f0;">Vencimiento</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${tableRows}
+                </tbody>
+              </table>
+            </td>
+          </tr>
+
+          <!-- CALL TO ACTION BUTTON -->
+          <tr>
+            <td align="center" style="padding: 0 40px 36px 40px;">
+              <a href="https://proyecto1-chi-gules.vercel.app" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #ffffff; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; text-decoration: none; padding: 16px 36px; border-radius: 14px; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);">
+                Acceder al Panel de Gestión →
+              </a>
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td style="background-color: #f8fafc; padding: 24px 40px; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p style="margin: 0 0 6px 0; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">
+                Punto Propiedades — Administración y Gestión Inmobiliaria
+              </p>
+              <p style="margin: 0; font-size: 10px; color: #94a3b8; line-height: 1.4;">
+                Este informe automático ha sido emitido para la supervisión predictiva de contratos.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
     `;
 
     try {
