@@ -38,7 +38,10 @@ export default async function handler(req: any, res: any) {
         host,
         port,
         secure: port === 465,
-        auth: { user, pass }
+        auth: { user, pass },
+        tls: {
+          rejectUnauthorized: false
+        }
       });
 
       const info = await transporter.sendMail({
