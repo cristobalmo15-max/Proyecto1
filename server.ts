@@ -34,10 +34,12 @@ if (!admin.apps.length) {
 }
 
 // SMTP Transporter
+const defaultSmtpPort = process.env.SMTP_PORT || '587';
+const defaultPortNum = parseInt(String(defaultSmtpPort), 10) || 587;
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: process.env.SMTP_PORT === '465',
+  port: defaultPortNum,
+  secure: defaultPortNum === 465,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
@@ -69,19 +71,73 @@ const memoryUpload = multer({ storage: multer.memoryStorage() });
 const getData = () => JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
 const saveData = (data: any) => fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
 
+// Parser de fechas flexible que instancia a mediodía (12:00:00) para evitar desfasajes de zona horaria (UTC-4)
+const parseExpiryDate = (terminoStr: string): Date | null => {
+  if (!terminoStr) return null;
+  let d: Date | null = null;
+  const str = String(terminoStr).trim();
+
+  if (str.includes('/')) {
+    const parts = str.split('/');
+    if (parts.length === 3) {
+      const d1 = parseInt(parts[0], 10);
+      const d2 = parseInt(parts[1], 10);
+      const year = parseInt(parts[2], 10);
+      if (!isNaN(d1) && !isNaN(d2) && !isNaN(year)) {
+        d = new Date(year, d2 - 1, d1, 12, 0, 0);
+      }
+    }
+  } else if (str.includes('-')) {
+    const parts = str.split('-');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        // YYYY-MM-DD
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10);
+        const day = parseInt(parts[2], 10);
+        if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+          d = new Date(year, month - 1, day, 12, 0, 0);
+        }
+      } else {
+        // DD-MM-YYYY
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10);
+        const year = parseInt(parts[2], 10);
+        if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+          d = new Date(year, month - 1, day, 12, 0, 0);
+        }
+      }
+    }
+  }
+
+  if (!d || isNaN(d.getTime())) {
+    const parsed = new Date(str);
+    if (!isNaN(parsed.getTime())) {
+      d = new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate(), 12, 0, 0);
+    }
+  }
+
+  if (d && !isNaN(d.getTime())) {
+    d.setHours(12, 0, 0, 0);
+    return d;
+  }
+  return null;
+};
+
 app.post('/api/create-meeting', async (req, res) => {
-  const token = req.headers.authorization;
-  if (!token) {
+  const tokenHeader = req.headers.authorization;
+  if (!tokenHeader) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
+  const authHeader = tokenHeader.startsWith('Bearer ') ? tokenHeader : `Bearer ${tokenHeader}`;
   const { title, description, start, end, recipientEmail, smtpConfig } = req.body;
 
   try {
     const calendarRes = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1', {
       method: 'POST',
       headers: { 
-        Authorization: token,
+        Authorization: authHeader,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -115,10 +171,11 @@ app.post('/api/create-meeting', async (req, res) => {
             // Use dynamic SMTP config if available
             let currentTransporter = transporter;
             if (smtpConfig && smtpConfig.host && smtpConfig.user && smtpConfig.pass) {
+                const portNum = parseInt(String(smtpConfig.port || '587'), 10) || 587;
                 currentTransporter = nodemailer.createTransport({
                     host: smtpConfig.host,
-                    port: parseInt(smtpConfig.port || '587'),
-                    secure: smtpConfig.port === '465',
+                    port: portNum,
+                    secure: portNum === 465,
                     auth: { user: smtpConfig.user, pass: smtpConfig.pass },
                 });
             }
@@ -143,7 +200,7 @@ app.post('/api/create-meeting', async (req, res) => {
 });
 
 // Visor de PDF personalizado con marca Punto Propiedades
-app.get('/api/punto-propiedades/visor-pdf/:name', async (req, res) => {
+app.get(['/api/punto-propiedades/visor-pdf/:name', '/api/server/punto-propiedades/visor-pdf/:name', '/punto-propiedades/visor-pdf/:name'], async (req, res) => {
   const fileUrl = req.query.url as string;
   if (!fileUrl) return res.status(400).send('URL de contrato no proporcionada');
   
@@ -163,10 +220,11 @@ app.post('/api/generate-report', async (req, res) => {
     try {
         let currentTransporter = transporter;
         if (smtpConfig && smtpConfig.host && smtpConfig.user && smtpConfig.pass) {
+            const portNum = parseInt(String(smtpConfig.port || '587'), 10) || 587;
             currentTransporter = nodemailer.createTransport({
                 host: smtpConfig.host,
-                port: parseInt(smtpConfig.port || '587'),
-                secure: smtpConfig.port === '465',
+                port: portNum,
+                secure: portNum === 465,
                 auth: { user: smtpConfig.user, pass: smtpConfig.pass },
             });
         }
@@ -305,17 +363,23 @@ app.post('/api/properties/:id/renew', (req, res) => {
   if (!prop) return res.status(404).json({ error: 'Property not found' });
 
   const hoy = new Date();
-  let fechaVence = new Date(prop.termino);
-  if (isNaN(fechaVence.getTime())) {
-    const [d, m, y] = prop.termino.split('/');
-    fechaVence = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+  hoy.setHours(12, 0, 0, 0);
+
+  let fechaVence = parseExpiryDate(prop.termino);
+  if (!fechaVence) {
+    fechaVence = new Date();
+    fechaVence.setHours(12, 0, 0, 0);
   }
 
   while (fechaVence <= hoy) {
     fechaVence.setFullYear(fechaVence.getFullYear() + 1);
   }
 
-  prop.termino = fechaVence.toISOString().split('T')[0];
+  const yyyy = fechaVence.getFullYear();
+  const mm = String(fechaVence.getMonth() + 1).padStart(2, '0');
+  const dd = String(fechaVence.getDate()).padStart(2, '0');
+  prop.termino = `${yyyy}-${mm}-${dd}`;
+
   saveData(data);
   res.json(prop);
 });
@@ -368,10 +432,11 @@ app.post('/api/send-report', async (req, res) => {
   if (smtpConfig && smtpConfig.host && smtpConfig.user && smtpConfig.pass) {
     console.log(`[Email] Using dynamic SMTP config: ${smtpConfig.host}`);
     try {
+      const portNum = parseInt(String(smtpConfig.port || '587'), 10) || 587;
       currentTransporter = nodemailer.createTransport({
         host: smtpConfig.host,
-        port: parseInt(smtpConfig.port || '587'),
-        secure: smtpConfig.port === '465',
+        port: portNum,
+        secure: portNum === 465,
         auth: {
           user: smtpConfig.user,
           pass: smtpConfig.pass,
@@ -415,10 +480,7 @@ app.post('/api/send-report', async (req, res) => {
 });
 
 // Cron Job automático mensual para avisar vencimientos de arriendos
-app.get('/api/cron/monthly-expiry', async (req, res) => {
-  // Opcional: Autorización básica con cabecera Vercel Cron
-  // if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) { ... }
-
+app.all(['/api/cron/monthly-expiry', '/api/server/cron/monthly-expiry', '/cron/monthly-expiry'], async (req, res) => {
   try {
     let properties: any[] = [];
 
@@ -440,12 +502,13 @@ app.get('/api/cron/monthly-expiry', async (req, res) => {
     }
 
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const maxDate = new Date(today.getFullYear(), today.getMonth() + 2, 0); // fin del mes siguiente
+    today.setHours(12, 0, 0, 0);
+    const maxDate = new Date(today.getFullYear(), today.getMonth() + 2, 0, 12, 0, 0); // fin del mes siguiente
 
     const expiringProps = properties.filter((p: any) => {
       if (!p.termino) return false;
-      const expiryDate = new Date(p.termino + 'T00:00:00');
+      const expiryDate = parseExpiryDate(p.termino);
+      if (!expiryDate) return false;
       return expiryDate <= maxDate;
     });
 
@@ -453,31 +516,56 @@ app.get('/api/cron/monthly-expiry', async (req, res) => {
       return res.json({ success: true, message: 'No hay propiedades por vencer este mes o el siguiente.' });
     }
 
-    // Obtener email de destino desde la configuración del usuario en settings
-    let targetEmail = process.env.SMTP_USER; // Default
+    // Permitir email manual por query/body o desde la configuración del usuario en settings
+    let targetEmail = (req.query.email as string) || (req.body && req.body.email) || process.env.SMTP_USER; // Default
     let dynamicTransporter = transporter;
+    let hasSmtpConfig = !!process.env.SMTP_HOST;
+
+    if (req.body && req.body.smtpConfig && req.body.smtpConfig.host) {
+      const portNum = parseInt(String(req.body.smtpConfig.port || '587'), 10) || 587;
+      dynamicTransporter = nodemailer.createTransport({
+        host: req.body.smtpConfig.host,
+        port: portNum,
+        secure: portNum === 465,
+        auth: { user: req.body.smtpConfig.user, pass: req.body.smtpConfig.pass },
+      });
+      if (req.body.smtpConfig.user) targetEmail = targetEmail || req.body.smtpConfig.user;
+      hasSmtpConfig = true;
+    }
 
     if (admin.apps.length) {
       try {
-        // Buscar el documento de settings de algún usuario administrador
         const settingsSnap = await admin.firestore().collection('settings').limit(1).get();
         if (!settingsSnap.empty) {
           const settingsData = settingsSnap.docs[0].data();
-          if (settingsData.reportEmail) {
+          if (!targetEmail && settingsData.reportEmail) {
             targetEmail = settingsData.reportEmail;
           }
           if (settingsData.smtpHost && settingsData.smtpUser && settingsData.smtpPass) {
+            const portNum = parseInt(String(settingsData.smtpPort || '587'), 10) || 587;
             dynamicTransporter = nodemailer.createTransport({
               host: settingsData.smtpHost,
-              port: parseInt(settingsData.smtpPort || '587'),
-              secure: settingsData.smtpPort === '465',
+              port: portNum,
+              secure: portNum === 465,
               auth: { user: settingsData.smtpUser, pass: settingsData.smtpPass },
             });
+            hasSmtpConfig = true;
           }
         }
       } catch (settingsErr) {
         console.error('[Cron] Failed to retrieve SMTP settings from Firestore:', settingsErr);
       }
+    }
+
+    if (!hasSmtpConfig) {
+      console.log('[Cron] Simulation mode: No SMTP configuration provided.');
+      return res.json({
+        success: true,
+        simulation: true,
+        message: `Simulado: No hay servidor de correo configurado. Se identificaron ${expiringProps.length} propiedad(es) por vencer o vencidas.`,
+        expiringCount: expiringProps.length,
+        properties: expiringProps.map((p: any) => ({ id: p.id, direccion: p.direccion, termino: p.termino }))
+      });
     }
 
     if (!targetEmail) {
@@ -487,12 +575,12 @@ app.get('/api/cron/monthly-expiry', async (req, res) => {
     // Crear contenido HTML
     let tableRows = '';
     expiringProps.forEach((p: any) => {
-      const parts = (p.termino || '').split('-');
-      const formattedDate = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : p.termino;
-      const isExpired = new Date(p.termino + 'T00:00:00') < today;
+      const expiryDate = parseExpiryDate(p.termino);
+      const formattedDate = expiryDate ? `${String(expiryDate.getDate()).padStart(2, '0')}-${String(expiryDate.getMonth() + 1).padStart(2, '0')}-${expiryDate.getFullYear()}` : p.termino;
+      const isExpired = expiryDate ? expiryDate < today : false;
 
       tableRows += `
-        <tr style="border-b: 1px solid #e2e8f0;">
+        <tr style="border-bottom: 1px solid #e2e8f0;">
           <td style="padding: 12px; font-weight: bold; color: #0f172a;">${p.direccion || 'N/A'}</td>
           <td style="padding: 12px; color: #475569;">${p.dueno || 'N/A'}</td>
           <td style="padding: 12px; color: #475569;">${p.arrendatario || 'N/A'}</td>
