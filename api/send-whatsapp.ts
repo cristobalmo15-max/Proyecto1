@@ -11,6 +11,17 @@ export default async function handler(req: any, res: any) {
     return res.status(200).end();
   }
 
+  // Meta Webhook GET Verification Challenge
+  if (req.method === 'GET') {
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+
+    if (mode === 'subscribe' && (token === 'puntopropiedades2026' || token === process.env.META_VERIFY_TOKEN)) {
+      return res.status(200).send(challenge);
+    }
+  }
+
   try {
     const bodyData = req.body || {};
     const queryData = req.query || {};
