@@ -57,8 +57,8 @@ export default async function handler(req: any, res: any) {
     }
 
     // 1. Meta WhatsApp Cloud API (Oficial de Meta / Facebook)
-    const metaToken = bodyData.metaToken || process.env.META_WHATSAPP_TOKEN;
-    const metaPhoneId = bodyData.metaPhoneId || process.env.META_PHONE_NUMBER_ID;
+    const metaToken = bodyData.metaToken || queryData.metaToken || (apiKey && apiKey.startsWith('EAA') ? apiKey : null) || process.env.META_WHATSAPP_TOKEN;
+    const metaPhoneId = bodyData.metaPhoneId || queryData.metaPhoneId || bodyData.phoneId || queryData.phoneId || process.env.META_PHONE_NUMBER_ID;
 
     if (metaToken && metaPhoneId) {
       try {
