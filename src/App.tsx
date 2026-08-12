@@ -4534,7 +4534,7 @@ if (!isAuthReady) return null;
                   <div className="grid grid-cols-1 gap-2">
                     <button
                       onClick={async () => {
-                        const phoneToUse = whatsappPhone || '56912345678';
+                        const phoneToUse = whatsappPhone || '56950125765';
                         showToast(`Procesando envío de WhatsApp de fondo a ${phoneToUse}...`, 'success');
                         try {
                           const maxDate = new Date();
@@ -4578,6 +4578,42 @@ if (!isAuthReady) return null;
                       className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[9.5px] tracking-wider py-3 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                     >
                       🤖 Probar Envío Automático de WhatsApp (De Fondo)
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        const phoneToUse = (whatsappPhone || '56950125765').replace(/[^0-9]/g, '');
+                        const targetPhone = phoneToUse.startsWith('56') ? phoneToUse : `56${phoneToUse}`;
+                        const maxDate = new Date();
+                        maxDate.setDate(maxDate.getDate() + 30);
+                        const expiringProps = properties.filter((p: any) => {
+                          if (!p.termino) return false;
+                          const parts = String(p.termino).split('-');
+                          if (parts.length === 3) {
+                            const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 12, 0, 0);
+                            return d <= maxDate;
+                          }
+                          return false;
+                        });
+
+                        let propDetails = '';
+                        if (expiringProps.length === 0) {
+                          propDetails = '\n✅ *No hay contratos por vencer en el período actual.*';
+                        } else {
+                          expiringProps.forEach((p: any, idx: number) => {
+                            propDetails += `\n🏠 *Propiedad ${idx + 1}:* ${p.direccion || 'Sin Dirección'}\n   • *Involucrados:* ${p.dueno || 'N/A'} vs ${p.arrendatario || 'N/A'}\n   • *Canon Renta:* ${p.valor || 'N/A'}\n   • *Vencimiento:* 🛑 *${p.termino || 'Por Vencer'}*\n`;
+                          });
+                        }
+
+                        const msg = `🚨 *PUNTO PROPIEDADES - CONTROL PREDICTIVO*\n------------------------------------------\n📊 *ALERTA DE VENCIMIENTOS DE ARRIENDO*\n\nSe identificaron *${expiringProps.length} Contrato(s)* que requieren atención o renovación:\n${propDetails}\n------------------------------------------\n🔗 *Acceder al Panel de Gestión:*\nhttps://proyecto1-chi-gules.vercel.app`;
+
+                        const waUrl = `https://api.whatsapp.com/send?phone=${targetPhone}&text=${encodeURIComponent(msg)}`;
+                        window.open(waUrl, '_blank');
+                        showToast('✓ Abriendo mensaje formateado en WhatsApp...', 'success');
+                      }}
+                      className="w-full bg-slate-800 hover:bg-slate-900 text-white font-black uppercase text-[9.5px] tracking-wider py-3 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      💬 Abrir y Enviar Resumen en WhatsApp Web / App
                     </button>
                   </div>
                 </div>
