@@ -65,7 +65,7 @@ export default async function handler(req: any, res: any) {
 
     if (metaToken && metaPhoneId) {
       try {
-        // Attempt 1: Freeform Text Message
+        // Attempt 1: Standard Text Message Payload
         const metaRes = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
           method: 'POST',
           headers: {
@@ -74,10 +74,9 @@ export default async function handler(req: any, res: any) {
           },
           body: JSON.stringify({
             messaging_product: 'whatsapp',
-            recipient_type: 'individual',
             to: formattedPhone,
             type: 'text',
-            text: { preview_url: false, body: messageText }
+            text: { body: messageText }
           })
         });
 
@@ -85,15 +84,14 @@ export default async function handler(req: any, res: any) {
         if (metaRes.ok && metaData.messages) {
           return res.status(200).json({
             success: true,
-            message: `✓ Alerta oficial de WhatsApp (Meta Cloud API) enviada a +${formattedPhone}. (ID: ${metaData.messages[0]?.id})`
+            message: `✓ Alerta oficial de WhatsApp enviada a +${formattedPhone}. (ID: ${metaData.messages[0]?.id})`
           });
         }
 
-        // Attempt 2: If freeform text failed (e.g. Meta 24-hour window policy), attempt template hello_world
-        if (metaData.error) {
-          console.error('[Meta API Return Error]:', metaData.error);
+        console.log('[Meta Text Payload Error]:', JSON.stringify(metaData));
 
-          // Try template hello_world or template message
+        // Attempt 2: If freeform text failed, attempt template message
+        if (metaData.error) {
           const templateRes = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
             method: 'POST',
             headers: {
@@ -115,21 +113,17 @@ export default async function handler(req: any, res: any) {
           if (templateRes.ok && templateData.messages) {
             return res.status(200).json({
               success: true,
-              message: `✓ Mensaje oficial de bienvenida Meta Cloud API enviado a +${formattedPhone}. (ID: ${templateData.messages[0]?.id})`
+              message: `✓ Mensaje de plantilla enviado a +${formattedPhone}. (Meta Error previo: ${metaData.error.message})`
             });
           }
 
           return res.status(200).json({
             success: false,
-            error: `Meta API Error (${metaData.error.code}): ${metaData.error.message || metaData.error.error_user_msg || 'Error de autenticación con Meta.'}`
+            error: `Meta API Error (${metaData.error.code}): ${metaData.error.message}`
           });
         }
       } catch (metaErr: any) {
         console.error('[Meta Cloud API Fetch Exception]:', metaErr);
-        return res.status(200).json({
-          success: false,
-          error: `Error al conectar con Meta Cloud API: ${metaErr.message}`
-        });
       }
     }
 
