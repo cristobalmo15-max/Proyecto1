@@ -602,6 +602,8 @@ export default function App() {
   const [smtpUser, setSmtpUser] = useState('');
   const [smtpPass, setSmtpPass] = useState('');
   const [reportEmail, setReportEmail] = useState('');
+  const [whatsappPhone, setWhatsappPhone] = useState('');
+  const [whatsappApiKey, setWhatsappApiKey] = useState('');
   const [testEmailDest, setTestEmailDest] = useState('');
 
   useEffect(() => {
@@ -611,8 +613,10 @@ export default function App() {
       setSmtpUser(appSettings.smtpUser || '');
       setSmtpPass(appSettings.smtpPass || '');
       setReportEmail(appSettings.reportEmail || '');
+      setWhatsappPhone(appSettings.whatsappPhone || '');
+      setWhatsappApiKey(appSettings.whatsappApiKey || '');
     }
-  }, [appSettings.smtpHost, appSettings.smtpPort, appSettings.smtpUser, appSettings.smtpPass, appSettings.reportEmail]);
+  }, [appSettings.smtpHost, appSettings.smtpPort, appSettings.smtpUser, appSettings.smtpPass, appSettings.reportEmail, appSettings.whatsappPhone, appSettings.whatsappApiKey]);
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketCategory, setTicketCategory] = useState('Lector IA');
   const [ticketPriority, setTicketPriority] = useState('Alta');
@@ -4339,27 +4343,51 @@ if (!isAuthReady) return null;
               {/* Left Column: Form Settings (Salida + Entrada) */}
               <div className="lg:col-span-7 bg-white p-6 md:p-8 rounded-[28px] border border-border shadow-sm space-y-6">
                 
-                {/* BLOQUE 1: RECEPCION DE ALERTAS */}
+                {/* BLOQUE 1: RECEPCION DE ALERTAS (EMAIL Y WHATSAPP) */}
                 <div className="space-y-4 pb-6 border-b border-border">
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 bg-amber-50 text-amber-700 rounded-lg flex items-center justify-center font-black text-xs">1</div>
                     <div>
                       <h4 className="text-xs font-black uppercase text-primary tracking-wider">Recepción de Alertas de Vencimiento</h4>
-                      <p className="text-[10px] text-muted font-bold leading-tight">Casilla donde recibirás el consolidado de contratos por vencer (Entrada).</p>
+                      <p className="text-[10px] text-muted font-bold leading-tight">Casillas y números donde recibirás el consolidado predictivo de contratos por vencer.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Correo Electrónico de Recepción</label>
+                      <input
+                        type="email"
+                        placeholder="Ej: tu-correo-personal@gmail.com"
+                        value={reportEmail}
+                        onChange={(e) => setReportEmail(e.target.value)}
+                        className="w-full bg-amber-50/40 border border-amber-200/80 rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-amber-400 transition-all text-amber-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Número de WhatsApp (Con Código País)</label>
+                      <input
+                        type="text"
+                        placeholder="Ej: +56912345678"
+                        value={whatsappPhone}
+                        onChange={(e) => setWhatsappPhone(e.target.value)}
+                        className="w-full bg-emerald-50/40 border border-emerald-200/80 rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-emerald-400 transition-all text-emerald-900 font-mono"
+                      />
                     </div>
                   </div>
 
                   <div>
-                    <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Correo Electrónico de Recepción</label>
+                    <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Token API de WhatsApp (Opcional para despacho masivo de fondo)</label>
                     <input
-                      type="email"
-                      placeholder="Ej: tu-correo-personal@gmail.com o contacto@tudominio.cl"
-                      value={reportEmail}
-                      onChange={(e) => setReportEmail(e.target.value)}
-                      className="w-full bg-amber-50/40 border border-amber-200/80 rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-amber-400 transition-all text-amber-900"
+                      type="password"
+                      placeholder="•••••••••••••••• (Dejar en blanco para simulación o proveedor por defecto)"
+                      value={whatsappApiKey}
+                      onChange={(e) => setWhatsappApiKey(e.target.value)}
+                      className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all font-mono"
                     />
                     <p className="text-[9px] text-amber-700/80 font-semibold mt-1">
-                      💡 Las alertas predictivas automáticas de contratos vencidos llegarán directamente a esta casilla sin requerir contraseña adicional.
+                      💡 Las alertas predictivas automáticas de contratos vencidos llegarán tanto por Correo como por WhatsApp de forma 100% automatizada en segundo plano.
                     </p>
                   </div>
                 </div>
@@ -4432,11 +4460,13 @@ if (!isAuthReady) return null;
                         smtpPort,
                         smtpUser,
                         smtpPass,
-                        reportEmail: reportEmail || smtpUser
+                        reportEmail: reportEmail || smtpUser,
+                        whatsappPhone,
+                        whatsappApiKey
                       };
                       setAppSettings(updatedSettings);
                       await updateAppSettings(updatedSettings);
-                      showToast('✓ Configuración de notificaciones guardada con éxito', 'success');
+                      showToast('✓ Configuración de notificaciones (Correo & WhatsApp) guardada con éxito', 'success');
                     }}
                     className="w-full bg-primary hover:bg-black text-white font-black uppercase text-[10px] tracking-widest py-4 rounded-xl transition-all shadow-md active:scale-[0.98] cursor-pointer"
                   >
@@ -4449,16 +4479,16 @@ if (!isAuthReady) return null;
               <div className="lg:col-span-5 bg-white p-6 md:p-8 rounded-[28px] border border-border shadow-sm space-y-6">
                 <div>
                   <h4 className="text-xs font-black uppercase text-primary mb-1 tracking-wider">Centro de Pruebas Rápidas</h4>
-                  <p className="text-[10px] text-muted font-bold leading-tight">Verifica el funcionamiento del servidor SMTP y prueba el envío de alertas.</p>
+                  <p className="text-[10px] text-muted font-bold leading-tight">Verifica el funcionamiento del servidor SMTP y prueba el envío automático de alertas.</p>
                 </div>
 
-                {/* PRUEBA 1: ALERTA DE VENCIMIENTOS */}
+                {/* PRUEBA 1: ALERTA DE VENCIMIENTOS POR EMAIL */}
                 <div className="bg-amber-50/50 p-5 rounded-2xl border border-amber-200/80 space-y-3">
                   <div className="flex items-center gap-2">
                     <span className="text-lg">🚨</span>
                     <div>
-                      <h5 className="text-[11px] font-black text-amber-900 uppercase tracking-tight">Prueba de Alerta de Vencimientos</h5>
-                      <p className="text-[9.5px] text-amber-800/80 font-bold">Envía inmediatamente el informe consolidado a tu casilla receptor.</p>
+                      <h5 className="text-[11px] font-black text-amber-900 uppercase tracking-tight">Prueba de Alerta de Vencimientos por Correo</h5>
+                      <p className="text-[9.5px] text-amber-800/80 font-bold">Envía inmediatamente el informe consolidado HTML a tu casilla receptor.</p>
                     </div>
                   </div>
 
@@ -4487,8 +4517,69 @@ if (!isAuthReady) return null;
                     }}
                     className="w-full bg-amber-600 hover:bg-amber-700 text-white font-black uppercase text-[9.5px] tracking-wider py-3 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                   >
-                    📧 Probar Alerta de Vencimientos Ahora
+                    📧 Probar Alerta de Vencimientos por Correo
                   </button>
+                </div>
+
+                {/* PRUEBA 2: ALERTA AUTOMÁTICA DE WHATSAPP (DE FONDO) */}
+                <div className="bg-emerald-50/50 p-5 rounded-2xl border border-emerald-200/80 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">💬</span>
+                    <div>
+                      <h5 className="text-[11px] font-black text-emerald-900 uppercase tracking-tight">Envío Automático de WhatsApp (Segundo Plano)</h5>
+                      <p className="text-[9.5px] text-emerald-800/80 font-bold">Prueba el envío automático desatendido directamente a tu celular.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2">
+                    <button
+                      onClick={async () => {
+                        const phoneToUse = whatsappPhone || '56912345678';
+                        showToast(`Procesando envío de WhatsApp de fondo a ${phoneToUse}...`, 'success');
+                        try {
+                          const maxDate = new Date();
+                          maxDate.setDate(maxDate.getDate() + 30);
+                          const expiringProps = properties.filter((p: any) => {
+                            if (!p.termino) return false;
+                            const parts = String(p.termino).split('-');
+                            if (parts.length === 3) {
+                              const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 12, 0, 0);
+                              return d <= maxDate;
+                            }
+                            return false;
+                          });
+
+                          const res = await fetch('/api/send-whatsapp', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              phone: phoneToUse,
+                              apiKey: whatsappApiKey,
+                              properties: expiringProps.map(p => ({
+                                direccion: p.direccion,
+                                dueno: p.dueno,
+                                arrendatario: p.arrendatario,
+                                valor: p.valor,
+                                termino: p.termino
+                              }))
+                            })
+                          });
+
+                          const data = await res.json();
+                          if (res.ok && data.success) {
+                            showToast(`✓ ${data.message || 'Envío de WhatsApp procesado.'}`, 'success');
+                          } else {
+                            showToast(`Error: ${data.error || 'Fallo en envío de WhatsApp.'}`, 'error');
+                          }
+                        } catch (err: any) {
+                          showToast(`Error: ${err.message}`, 'error');
+                        }
+                      }}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[9.5px] tracking-wider py-3 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      🤖 Probar Envío Automático de WhatsApp (De Fondo)
+                    </button>
+                  </div>
                 </div>
 
                 {/* PRUEBA 2: ENVÍO SMTP DE PRUEBA */}
