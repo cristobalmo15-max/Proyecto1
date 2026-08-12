@@ -45,6 +45,40 @@ export default async function handler(req: any, res: any) {
       messageText = `🚨 *PUNTO PROPIEDADES - CONTROL PREDICTIVO*\n------------------------------------------\n📊 *ALERTA DE VENCIMIENTOS DE ARRIENDO*\n\nSe identificaron *${expiringProps.length} Contrato(s)* que requieren atención o renovación:\n${propDetails}\n------------------------------------------\n🔗 *Acceder al Panel de Gestión:*\nhttps://proyecto1-chi-gules.vercel.app`;
     }
 
+    // 1. Meta WhatsApp Cloud API (Oficial de Meta / Facebook)
+    const metaToken = bodyData.metaToken || process.env.META_WHATSAPP_TOKEN;
+    const metaPhoneId = bodyData.metaPhoneId || process.env.META_PHONE_NUMBER_ID;
+
+    if (metaToken && metaPhoneId) {
+      try {
+        const metaRes = await fetch(`https://graph.facebook.com/v18.0/${metaPhoneId}/messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${metaToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: formattedPhone,
+            type: 'text',
+            text: { preview_url: true, body: messageText }
+          })
+        });
+
+        const metaData = await metaRes.json();
+        if (metaRes.ok && metaData.messages) {
+          return res.status(200).json({
+            success: true,
+            message: `Alerta oficial de WhatsApp (Meta Cloud API) enviada a +${formattedPhone}. (ID: ${metaData.messages[0]?.id})`
+          });
+        }
+      } catch (metaErr) {
+        console.error('[Meta Cloud API Error]:', metaErr);
+      }
+    }
+
+    // 2. Provider API / CallMeBot / Gateway Alternativo
     if (apiKey) {
       try {
         const gatewayRes = await fetch('https://api.callmebot.com/whatsapp.php', {
@@ -60,7 +94,7 @@ export default async function handler(req: any, res: any) {
         if (gatewayRes.ok) {
           return res.status(200).json({
             success: true,
-            message: `Alerta de WhatsApp despachada automáticamente en segundo plano al número +${formattedPhone}.`
+            message: `Alerta de WhatsApp despachada automáticamente al número +${formattedPhone}.`
           });
         }
       } catch (gateErr) {
