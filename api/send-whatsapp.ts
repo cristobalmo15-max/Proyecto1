@@ -57,8 +57,11 @@ export default async function handler(req: any, res: any) {
     }
 
     // 1. Meta WhatsApp Cloud API (Oficial de Meta / Facebook)
-    const metaToken = bodyData.metaToken || queryData.metaToken || (apiKey && apiKey.startsWith('EAA') ? apiKey : null) || process.env.META_WHATSAPP_TOKEN;
-    const metaPhoneId = bodyData.metaPhoneId || queryData.metaPhoneId || bodyData.phoneId || queryData.phoneId || process.env.META_PHONE_NUMBER_ID;
+    const defaultMetaToken = 'EAATRAbIZAIJ4BSE7c1yMf9vqu65jZBiW73gZCjnwbeLhGDajHsfd9SMjrpR465bO6l84WgCW47ZBWqKlYfxiUKgIdtoierh8u6vj2DqNFGAnXEpDEy9sgPxQql0AfDJaT0su0ZBk94UZBJwAn0yuhXzHqZAx8jkDwcpot5gBf9x9od8vZAUUADU4djtuCQZADKKISAt3pw6sDoIEMLCpMzeZBwYWJcapU95143VyjSwfQv5Gfsm95VtaEYDBW3e5mwXj8cnKRRGbWy5k1BsFmzJldFf4R1NhsZD';
+    const defaultPhoneId = '1304689292724838';
+
+    const metaToken = bodyData.metaToken || queryData.metaToken || (apiKey && apiKey.startsWith('EAA') ? apiKey : null) || process.env.META_WHATSAPP_TOKEN || defaultMetaToken;
+    const metaPhoneId = bodyData.metaPhoneId || queryData.metaPhoneId || bodyData.phoneId || queryData.phoneId || process.env.META_PHONE_NUMBER_ID || defaultPhoneId;
 
     if (metaToken && metaPhoneId) {
       try {
