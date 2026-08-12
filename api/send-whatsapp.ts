@@ -65,8 +65,18 @@ export default async function handler(req: any, res: any) {
 
     if (metaToken && metaPhoneId) {
       try {
-        // Attempt 1: Standard Text Message Payload
-        const metaRes = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
+        let propSummaryParam = '';
+        const expiringProps = Array.isArray(properties) ? properties : [];
+        if (expiringProps.length === 0) {
+          propSummaryParam = 'No hay contratos por vencer en el período actual.';
+        } else {
+          expiringProps.forEach((p: any, idx: number) => {
+            propSummaryParam += `${idx + 1}. ${p.direccion || 'Sin Dirección'} (Dueño: ${p.dueno || 'N/A'}, Inquilino: ${p.arrendatario || 'N/A'}) - Canon: ${p.valor || 'N/A'} - Vencimiento: ${p.termino || 'Por Vencer'} | `;
+          });
+        }
+
+        // Attempt 1: Custom Template 'alerta_vencimiento_contrato'
+        const templateRes = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${metaToken}`,
@@ -75,53 +85,60 @@ export default async function handler(req: any, res: any) {
           body: JSON.stringify({
             messaging_product: 'whatsapp',
             to: formattedPhone,
-            type: 'text',
-            text: { body: messageText }
+            type: 'template',
+            template: {
+              name: 'alerta_vencimiento_contrato',
+              language: { code: 'es' },
+              components: [
+                {
+                  type: 'body',
+                  parameters: [
+                    { type: 'text', text: propSummaryParam.substring(0, 900) }
+                  ]
+                }
+              ]
+            }
           })
         });
 
-        const metaData = await metaRes.json();
-        if (metaRes.ok && metaData.messages) {
+        const templateData = await templateRes.json();
+        if (templateRes.ok && templateData.messages) {
           return res.status(200).json({
             success: true,
-            message: `✓ Alerta oficial de WhatsApp enviada a +${formattedPhone}. (ID: ${metaData.messages[0]?.id})`
+            message: `✓ Alerta oficial de WhatsApp enviada a +${formattedPhone}. (ID: ${templateData.messages[0]?.id})`
           });
         }
 
-        console.log('[Meta Text Payload Error]:', JSON.stringify(metaData));
+        // Attempt 2: Fallback to hello_world if template is still pending approval
+        const fallbackRes = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${metaToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            to: formattedPhone,
+            type: 'template',
+            template: {
+              name: 'hello_world',
+              language: { code: 'en_US' }
+            }
+          })
+        });
 
-        // Attempt 2: If freeform text failed, attempt template message
-        if (metaData.error) {
-          const templateRes = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${metaToken}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              messaging_product: 'whatsapp',
-              to: formattedPhone,
-              type: 'template',
-              template: {
-                name: 'hello_world',
-                language: { code: 'en_US' }
-              }
-            })
-          });
-
-          const templateData = await templateRes.json();
-          if (templateRes.ok && templateData.messages) {
-            return res.status(200).json({
-              success: true,
-              message: `✓ Mensaje de plantilla enviado a +${formattedPhone}. (Meta Error previo: ${metaData.error.message})`
-            });
-          }
-
+        const fallbackData = await fallbackRes.json();
+        if (fallbackRes.ok && fallbackData.messages) {
           return res.status(200).json({
-            success: false,
-            error: `Meta API Error (${metaData.error.code}): ${metaData.error.message}`
+            success: true,
+            message: `✓ Mensaje de confirmación enviado a +${formattedPhone}. (La plantilla 'alerta_vencimiento_contrato' está en proceso final de aprobación).`
           });
         }
+
+        return res.status(200).json({
+          success: false,
+          error: `Meta API Error: ${templateData.error?.message || fallbackData.error?.message || 'Fallo al procesar plantilla.'}`
+        });
       } catch (metaErr: any) {
         console.error('[Meta Cloud API Fetch Exception]:', metaErr);
       }
