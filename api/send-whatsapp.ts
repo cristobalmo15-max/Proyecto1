@@ -65,7 +65,8 @@ export default async function handler(req: any, res: any) {
 
     if (metaToken && metaPhoneId) {
       try {
-        const metaRes = await fetch(`https://graph.facebook.com/v18.0/${metaPhoneId}/messages`, {
+        // Attempt 1: Freeform Text Message
+        const metaRes = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${metaToken}`,
@@ -76,7 +77,7 @@ export default async function handler(req: any, res: any) {
             recipient_type: 'individual',
             to: formattedPhone,
             type: 'text',
-            text: { preview_url: true, body: messageText }
+            text: { preview_url: false, body: messageText }
           })
         });
 
@@ -84,11 +85,51 @@ export default async function handler(req: any, res: any) {
         if (metaRes.ok && metaData.messages) {
           return res.status(200).json({
             success: true,
-            message: `Alerta oficial de WhatsApp (Meta Cloud API) enviada a +${formattedPhone}. (ID: ${metaData.messages[0]?.id})`
+            message: `✓ Alerta oficial de WhatsApp (Meta Cloud API) enviada a +${formattedPhone}. (ID: ${metaData.messages[0]?.id})`
           });
         }
-      } catch (metaErr) {
-        console.error('[Meta Cloud API Error]:', metaErr);
+
+        // Attempt 2: If freeform text failed (e.g. Meta 24-hour window policy), attempt template hello_world
+        if (metaData.error) {
+          console.error('[Meta API Return Error]:', metaData.error);
+
+          // Try template hello_world or template message
+          const templateRes = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${metaToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              messaging_product: 'whatsapp',
+              to: formattedPhone,
+              type: 'template',
+              template: {
+                name: 'hello_world',
+                language: { code: 'en_US' }
+              }
+            })
+          });
+
+          const templateData = await templateRes.json();
+          if (templateRes.ok && templateData.messages) {
+            return res.status(200).json({
+              success: true,
+              message: `✓ Mensaje oficial de bienvenida Meta Cloud API enviado a +${formattedPhone}. (ID: ${templateData.messages[0]?.id})`
+            });
+          }
+
+          return res.status(200).json({
+            success: false,
+            error: `Meta API Error (${metaData.error.code}): ${metaData.error.message || metaData.error.error_user_msg || 'Error de autenticación con Meta.'}`
+          });
+        }
+      } catch (metaErr: any) {
+        console.error('[Meta Cloud API Fetch Exception]:', metaErr);
+        return res.status(200).json({
+          success: false,
+          error: `Error al conectar con Meta Cloud API: ${metaErr.message}`
+        });
       }
     }
 
