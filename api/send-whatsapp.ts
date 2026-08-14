@@ -75,7 +75,58 @@ export default async function handler(req: any, res: any) {
           });
         }
 
-        // 1. Attempt template 'jaspers_market_order_confirmation_v1' with concise property details
+        // Format rich emoji property list for Spanish custom template {{1}}
+        let richPropParam = '';
+        if (expiringProps.length === 0) {
+          richPropParam = '✅ No hay contratos por vencer en el período actual.';
+        } else {
+          expiringProps.slice(0, 3).forEach((p: any, idx: number) => {
+            richPropParam += `🏠 ${idx + 1}. ${p.direccion || 'Sin Dirección'}\n   • Involucrados: ${p.dueno || 'N/A'} vs ${p.arrendatario || 'N/A'}\n   • Canon: ${p.valor || 'N/A'} | 🛑 Vencimiento: ${p.termino || 'Por Vencer'}\n`;
+          });
+        }
+
+        // 1. Attempt custom approved Spanish template (alerta_vencimiento_contrato / alerta_vencimiento_co)
+        const customNames = ['alerta_vencimiento_contrato', 'alerta_vencimiento_co', 'alerta_vencimiento_cc', 'alerta_vencimiento'];
+        const customLangs = ['es', 'es_LA', 'es_ES', 'es_MX'];
+
+        for (const tName of customNames) {
+          for (const cLang of customLangs) {
+            const spanishRes = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${metaToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                messaging_product: 'whatsapp',
+                to: formattedPhone,
+                type: 'template',
+                template: {
+                  name: tName,
+                  language: { code: cLang },
+                  components: [
+                    {
+                      type: 'body',
+                      parameters: [
+                        { type: 'text', text: richPropParam.substring(0, 800) }
+                      ]
+                    }
+                  ]
+                }
+              })
+            });
+
+            const spanishData = await spanishRes.json();
+            if (spanishRes.ok && spanishData.messages) {
+              return res.status(200).json({
+                success: true,
+                message: `✓ Alerta oficial de WhatsApp en Español enviada a +${formattedPhone}. (Plantilla: '${tName}', ID: ${spanishData.messages[0]?.id})`
+              });
+            }
+          }
+        }
+
+        // 2. Fallback to jaspers_market_order_confirmation_v1 if custom template language is resolving
         const p1 = 'Punto Propiedades';
         const p2 = `${expiringProps.length} Contrato(s) por Vencer`;
         
@@ -116,7 +167,7 @@ export default async function handler(req: any, res: any) {
         if (templateRes.ok && templateData.messages) {
           return res.status(200).json({
             success: true,
-            message: `✓ Alerta predictiva oficial de WhatsApp enviada a +${formattedPhone}. (ID: ${templateData.messages[0]?.id})`
+            message: `✓ Alerta oficial de WhatsApp enviada a +${formattedPhone}. (ID: ${templateData.messages[0]?.id})`
           });
         }
 
