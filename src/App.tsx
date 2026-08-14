@@ -261,7 +261,8 @@ export default function App() {
   const [impersonatedUid, setImpersonatedUid] = useState<string | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [activeModule, setActiveModule] = useState<'dashboard' | 'properties' | 'ai' | 'expenses' | 'reports' | 'support' | 'meetings' | 'settings' | 'email' | 'admin'>('dashboard');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isHoveredSidebar, setIsHoveredSidebar] = useState(false);
   const [isEmailConnected, setIsEmailConnected] = useState(false);
   const [connectedEmail, setConnectedEmail] = useState('');
   const [customEmailInput, setCustomEmailInput] = useState('');
@@ -2815,19 +2816,26 @@ if (!isAuthReady) return null;
       return p.f_ini.startsWith(selectedYearFilter);
     });
   
+  const isExpanded = sidebarOpen || isHoveredSidebar;
+
   return (
     <div className="flex h-screen bg-[#faf9f6]/40 text-[#1a1a1a] overflow-hidden selection:bg-primary/20">
-      {/* Sidebar: Clean & Bright */}
-      <aside className={`bg-white transition-all duration-500 ease-in-out flex flex-col z-40 relative border-r border-border/50 shadow-sm ${sidebarOpen ? 'w-[260px]' : 'w-[80px]'}`}>
-        <div className={`py-6 mb-4 flex items-center transition-all duration-500 ${sidebarOpen ? 'px-6 justify-between' : 'px-4 justify-center gap-3'}`}>
-          <div className={`flex items-center gap-3 transition-all duration-500 ${!sidebarOpen && 'scale-105'}`}>
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-red-600 to-red-500 flex items-center justify-center shrink-0 shadow-lg shadow-accent/20">
+      {/* Sidebar: Instagram Web Style - Hover Expand */}
+      <aside 
+        onMouseEnter={() => setIsHoveredSidebar(true)}
+        onMouseLeave={() => setIsHoveredSidebar(false)}
+        className={`bg-white transition-all duration-300 ease-in-out flex flex-col z-40 relative border-r border-border/50 shadow-sm hover:shadow-xl ${isExpanded ? 'w-[260px]' : 'w-[80px]'}`}
+      >
+        <div className={`py-6 mb-4 flex items-center transition-all duration-300 ${isExpanded ? 'px-6 justify-between' : 'px-4 justify-center gap-3'}`}>
+          <div className={`flex items-center gap-3 transition-all duration-300 ${!isExpanded && 'scale-105'}`}>
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-red-600 to-red-500 flex items-center justify-center shrink-0 shadow-lg shadow-accent/20 cursor-pointer">
                <span className="text-white font-bold text-sm">P</span>
             </div>
-            {sidebarOpen && (
+            {isExpanded && (
               <motion.div 
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.2 }}
                 className="flex flex-col gap-0.5 min-w-0"
               >
                 <span className="text-ink font-black text-sm tracking-tight leading-none uppercase truncate">Punto</span>
@@ -2835,12 +2843,16 @@ if (!isAuthReady) return null;
               </motion.div>
             )}
           </div>
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className={`text-muted hover:text-ink transition-all shrink-0 ${!sidebarOpen ? 'p-2 hover:bg-gray-50 rounded-lg' : ''}`}>
-             <Menu className={sidebarOpen ? 'w-5 h-5' : 'w-4 h-4'} />
+          <button 
+            onClick={() => setSidebarOpen(!sidebarOpen)} 
+            className={`text-muted hover:text-ink transition-all shrink-0 ${!isExpanded ? 'p-2 hover:bg-gray-50 rounded-lg' : ''}`}
+            title={sidebarOpen ? 'Fijar minimizado' : 'Fijar expandido'}
+          >
+             <Menu className={isExpanded ? 'w-5 h-5' : 'w-4 h-4'} />
           </button>
         </div>
 
-        <nav className="flex-1 px-3 space-y-1.5 mt-4">
+        <nav className="flex-1 px-3 space-y-1.5 mt-4 overflow-x-hidden">
           {[
             { id: 'dashboard', icon: <LayoutDashboard className="w-4 h-4" />, label: 'Panel de Control' },
             { id: 'properties', icon: <Building2 className="w-4 h-4" />, label: 'Propiedades Activas' },
@@ -2854,6 +2866,7 @@ if (!isAuthReady) return null;
             <button
               key={item.id}
               onClick={() => setActiveModule(item.id as any)}
+              title={!isExpanded ? item.label : undefined}
               className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-full font-bold text-[11px] tracking-wider relative group overflow-hidden smooth-transition ${
                 activeModule === item.id 
                   ? 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-premium shadow-accent/20 scale-[1.02] glow-hover' 
@@ -2863,15 +2876,24 @@ if (!isAuthReady) return null;
               <div className="relative z-10 shrink-0">
                 {item.icon}
               </div>
-              {sidebarOpen && <span className="relative z-10 truncate">{item.label}</span>}
+              {isExpanded && (
+                <motion.span 
+                  initial={{ opacity: 0, x: -5 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="relative z-10 truncate whitespace-nowrap"
+                >
+                  {item.label}
+                </motion.span>
+              )}
             </button>
           ))}
         </nav>
         
         <div className="px-4 py-6">
-          <div className={`flex items-center gap-3 p-3 rounded-2xl bg-white border border-border/50 shadow-sm ${!sidebarOpen && 'justify-center'}`}>
+          <div className={`flex items-center gap-3 p-3 rounded-2xl bg-white border border-border/50 shadow-sm ${!isExpanded && 'justify-center'}`}>
             {impersonatedUid && (
-              <button className="px-2 py-1 bg-red-100 text-red-700 text-[8px] font-black uppercase rounded-lg" onClick={() => setImpersonatedUid(null)}>
+              <button className="px-2 py-1 bg-red-100 text-red-700 text-[8px] font-black uppercase rounded-lg shrink-0" onClick={() => setImpersonatedUid(null)}>
                 Volver
               </button>
             )}
@@ -2879,14 +2901,19 @@ if (!isAuthReady) return null;
                <img src={user.photoURL || ''} className="w-8 h-8 rounded-full" referrerPolicy="no-referrer" />
                <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full" />
             </div>
-            {sidebarOpen && (
-              <div className="flex-1 min-w-0">
+            {isExpanded && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.2 }}
+                className="flex-1 min-w-0"
+              >
                 <p className="text-[10px] font-bold truncate text-ink">{user.displayName || 'Corredor'}</p>
                 <p className="text-[8px] text-muted font-medium truncate">{user.email}</p>
-              </div>
+              </motion.div>
             )}
-            {sidebarOpen && (
-               <button onClick={() => auth.signOut()} className="text-muted hover:text-red-500 transition-colors ml-1">
+            {isExpanded && (
+               <button onClick={() => auth.signOut()} className="text-muted hover:text-red-500 transition-colors ml-1 shrink-0" title="Cerrar Sesión">
                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
                </button>
             )}
