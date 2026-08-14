@@ -75,10 +75,15 @@ export default async function handler(req: any, res: any) {
           });
         }
 
-        // 1. Attempt template 'jaspers_market_order_confirmation_v1' with dynamic property details
-        const p1 = 'Estimado Administrador (Punto Propiedades)';
-        const p2 = `Reporte Predictivo - ${expiringProps.length} Contrato(s) por Vencer`;
-        const p3 = propSummaryParam ? propSummaryParam.substring(0, 900) : 'Sin contratos pendientes por vencer.';
+        // 1. Attempt template 'jaspers_market_order_confirmation_v1' with concise property details
+        const p1 = 'Punto Propiedades';
+        const p2 = `${expiringProps.length} Contrato(s) por Vencer`;
+        
+        let p3Short = 'Sin contratos pendientes.';
+        if (expiringProps.length > 0) {
+          const firstProp = expiringProps[0];
+          p3Short = `${firstProp.direccion || 'Propiedad'} (${firstProp.dueno || 'Dueño'}) - ${firstProp.valor || 'Canon'} - VENCIDO`;
+        }
 
         const templateRes = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
           method: 'POST',
@@ -97,9 +102,9 @@ export default async function handler(req: any, res: any) {
                 {
                   type: 'body',
                   parameters: [
-                    { type: 'text', text: p1 },
-                    { type: 'text', text: p2 },
-                    { type: 'text', text: p3 }
+                    { type: 'text', text: p1.substring(0, 50) },
+                    { type: 'text', text: p2.substring(0, 50) },
+                    { type: 'text', text: p3Short.substring(0, 100) }
                   ]
                 }
               ]
