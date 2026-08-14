@@ -75,38 +75,41 @@ export default async function handler(req: any, res: any) {
           });
         }
 
-        // Attempt 1: Custom Template 'alerta_vencimiento_contrato'
-        const templateRes = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${metaToken}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            messaging_product: 'whatsapp',
-            to: formattedPhone,
-            type: 'template',
-            template: {
-              name: 'alerta_vencimiento_contrato',
-              language: { code: 'es' },
-              components: [
-                {
-                  type: 'body',
-                  parameters: [
-                    { type: 'text', text: propSummaryParam.substring(0, 900) }
-                  ]
-                }
-              ]
-            }
-          })
-        });
-
-        const templateData = await templateRes.json();
-        if (templateRes.ok && templateData.messages) {
-          return res.status(200).json({
-            success: true,
-            message: `✓ Alerta oficial de WhatsApp enviada a +${formattedPhone}. (ID: ${templateData.messages[0]?.id})`
+        // Attempt 1: Approved Template Matching (alerta_vencimiento_contrato / alerta_vencimiento_co)
+        const possibleTemplates = ['alerta_vencimiento_contrato', 'alerta_vencimiento_co', 'alerta_vencimiento_cc', 'alerta_vencimiento'];
+        for (const tName of possibleTemplates) {
+          const templateRes = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${metaToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              messaging_product: 'whatsapp',
+              to: formattedPhone,
+              type: 'template',
+              template: {
+                name: tName,
+                language: { code: 'es' },
+                components: [
+                  {
+                    type: 'body',
+                    parameters: [
+                      { type: 'text', text: propSummaryParam.substring(0, 900) }
+                    ]
+                  }
+                ]
+              }
+            })
           });
+
+          const templateData = await templateRes.json();
+          if (templateRes.ok && templateData.messages) {
+            return res.status(200).json({
+              success: true,
+              message: `✓ Alerta oficial de WhatsApp enviada exitosamente a +${formattedPhone}. (Plantilla: '${tName}', ID: ${templateData.messages[0]?.id})`
+            });
+          }
         }
 
         // Attempt 2: Fallback to hello_world if template is still pending approval
@@ -137,7 +140,7 @@ export default async function handler(req: any, res: any) {
 
         return res.status(200).json({
           success: false,
-          error: `Meta API Error: ${templateData.error?.message || fallbackData.error?.message || 'Fallo al procesar plantilla.'}`
+          error: `Meta API Error: ${fallbackData.error?.message || 'Fallo al procesar plantilla.'}`
         });
       } catch (metaErr: any) {
         console.error('[Meta Cloud API Fetch Exception]:', metaErr);
