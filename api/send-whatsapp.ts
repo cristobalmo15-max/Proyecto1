@@ -75,55 +75,49 @@ export default async function handler(req: any, res: any) {
           });
         }
 
-        // Attempt 1: Approved Template Matching across all Spanish language codes (es_LA, es, es_ES)
-        const possibleTemplates = ['alerta_vencimiento_contrato', 'alerta_vencimiento_co', 'alerta_vencimiento_cc', 'alerta_vencimiento'];
-        const possibleLangs = ['es_LA', 'es', 'es_ES', 'es_MX'];
+        // 1. Attempt template 'jaspers_market_order_confirmation_v1' with dynamic property details
+        const p1 = 'Estimado Administrador (Punto Propiedades)';
+        const p2 = `Reporte Predictivo - ${expiringProps.length} Contrato(s) por Vencer`;
+        const p3 = propSummaryParam ? propSummaryParam.substring(0, 900) : 'Sin contratos pendientes por vencer.';
 
-        let lastMetaErrorStr = '';
-
-        for (const tName of possibleTemplates) {
-          for (const langCode of possibleLangs) {
-            const templateRes = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${metaToken}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                messaging_product: 'whatsapp',
-                to: formattedPhone,
-                type: 'template',
-                template: {
-                  name: tName,
-                  language: { code: langCode },
-                  components: [
-                    {
-                      type: 'body',
-                      parameters: [
-                        { type: 'text', text: propSummaryParam.substring(0, 900) }
-                      ]
-                    }
+        const templateRes = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${metaToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            to: formattedPhone,
+            type: 'template',
+            template: {
+              name: 'jaspers_market_order_confirmation_v1',
+              language: { code: 'en_US' },
+              components: [
+                {
+                  type: 'body',
+                  parameters: [
+                    { type: 'text', text: p1 },
+                    { type: 'text', text: p2 },
+                    { type: 'text', text: p3 }
                   ]
                 }
-              })
-            });
-
-            const templateData = await templateRes.json();
-            if (templateRes.ok && templateData.messages) {
-              return res.status(200).json({
-                success: true,
-                message: `✓ Alerta oficial de WhatsApp enviada a +${formattedPhone}. (Plantilla: '${tName}', Idioma: ${langCode}, ID: ${templateData.messages[0]?.id})`
-              });
-            } else if (templateData.error) {
-              lastMetaErrorStr = `(${templateData.error.code}) ${templateData.error.message || templateData.error.error_user_msg}`;
+              ]
             }
-          }
+          })
+        });
+
+        const templateData = await templateRes.json();
+        if (templateRes.ok && templateData.messages) {
+          return res.status(200).json({
+            success: true,
+            message: `✓ Alerta predictiva oficial de WhatsApp enviada a +${formattedPhone}. (ID: ${templateData.messages[0]?.id})`
+          });
         }
 
-        // Return exact Meta error instead of fallback to hello_world
         return res.status(200).json({
           success: false,
-          error: `Meta Cloud API Error: ${lastMetaErrorStr || 'No se pudo vincular la plantilla aprobada en Meta.'}`
+          error: `Meta Cloud API Error (${templateData.error?.code}): ${templateData.error?.message}`
         });
       } catch (metaErr: any) {
         console.error('[Meta Cloud API Fetch Exception]:', metaErr);
