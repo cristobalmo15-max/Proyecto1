@@ -79,7 +79,7 @@ export default async function handler(req: any, res: any) {
         const possibleTemplates = ['alerta_vencimiento_contrato', 'alerta_vencimiento_co', 'alerta_vencimiento_cc', 'alerta_vencimiento'];
         const possibleLangs = ['es_LA', 'es', 'es_ES', 'es_MX'];
 
-        let lastMetaError = null;
+        let lastMetaErrorStr = '';
 
         for (const tName of possibleTemplates) {
           for (const langCode of possibleLangs) {
@@ -115,40 +115,15 @@ export default async function handler(req: any, res: any) {
                 message: `✓ Alerta oficial de WhatsApp enviada a +${formattedPhone}. (Plantilla: '${tName}', Idioma: ${langCode}, ID: ${templateData.messages[0]?.id})`
               });
             } else if (templateData.error) {
-              lastMetaError = templateData.error;
+              lastMetaErrorStr = `(${templateData.error.code}) ${templateData.error.message || templateData.error.error_user_msg}`;
             }
           }
         }
 
-        // Attempt 2: Fallback to hello_world only if template dispatch returned an error
-        const fallbackRes = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${metaToken}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            messaging_product: 'whatsapp',
-            to: formattedPhone,
-            type: 'template',
-            template: {
-              name: 'hello_world',
-              language: { code: 'en_US' }
-            }
-          })
-        });
-
-        const fallbackData = await fallbackRes.json();
-        if (fallbackRes.ok && fallbackData.messages) {
-          return res.status(200).json({
-            success: true,
-            message: `✓ Plantilla de muestra enviada a +${formattedPhone}. (Detalle Meta: ${lastMetaError?.message || 'Revisando idioma de plantilla'})`
-          });
-        }
-
+        // Return exact Meta error instead of fallback to hello_world
         return res.status(200).json({
           success: false,
-          error: `Meta API Error: ${lastMetaError?.message || fallbackData.error?.message || 'Fallo al procesar plantilla.'}`
+          error: `Meta Cloud API Error: ${lastMetaErrorStr || 'No se pudo vincular la plantilla aprobada en Meta.'}`
         });
       } catch (metaErr: any) {
         console.error('[Meta Cloud API Fetch Exception]:', metaErr);
