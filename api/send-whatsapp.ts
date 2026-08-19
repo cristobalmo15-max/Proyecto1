@@ -75,19 +75,18 @@ export default async function handler(req: any, res: any) {
           });
         }
 
-        // Format rich emoji property list for Spanish custom template {{1}}
+        // Format rich property parameter for Spanish custom template {{1}}
         let richPropParam = '';
         if (expiringProps.length === 0) {
-          richPropParam = '✅ No hay contratos por vencer en el período actual.';
+          richPropParam = 'No hay contratos por vencer en el período actual.';
         } else {
-          expiringProps.slice(0, 3).forEach((p: any, idx: number) => {
-            richPropParam += `🏠 ${idx + 1}. ${p.direccion || 'Sin Dirección'}\n   • Involucrados: ${p.dueno || 'N/A'} vs ${p.arrendatario || 'N/A'}\n   • Canon: ${p.valor || 'N/A'} | 🛑 Vencimiento: ${p.termino || 'Por Vencer'}\n`;
-          });
+          const firstProp = expiringProps[0];
+          richPropParam = `${firstProp.direccion || 'Propiedad'} (Dueño: ${firstProp.dueno || 'N/A'}) - Canon: ${firstProp.valor || 'N/A'} - VENCIDO (${firstProp.termino || 'Por Vencer'})`;
         }
 
-        // 1. Attempt custom approved Spanish template (alerta_vencimiento_contrato / alerta_vencimiento_co)
-        const customNames = ['alerta_vencimiento_contrato', 'alerta_vencimiento_co', 'alerta_vencimiento_cc', 'alerta_vencimiento'];
-        const customLangs = ['es', 'es_LA', 'es_ES', 'es_MX'];
+        // 1. Attempt custom approved Spanish template matching
+        const customNames = ['alerta_vencimiento_contrato', 'alerta_vencimiento_contra', 'alerta_vencimiento_co', 'alerta_vencimiento_cc', 'alerta_vencimiento'];
+        const customLangs = ['es', 'es_LA', 'es_ES', 'es_MX', 'es_CL'];
 
         for (const tName of customNames) {
           for (const cLang of customLangs) {
@@ -108,7 +107,7 @@ export default async function handler(req: any, res: any) {
                     {
                       type: 'body',
                       parameters: [
-                        { type: 'text', text: richPropParam.substring(0, 800) }
+                        { type: 'text', text: richPropParam.substring(0, 150) }
                       ]
                     }
                   ]
