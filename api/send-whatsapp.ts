@@ -81,7 +81,10 @@ export default async function handler(req: any, res: any) {
           richPropParam = 'No hay contratos por vencer en el período actual.';
         } else {
           const firstProp = expiringProps[0];
-          richPropParam = `${firstProp.direccion || 'Propiedad'} (Dueño: ${firstProp.dueno || 'N/A'}) - Canon: ${firstProp.valor || 'N/A'} - VENCIDO (${firstProp.termino || 'Por Vencer'})`;
+          const formattedVal = typeof firstProp.valor === 'number' 
+            ? `$${firstProp.valor.toLocaleString('es-CL')}` 
+            : (firstProp.valor ? `$${firstProp.valor}` : 'N/A');
+          richPropParam = `${firstProp.direccion || 'Propiedad'} (Dueño: ${firstProp.dueno || 'N/A'}) - Canon: ${formattedVal} - VENCIDO (${firstProp.termino || 'Por Vencer'})`;
         }
 
         // 1. Attempt custom approved Spanish template matching
@@ -107,7 +110,7 @@ export default async function handler(req: any, res: any) {
                     {
                       type: 'body',
                       parameters: [
-                        { type: 'text', text: richPropParam.substring(0, 150) }
+                        { type: 'text', text: richPropParam.substring(0, 500) }
                       ]
                     }
                   ]
