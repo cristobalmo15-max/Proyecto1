@@ -610,6 +610,12 @@ export default function App() {
   const [whatsappApiKey, setWhatsappApiKey] = useState('');
   const [testEmailDest, setTestEmailDest] = useState('');
 
+  // Reportes Automatizados WhatsApp Personalizados (X Plazo & X Días)
+  const [waAutoReportEnabled, setWaAutoReportEnabled] = useState<boolean>(true);
+  const [waPlazoDias, setWaPlazoDias] = useState<number>(30); // X Plazo: días de anticipación
+  const [waFrecuenciaDias, setWaFrecuenciaDias] = useState<number>(7); // X Frecuencia: cada X días
+  const [waHoraEnvio, setWaHoraEnvio] = useState<string>('09:00');
+
   useEffect(() => {
     if (appSettings) {
       setSmtpHost(appSettings.smtpHost || '');
@@ -619,8 +625,15 @@ export default function App() {
       setReportEmail(appSettings.reportEmail || '');
       setWhatsappPhone(appSettings.whatsappPhone || '');
       setWhatsappApiKey(appSettings.whatsappApiKey || '');
+      if ((appSettings as any).whatsappAutoReport) {
+        const autoRep = (appSettings as any).whatsappAutoReport;
+        setWaAutoReportEnabled(autoRep.enabled ?? true);
+        setWaPlazoDias(autoRep.daysBeforeExpiry ?? 30);
+        setWaFrecuenciaDias(autoRep.frequencyDays ?? 7);
+        setWaHoraEnvio(autoRep.preferredTime || '09:00');
+      }
     }
-  }, [appSettings.smtpHost, appSettings.smtpPort, appSettings.smtpUser, appSettings.smtpPass, appSettings.reportEmail, appSettings.whatsappPhone, appSettings.whatsappApiKey]);
+  }, [appSettings]);
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketCategory, setTicketCategory] = useState('Lector IA');
   const [ticketPriority, setTicketPriority] = useState('Alta');
@@ -4442,47 +4455,181 @@ if (!isAuthReady) return null;
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-border">
+                  {/* BLOQUE DE CONTROL PERSONALIZADO: X PLAZO Y X DÍAS */}
+                  <div className="bg-gradient-to-br from-emerald-50/60 to-teal-50/40 p-5 rounded-2xl border border-emerald-200/80 space-y-4">
+                    <div className="flex justify-between items-center border-b border-emerald-200/60 pb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">⚙️</span>
+                        <div>
+                          <h5 className="text-xs font-black text-emerald-950 uppercase tracking-tight">Reportes Automáticos Personalizados (X Plazo & X Días)</h5>
+                          <p className="text-[9.5px] text-emerald-800/80 font-bold">Define cada cuántos días y con qué anticipación deseas recibir la alerta.</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setWaAutoReportEnabled(!waAutoReportEnabled)}
+                        className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider transition-all ${
+                          waAutoReportEnabled 
+                            ? 'bg-emerald-600 text-white shadow-xs' 
+                            : 'bg-gray-200 text-gray-600'
+                        }`}
+                      >
+                        {waAutoReportEnabled ? '✓ Automatización Activa' : '✕ Pausada'}
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* X PLAZO */}
+                      <div className="bg-white p-3.5 rounded-xl border border-emerald-200 shadow-xs">
+                        <label className="text-[9px] font-black uppercase text-emerald-900 tracking-wider block mb-1">
+                          📅 X Plazo: Anticipación Vencimiento (Días)
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="1"
+                            max="365"
+                            value={waPlazoDias}
+                            onChange={(e) => setWaPlazoDias(Math.max(1, parseInt(e.target.value, 10) || 30))}
+                            className="w-20 bg-gray-50 border border-border rounded-lg p-2 text-xs font-black text-center text-ink outline-none focus:border-emerald-500"
+                          />
+                          <span className="text-xs font-bold text-muted">días de anticipación</span>
+                        </div>
+                        <div className="flex gap-1 mt-2">
+                          {[15, 30, 45, 60, 90].map((d) => (
+                            <button
+                              key={`plazo-${d}`}
+                              type="button"
+                              onClick={() => setWaPlazoDias(d)}
+                              className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${
+                                waPlazoDias === d ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                            >
+                              {d}d
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* X FRECUENCIA */}
+                      <div className="bg-white p-3.5 rounded-xl border border-emerald-200 shadow-xs">
+                        <label className="text-[9px] font-black uppercase text-emerald-900 tracking-wider block mb-1">
+                          ⏱️ X Frecuencia: Enviar Cada (Días)
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="1"
+                            max="90"
+                            value={waFrecuenciaDias}
+                            onChange={(e) => setWaFrecuenciaDias(Math.max(1, parseInt(e.target.value, 10) || 7))}
+                            className="w-20 bg-gray-50 border border-border rounded-lg p-2 text-xs font-black text-center text-ink outline-none focus:border-emerald-500"
+                          />
+                          <span className="text-xs font-bold text-muted">días</span>
+                        </div>
+                        <div className="flex gap-1 mt-2">
+                          {[
+                            { label: 'Diario', val: 1 },
+                            { label: 'Cada 3d', val: 3 },
+                            { label: 'Semanal', val: 7 },
+                            { label: 'Quincenal', val: 15 },
+                            { label: 'Mensual', val: 30 }
+                          ].map((f) => (
+                            <button
+                              key={`frec-${f.val}`}
+                              type="button"
+                              onClick={() => setWaFrecuenciaDias(f.val)}
+                              className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${
+                                waFrecuenciaDias === f.val ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                            >
+                              {f.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* VISTA PREVIA CALCULADA EN TIEMPO REAL */}
+                    {(() => {
+                      const today = new Date();
+                      today.setHours(0,0,0,0);
+                      const maxD = new Date(today);
+                      maxD.setDate(maxD.getDate() + Number(waPlazoDias || 30));
+                      const matchingProps = properties.filter((p: any) => {
+                        if (!p.termino) return false;
+                        const parts = String(p.termino).split('-');
+                        if (parts.length === 3) {
+                          const expD = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 12, 0, 0);
+                          return expD <= maxD;
+                        }
+                        return false;
+                      });
+
+                      return (
+                        <div className="bg-white/80 p-3 rounded-xl border border-emerald-200/60 flex items-center justify-between">
+                          <span className="text-[9.5px] font-bold text-emerald-950">
+                            📊 <strong>Vista Previa Calculada:</strong> Se encontraron <strong>{matchingProps.length} contrato(s)</strong> que vencen dentro del plazo personalizado de <strong>{waPlazoDias} días</strong>.
+                          </span>
+                          <span className="text-[8.5px] font-black uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">
+                            Cada {waFrecuenciaDias} días
+                          </span>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="pt-4 border-t border-border flex flex-col gap-2">
                     <button
                       onClick={async () => {
                         const updatedSettings = {
                           ...appSettings,
                           whatsappPhone,
-                          whatsappApiKey
+                          whatsappApiKey,
+                          whatsappAutoReport: {
+                            enabled: waAutoReportEnabled,
+                            daysBeforeExpiry: waPlazoDias,
+                            frequencyDays: waFrecuenciaDias,
+                            preferredTime: waHoraEnvio,
+                            updatedAt: new Date().toISOString()
+                          }
                         };
                         setAppSettings(updatedSettings);
                         await updateAppSettings(updatedSettings);
-                        showToast('✓ Ajustes de WhatsApp guardados correctamente', 'success');
+                        showToast(`✓ Programación guardada: Alertas a ${waPlazoDias} días cada ${waFrecuenciaDias} días`, 'success');
                       }}
                       className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[10px] tracking-widest py-4 rounded-xl transition-all shadow-md active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
                     >
-                      💾 Guardar Configuración de WhatsApp
+                      💾 Guardar Programación Personalizada (X Plazo: {waPlazoDias}d / Cada {waFrecuenciaDias}d)
                     </button>
                   </div>
                 </div>
 
                 <div className="lg:col-span-5 bg-white p-6 md:p-8 rounded-[28px] border border-border shadow-sm space-y-6">
                   <div>
-                    <h4 className="text-xs font-black uppercase text-emerald-900 mb-1 tracking-wider">Prueba de Envío WhatsApp</h4>
-                    <p className="text-[10px] text-muted font-bold">Verifica el despacho en segundo plano o genera enlaces interactivos.</p>
+                    <h4 className="text-xs font-black uppercase text-emerald-900 mb-1 tracking-wider">Despacho Inmediato Personalizado</h4>
+                    <p className="text-[10px] text-muted font-bold">Prueba el envío automático usando los parámetros personalizados que configuraste.</p>
                   </div>
 
                   <div className="bg-emerald-50/50 p-5 rounded-2xl border border-emerald-200/80 space-y-4">
                     <div className="flex items-center gap-2">
-                      <span className="text-2xl">🤖</span>
+                      <span className="text-2xl">🚀</span>
                       <div>
-                        <h5 className="text-[11px] font-black text-emerald-900 uppercase tracking-tight">Despacho de Fondo (Meta Cloud API)</h5>
-                        <p className="text-[9.5px] text-emerald-800/80 font-bold">Envía el mensaje formateado en español con emojis a tu WhatsApp.</p>
+                        <h5 className="text-[11px] font-black text-emerald-900 uppercase tracking-tight">Despacho Personalizado (Plazo {waPlazoDias} días)</h5>
+                        <p className="text-[9.5px] text-emerald-800/80 font-bold">Genera y envía por WhatsApp la lista de propiedades a vencer en los próximos {waPlazoDias} días.</p>
                       </div>
                     </div>
 
                     <button
                       onClick={async () => {
                         const phoneToUse = whatsappPhone || '56950125765';
-                        showToast(`Procesando envío de WhatsApp de fondo a ${phoneToUse}...`, 'success');
+                        showToast(`Procesando envío con plazo personalizado de ${waPlazoDias} días a ${phoneToUse}...`, 'success');
                         try {
-                          const maxDate = new Date();
-                          maxDate.setDate(maxDate.getDate() + 30);
+                          const today = new Date();
+                          today.setHours(0,0,0,0);
+                          const maxDate = new Date(today);
+                          maxDate.setDate(maxDate.getDate() + Number(waPlazoDias || 30));
+
                           const expiringProps = properties.filter((p: any) => {
                             if (!p.termino) return false;
                             const parts = String(p.termino).split('-');
@@ -4499,6 +4646,7 @@ if (!isAuthReady) return null;
                             body: JSON.stringify({
                               phone: phoneToUse,
                               apiKey: whatsappApiKey,
+                              daysBeforeExpiry: waPlazoDias,
                               properties: expiringProps.map(p => ({
                                 direccion: p.direccion,
                                 dueno: p.dueno,
@@ -4521,15 +4669,18 @@ if (!isAuthReady) return null;
                       }}
                       className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[9.5px] tracking-wider py-3.5 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                     >
-                      🤖 Probar Envío Automático de WhatsApp (De Fondo)
+                      🤖 Probar Envío Automático (Plazo {waPlazoDias} Días)
                     </button>
 
                     <button
                       onClick={() => {
                         const phoneToUse = (whatsappPhone || '56950125765').replace(/[^0-9]/g, '');
                         const targetPhone = phoneToUse.startsWith('56') ? phoneToUse : `56${phoneToUse}`;
-                        const maxDate = new Date();
-                        maxDate.setDate(maxDate.getDate() + 30);
+                        const today = new Date();
+                        today.setHours(0,0,0,0);
+                        const maxDate = new Date(today);
+                        maxDate.setDate(maxDate.getDate() + Number(waPlazoDias || 30));
+
                         const expiringProps = properties.filter((p: any) => {
                           if (!p.termino) return false;
                           const parts = String(p.termino).split('-');
@@ -4542,22 +4693,22 @@ if (!isAuthReady) return null;
 
                         let propDetails = '';
                         if (expiringProps.length === 0) {
-                          propDetails = '\n✅ *No hay contratos por vencer en el período actual.*';
+                          propDetails = `\n✅ *No hay contratos por vencer en los próximos ${waPlazoDias} días.*`;
                         } else {
                           expiringProps.forEach((p: any, idx: number) => {
                             propDetails += `\n🏠 *Propiedad ${idx + 1}:* ${p.direccion || 'Sin Dirección'}\n   • *Involucrados:* ${p.dueno || 'N/A'} vs ${p.arrendatario || 'N/A'}\n   • *Canon Renta:* ${p.valor || 'N/A'}\n   • *Vencimiento:* 🛑 *${p.termino || 'Por Vencer'}*\n`;
                           });
                         }
 
-                        const msg = `🚨 *PUNTO PROPIEDADES - CONTROL PREDICTIVO*\n------------------------------------------\n📊 *ALERTA DE VENCIMIENTOS DE ARRIENDO*\n\nSe identificaron *${expiringProps.length} Contrato(s)* que requieren atención o renovación:\n${propDetails}\n------------------------------------------\n🔗 *Acceder al Panel de Gestión:*\nhttps://proyecto1-chi-gules.vercel.app`;
+                        const msg = `🚨 *PUNTO PROPIEDADES - REPORTE PERSONALIZADO (${waPlazoDias} DÍAS)*\n------------------------------------------\n📊 *ALERTA DE VENCIMIENTOS DE ARRIENDO*\n\nSe identificaron *${expiringProps.length} Contrato(s)* que vencen en los próximos ${waPlazoDias} días:\n${propDetails}\n------------------------------------------\n🔗 *Acceder al Panel de Gestión:*\nhttps://proyecto1-chi-gules.vercel.app`;
 
                         const waUrl = `https://api.whatsapp.com/send?phone=${targetPhone}&text=${encodeURIComponent(msg)}`;
                         window.open(waUrl, '_blank');
-                        showToast('✓ Abriendo mensaje formateado en WhatsApp...', 'success');
+                        showToast('✓ Abriendo mensaje personalizado en WhatsApp...', 'success');
                       }}
                       className="w-full bg-slate-800 hover:bg-slate-900 text-white font-black uppercase text-[9.5px] tracking-wider py-3.5 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                     >
-                      💬 Abrir y Enviar Resumen en WhatsApp Web / App
+                      💬 Abrir Resumen Personalizado en WhatsApp Web
                     </button>
                   </div>
                 </div>
