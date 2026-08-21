@@ -78,13 +78,19 @@ export default async function handler(req: any, res: any) {
         // Format rich property parameter for Spanish custom template {{1}}
         let richPropParam = '';
         if (expiringProps.length === 0) {
-          richPropParam = 'No hay contratos por vencer en el período actual.';
-        } else {
+          richPropParam = 'No hay contratos por vencer en el período seleccionado.';
+        } else if (expiringProps.length === 1) {
           const firstProp = expiringProps[0];
           const formattedVal = typeof firstProp.valor === 'number' 
             ? `$${firstProp.valor.toLocaleString('es-CL')}` 
             : (firstProp.valor ? `$${firstProp.valor}` : 'N/A');
           richPropParam = `${firstProp.direccion || 'Propiedad'} (Dueño: ${firstProp.dueno || 'N/A'}) - Canon: ${formattedVal} - VENCIDO (${firstProp.termino || 'Por Vencer'})`;
+        } else {
+          const listSummary = expiringProps.slice(0, 3).map((p: any, i: number) => {
+            const val = typeof p.valor === 'number' ? `$${p.valor.toLocaleString('es-CL')}` : (p.valor || 'N/A');
+            return `${i + 1}. ${p.direccion || 'Propiedad'} (${val} - ${p.termino || 'Por vencer'})`;
+          }).join('; ');
+          richPropParam = `Total ${expiringProps.length} contratos por vencer: ${listSummary}`;
         }
 
         // 1. Attempt custom approved Spanish template matching
