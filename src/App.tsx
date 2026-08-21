@@ -38,6 +38,8 @@ import {
   Menu,
   Zap,
   Globe,
+  Share2,
+  MessageSquare,
   Pencil,
   Headset,
   Video,
@@ -263,6 +265,7 @@ export default function App() {
   const [activeModule, setActiveModule] = useState<'dashboard' | 'properties' | 'ai' | 'expenses' | 'reports' | 'support' | 'meetings' | 'settings' | 'email' | 'admin'>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isHoveredSidebar, setIsHoveredSidebar] = useState(false);
+  const [networksTab, setNetworksTab] = useState<'whatsapp' | 'email' | 'status'>('whatsapp');
   const [isEmailConnected, setIsEmailConnected] = useState(false);
   const [connectedEmail, setConnectedEmail] = useState('');
   const [customEmailInput, setCustomEmailInput] = useState('');
@@ -2860,7 +2863,7 @@ if (!isAuthReady) return null;
             { id: 'reports', icon: <PieChart className="w-4 h-4" />, label: 'Reportes Mensuales' },
             { id: 'meetings', icon: <Video className="w-4 h-4" />, label: 'Reuniones & Meet' },
             { id: 'support', icon: <Headset className="w-4 h-4" />, label: 'Mesa de Soporte' },
-            { id: 'settings', icon: <Mail className="w-4 h-4" />, label: 'Correo' },
+            { id: 'settings', icon: <Share2 className="w-4 h-4" />, label: 'Redes & Canales' },
             ...(isAdmin ? [{ id: 'admin', icon: <ShieldCheck className="w-4 h-4" />, label: 'Admin Master' }] : [])
           ].map((item) => (
             <button
@@ -4351,214 +4354,128 @@ if (!isAuthReady) return null;
               <div className="space-y-1">
                 <h3 className="text-xl font-black text-ink uppercase tracking-tight flex items-center gap-3">
                   <span className="p-2 bg-primary/10 text-primary rounded-xl flex items-center justify-center">
-                    <Mail className="w-6 h-6" />
+                    <Share2 className="w-6 h-6" />
                   </span>
-                  Centro de Notificaciones & Correo Electrónico
+                  Redes & Canales de Comunicación
                 </h3>
                 <p className="text-xs text-muted font-medium max-w-3xl leading-relaxed">
-                  Configura tus servidores de envío (salida) a clientes y administra la casilla donde recibirás los informes de vencimientos de contratos.
+                  Administra las conexiones multicanal de tu plataforma: WhatsApp Cloud API, Servidor de Correo SMTP y estado de integraciones de fondo.
                 </p>
               </div>
 
-              <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                Sistema de Alertas Activo
-              </span>
+              {/* Top Subcategory Navigation Tabs */}
+              <div className="flex bg-gray-100 p-1.5 rounded-2xl border border-border shrink-0">
+                <button
+                  onClick={() => setNetworksTab('whatsapp')}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-2 ${
+                    networksTab === 'whatsapp'
+                      ? 'bg-emerald-600 text-white shadow-md'
+                      : 'text-muted hover:text-ink'
+                  }`}
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  WhatsApp
+                </button>
+                <button
+                  onClick={() => setNetworksTab('email')}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-2 ${
+                    networksTab === 'email'
+                      ? 'bg-primary text-white shadow-md'
+                      : 'text-muted hover:text-ink'
+                  }`}
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  Correo SMTP
+                </button>
+                <button
+                  onClick={() => setNetworksTab('status')}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-2 ${
+                    networksTab === 'status'
+                      ? 'bg-slate-900 text-white shadow-md'
+                      : 'text-muted hover:text-ink'
+                  }`}
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  Estado & Canales
+                </button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              {/* Left Column: Form Settings (Salida + Entrada) */}
-              <div className="lg:col-span-7 bg-white p-6 md:p-8 rounded-[28px] border border-border shadow-sm space-y-6">
-                
-                {/* BLOQUE 1: RECEPCION DE ALERTAS (EMAIL Y WHATSAPP) */}
-                <div className="space-y-4 pb-6 border-b border-border">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 bg-amber-50 text-amber-700 rounded-lg flex items-center justify-center font-black text-xs">1</div>
+            {/* TAB CONTENT 1: WHATSAPP CLOUD API */}
+            {networksTab === 'whatsapp' && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-in fade-in duration-300">
+                <div className="lg:col-span-7 bg-white p-6 md:p-8 rounded-[28px] border border-border shadow-sm space-y-6">
+                  <div className="flex items-center gap-3 pb-4 border-b border-border">
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                      <MessageSquare className="w-5 h-5" />
+                    </div>
                     <div>
-                      <h4 className="text-xs font-black uppercase text-primary tracking-wider">Recepción de Alertas de Vencimiento</h4>
-                      <p className="text-[10px] text-muted font-bold leading-tight">Casillas y números donde recibirás el consolidado predictivo de contratos por vencer.</p>
+                      <h4 className="text-sm font-black uppercase text-emerald-900 tracking-wider">Configuración de WhatsApp Cloud API</h4>
+                      <p className="text-[10px] text-muted font-bold">Canal directo para alertas de vencimientos de contratos y atención automatizada.</p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-4">
                     <div>
-                      <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Correo Electrónico de Recepción</label>
-                      <input
-                        type="email"
-                        placeholder="Ej: tu-correo-personal@gmail.com"
-                        value={reportEmail}
-                        onChange={(e) => setReportEmail(e.target.value)}
-                        className="w-full bg-amber-50/40 border border-amber-200/80 rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-amber-400 transition-all text-amber-900"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Número de WhatsApp (Con Código País)</label>
+                      <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Número Destino de Alertas (Con Código País)</label>
                       <input
                         type="text"
-                        placeholder="Ej: +56912345678"
+                        placeholder="Ej: +56950125765"
                         value={whatsappPhone}
                         onChange={(e) => setWhatsappPhone(e.target.value)}
-                        className="w-full bg-emerald-50/40 border border-emerald-200/80 rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-emerald-400 transition-all text-emerald-900 font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Token API de WhatsApp (Opcional para despacho masivo de fondo)</label>
-                    <input
-                      type="password"
-                      placeholder="•••••••••••••••• (Dejar en blanco para simulación o proveedor por defecto)"
-                      value={whatsappApiKey}
-                      onChange={(e) => setWhatsappApiKey(e.target.value)}
-                      className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all font-mono"
-                    />
-                    <p className="text-[9px] text-amber-700/80 font-semibold mt-1">
-                      💡 Las alertas predictivas automáticas de contratos vencidos llegarán tanto por Correo como por WhatsApp de forma 100% automatizada en segundo plano.
-                    </p>
-                  </div>
-                </div>
-
-                {/* BLOQUE 2: CREDANCIALES SMTP DE SALIDA */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 bg-primary/10 text-primary rounded-lg flex items-center justify-center font-black text-xs">2</div>
-                    <div>
-                      <h4 className="text-xs font-black uppercase text-primary tracking-wider">Credenciales del Servidor Emisor (SMTP)</h4>
-                      <p className="text-[10px] text-muted font-bold leading-tight">Datos del servidor con el que la app envía correos a dueños e inquilinos (Salida).</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4 font-medium text-xs">
-                    <div>
-                      <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Host del Servidor SMTP</label>
-                      <input
-                        type="text"
-                        placeholder="Ej: smtp.gmail.com o smtp.office365.com"
-                        value={smtpHost}
-                        onChange={(e) => setSmtpHost(e.target.value)}
-                        className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all"
+                        className="w-full bg-emerald-50/40 border border-emerald-200/80 rounded-xl p-3.5 text-xs font-bold outline-none focus:bg-white focus:border-emerald-500 transition-all text-emerald-900 font-mono"
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Puerto SMTP</label>
-                        <input
-                          type="text"
-                          placeholder="Ej: 587 o 465"
-                          value={smtpPort}
-                          onChange={(e) => setSmtpPort(e.target.value)}
-                          className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Usuario / Correo Emisor</label>
-                        <input
-                          type="email"
-                          placeholder="Ej: corredor@puntopropiedades.cl"
-                          value={smtpUser}
-                          onChange={(e) => setSmtpUser(e.target.value)}
-                          className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all"
-                        />
-                      </div>
-                    </div>
-
                     <div>
-                      <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Contraseña o Clave de Aplicación</label>
+                      <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Token Permanente / API Key de Meta WhatsApp (Opcional)</label>
                       <input
                         type="password"
-                        placeholder="••••••••••••••••"
-                        value={smtpPass}
-                        onChange={(e) => setSmtpPass(e.target.value)}
-                        className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all font-mono"
+                        placeholder="•••••••••••••••• (Utiliza el token por defecto del servidor si se omite)"
+                        value={whatsappApiKey}
+                        onChange={(e) => setWhatsappApiKey(e.target.value)}
+                        className="w-full bg-gray-50 border border-border rounded-xl p-3.5 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all font-mono"
                       />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-border">
-                  <button
-                    onClick={async () => {
-                      const updatedSettings = {
-                        ...appSettings,
-                        smtpHost,
-                        smtpPort,
-                        smtpUser,
-                        smtpPass,
-                        reportEmail: reportEmail || smtpUser,
-                        whatsappPhone,
-                        whatsappApiKey
-                      };
-                      setAppSettings(updatedSettings);
-                      await updateAppSettings(updatedSettings);
-                      showToast('✓ Configuración de notificaciones (Correo & WhatsApp) guardada con éxito', 'success');
-                    }}
-                    className="w-full bg-primary hover:bg-black text-white font-black uppercase text-[10px] tracking-widest py-4 rounded-xl transition-all shadow-md active:scale-[0.98] cursor-pointer"
-                  >
-                    💾 Guardar Toda la Configuración de Notificaciones
-                  </button>
-                </div>
-              </div>
-
-              {/* Right Column: Connection & Alert Testing */}
-              <div className="lg:col-span-5 bg-white p-6 md:p-8 rounded-[28px] border border-border shadow-sm space-y-6">
-                <div>
-                  <h4 className="text-xs font-black uppercase text-primary mb-1 tracking-wider">Centro de Pruebas Rápidas</h4>
-                  <p className="text-[10px] text-muted font-bold leading-tight">Verifica el funcionamiento del servidor SMTP y prueba el envío automático de alertas.</p>
-                </div>
-
-                {/* PRUEBA 1: ALERTA DE VENCIMIENTOS POR EMAIL */}
-                <div className="bg-amber-50/50 p-5 rounded-2xl border border-amber-200/80 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">🚨</span>
-                    <div>
-                      <h5 className="text-[11px] font-black text-amber-900 uppercase tracking-tight">Prueba de Alerta de Vencimientos por Correo</h5>
-                      <p className="text-[9.5px] text-amber-800/80 font-bold">Envía inmediatamente el informe consolidado HTML a tu casilla receptor.</p>
+                      <p className="text-[9px] text-emerald-700/80 font-semibold mt-1">
+                        💡 Las plantillas oficiales aprobadas por Meta (en español y con emojis) se despachan de fondo sin requerir interacción manual.
+                      </p>
                     </div>
                   </div>
 
-                  <button
-                    onClick={async () => {
-                      try {
-                        showToast('Ejecutando prueba de alerta de vencimientos...', 'success');
-                        const target = reportEmail || smtpUser;
-                        const res = await fetch(`/api/cron/monthly-expiry?action=monthly-expiry${target ? `&email=${encodeURIComponent(target)}` : ''}`);
-                        const text = await res.text();
-                        let data: any;
-                        try {
-                          data = JSON.parse(text);
-                        } catch (jsonErr) {
-                          showToast(`Error de Servidor (${res.status}): ${text.replace(/<[^>]*>/g, '').substring(0, 100)}`, 'error');
-                          return;
-                        }
-                        if (res.ok && data.success) {
-                          showToast(`✓ ${data.message || 'Reporte de vencimientos procesado.'}`, 'success');
-                        } else {
-                          showToast(`Error: ${data.message || data.error || data.details || 'No se pudo enviar.'}`, 'error');
-                        }
-                      } catch (err: any) {
-                        showToast(`Error de servidor: ${err.message}`, 'error');
-                      }
-                    }}
-                    className="w-full bg-amber-600 hover:bg-amber-700 text-white font-black uppercase text-[9.5px] tracking-wider py-3 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    📧 Probar Alerta de Vencimientos por Correo
-                  </button>
+                  <div className="pt-4 border-t border-border">
+                    <button
+                      onClick={async () => {
+                        const updatedSettings = {
+                          ...appSettings,
+                          whatsappPhone,
+                          whatsappApiKey
+                        };
+                        setAppSettings(updatedSettings);
+                        await updateAppSettings(updatedSettings);
+                        showToast('✓ Ajustes de WhatsApp guardados correctamente', 'success');
+                      }}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[10px] tracking-widest py-4 rounded-xl transition-all shadow-md active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      💾 Guardar Configuración de WhatsApp
+                    </button>
+                  </div>
                 </div>
 
-                {/* PRUEBA 2: ALERTA AUTOMÁTICA DE WHATSAPP (DE FONDO) */}
-                <div className="bg-emerald-50/50 p-5 rounded-2xl border border-emerald-200/80 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">💬</span>
-                    <div>
-                      <h5 className="text-[11px] font-black text-emerald-900 uppercase tracking-tight">Envío Automático de WhatsApp (Segundo Plano)</h5>
-                      <p className="text-[9.5px] text-emerald-800/80 font-bold">Prueba el envío automático desatendido directamente a tu celular.</p>
-                    </div>
+                <div className="lg:col-span-5 bg-white p-6 md:p-8 rounded-[28px] border border-border shadow-sm space-y-6">
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-emerald-900 mb-1 tracking-wider">Prueba de Envío WhatsApp</h4>
+                    <p className="text-[10px] text-muted font-bold">Verifica el despacho en segundo plano o genera enlaces interactivos.</p>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-2">
+                  <div className="bg-emerald-50/50 p-5 rounded-2xl border border-emerald-200/80 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">🤖</span>
+                      <div>
+                        <h5 className="text-[11px] font-black text-emerald-900 uppercase tracking-tight">Despacho de Fondo (Meta Cloud API)</h5>
+                        <p className="text-[9.5px] text-emerald-800/80 font-bold">Envía el mensaje formateado en español con emojis a tu WhatsApp.</p>
+                      </div>
+                    </div>
+
                     <button
                       onClick={async () => {
                         const phoneToUse = whatsappPhone || '56950125765';
@@ -4602,7 +4519,7 @@ if (!isAuthReady) return null;
                           showToast(`Error: ${err.message}`, 'error');
                         }
                       }}
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[9.5px] tracking-wider py-3 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[9.5px] tracking-wider py-3.5 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                     >
                       🤖 Probar Envío Automático de WhatsApp (De Fondo)
                     </button>
@@ -4638,71 +4555,6 @@ if (!isAuthReady) return null;
                         window.open(waUrl, '_blank');
                         showToast('✓ Abriendo mensaje formateado en WhatsApp...', 'success');
                       }}
-                      className="w-full bg-slate-800 hover:bg-slate-900 text-white font-black uppercase text-[9.5px] tracking-wider py-3 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      💬 Abrir y Enviar Resumen en WhatsApp Web / App
-                    </button>
-                  </div>
-                </div>
-
-                {/* PRUEBA 2: ENVÍO SMTP DE PRUEBA */}
-                <div className="space-y-4 pt-2 border-t border-border">
-                  <div>
-                    <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Enviar Correo de Prueba SMTP a:</label>
-                    <input
-                      type="email"
-                      placeholder="ejemplo@correo.com"
-                      value={testEmailDest}
-                      onChange={(e) => setTestEmailDest(e.target.value)}
-                      className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all"
-                    />
-                  </div>
-
-                  <button
-                    onClick={async () => {
-                      if (!testEmailDest) {
-                        showToast('Ingresa un correo de destino para la prueba', 'error');
-                        return;
-                      }
-                      setLoading(true);
-                      setLoadingStatus('Enviando correo de prueba...');
-                      try {
-                        const res = await fetch('/api/send-report', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            to: testEmailDest,
-                            subject: 'Punto Propiedades - Prueba de Correo SMTP',
-                            body: '¡Éxito! Tu configuración de servidor de correo en Punto Propiedades funciona correctamente.',
-                            smtpConfig: {
-                              host: smtpHost,
-                              port: smtpPort,
-                              user: smtpUser,
-                              pass: smtpPass
-                            }
-                          })
-                        });
-                        const text = await res.text();
-                        let data: any;
-                        try {
-                          data = JSON.parse(text);
-                        } catch (e) {
-                          showToast(`Respuesta (${res.status}): ${text.substring(0, 80)}`, 'error');
-                          return;
-                        }
-                        if (res.ok && data.success) {
-                          showToast('✓ Correo de prueba enviado con éxito', 'success');
-                        } else {
-                          showToast(`Error: ${data.message || data.error || 'Fallo en la prueba.'}`, 'error');
-                        }
-                      } catch (err: any) {
-                        showToast(`Error al enviar: ${err.message}`, 'error');
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
-                    disabled={loading}
-                    className="w-full bg-slate-900 hover:bg-black text-white font-black uppercase text-[9.5px] tracking-wider py-3.5 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                   >
                     ✓ Enviar Correo de Prueba SMTP
                   </button>
