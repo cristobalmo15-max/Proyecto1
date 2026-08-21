@@ -4555,22 +4555,14 @@ if (!isAuthReady) return null;
                         window.open(waUrl, '_blank');
                         showToast('✓ Abriendo mensaje formateado en WhatsApp...', 'success');
                       }}
-                  >
-                    ✓ Enviar Correo de Prueba SMTP
-                  </button>
-
-                  <div className="p-4 bg-slate-50 border border-border rounded-2xl text-[10px] text-muted leading-relaxed font-semibold">
-                    <p className="font-black text-ink uppercase mb-1">💡 Consejos de Conexión:</p>
-                    <ul className="list-disc pl-4 space-y-1">
-                      <li><strong>Gmail:</strong> Requiere habilitar la verificación en dos pasos y generar una <em>Contraseña de Aplicación</em>.</li>
-                      <li><strong>Office 365 / Outlook:</strong> Requiere verificar si tu tenant permite la autenticación SMTP básica.</li>
-                      <li><strong>Puerto 587:</strong> Recomendado para conexiones STARTTLS estándar.</li>
-                    </ul>
+                      className="w-full bg-slate-800 hover:bg-slate-900 text-white font-black uppercase text-[9.5px] tracking-wider py-3.5 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      💬 Abrir y Enviar Resumen en WhatsApp Web / App
+                    </button>
                   </div>
                 </div>
-
               </div>
-            </div>
+            )}
           </div>
         )}
 
