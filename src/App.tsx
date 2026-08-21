@@ -4563,6 +4563,259 @@ if (!isAuthReady) return null;
                 </div>
               </div>
             )}
+
+            {/* TAB CONTENT 2: CORREO ELECTRÓNICO (SMTP) */}
+            {networksTab === 'email' && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-in fade-in duration-300">
+                <div className="lg:col-span-7 bg-white p-6 md:p-8 rounded-[28px] border border-border shadow-sm space-y-6">
+                  <div className="flex items-center gap-3 pb-4 border-b border-border">
+                    <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                      <Mail className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black uppercase text-primary tracking-wider">Servidor de Correo Emisor (SMTP)</h4>
+                      <p className="text-[10px] text-muted font-bold">Configura el servidor con el que la app envía informes y alertas de correo.</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Correo Receptor de Alertas de Vencimiento</label>
+                      <input
+                        type="email"
+                        placeholder="Ej: tu-correo-personal@gmail.com"
+                        value={reportEmail}
+                        onChange={(e) => setReportEmail(e.target.value)}
+                        className="w-full bg-amber-50/40 border border-amber-200/80 rounded-xl p-3.5 text-xs font-semibold outline-none focus:bg-white focus:border-amber-400 transition-all text-amber-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Host del Servidor SMTP</label>
+                      <input
+                        type="text"
+                        placeholder="Ej: smtp.gmail.com o smtp.office365.com"
+                        value={smtpHost}
+                        onChange={(e) => setSmtpHost(e.target.value)}
+                        className="w-full bg-gray-50 border border-border rounded-xl p-3.5 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Puerto SMTP</label>
+                        <input
+                          type="text"
+                          placeholder="Ej: 587 o 465"
+                          value={smtpPort}
+                          onChange={(e) => setSmtpPort(e.target.value)}
+                          className="w-full bg-gray-50 border border-border rounded-xl p-3.5 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Usuario / Correo Emisor</label>
+                        <input
+                          type="email"
+                          placeholder="Ej: corredor@puntopropiedades.cl"
+                          value={smtpUser}
+                          onChange={(e) => setSmtpUser(e.target.value)}
+                          className="w-full bg-gray-50 border border-border rounded-xl p-3.5 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Contraseña o Clave de Aplicación</label>
+                      <input
+                        type="password"
+                        placeholder="••••••••••••••••"
+                        value={smtpPass}
+                        onChange={(e) => setSmtpPass(e.target.value)}
+                        className="w-full bg-gray-50 border border-border rounded-xl p-3.5 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-border">
+                    <button
+                      onClick={async () => {
+                        const updatedSettings = {
+                          ...appSettings,
+                          smtpHost,
+                          smtpPort,
+                          smtpUser,
+                          smtpPass,
+                          reportEmail: reportEmail || smtpUser
+                        };
+                        setAppSettings(updatedSettings);
+                        await updateAppSettings(updatedSettings);
+                        showToast('✓ Ajustes de Correo SMTP guardados correctamente', 'success');
+                      }}
+                      className="w-full bg-primary hover:bg-black text-white font-black uppercase text-[10px] tracking-widest py-4 rounded-xl transition-all shadow-md active:scale-[0.98] cursor-pointer"
+                    >
+                      💾 Guardar Configuración de Correo SMTP
+                    </button>
+                  </div>
+                </div>
+
+                <div className="lg:col-span-5 bg-white p-6 md:p-8 rounded-[28px] border border-border shadow-sm space-y-6">
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-primary mb-1 tracking-wider">Pruebas de Correo SMTP</h4>
+                    <p className="text-[10px] text-muted font-bold">Verifica el despacho de alertas o correos de prueba individuales.</p>
+                  </div>
+
+                  <div className="bg-amber-50/50 p-5 rounded-2xl border border-amber-200/80 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">🚨</span>
+                      <div>
+                        <h5 className="text-[11px] font-black text-amber-900 uppercase tracking-tight">Alerta de Vencimientos por Correo</h5>
+                        <p className="text-[9.5px] text-amber-800/80 font-bold">Envía el informe consolidado a tu casilla configurada.</p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={async () => {
+                        try {
+                          showToast('Ejecutando prueba de alerta de vencimientos...', 'success');
+                          const target = reportEmail || smtpUser;
+                          const res = await fetch(`/api/cron/monthly-expiry?action=monthly-expiry${target ? `&email=${encodeURIComponent(target)}` : ''}`);
+                          const text = await res.text();
+                          let data: any;
+                          try {
+                            data = JSON.parse(text);
+                          } catch (jsonErr) {
+                            showToast(`Error de Servidor (${res.status}): ${text.replace(/<[^>]*>/g, '').substring(0, 100)}`, 'error');
+                            return;
+                          }
+                          if (res.ok && data.success) {
+                            showToast(`✓ ${data.message || 'Reporte de vencimientos procesado.'}`, 'success');
+                          } else {
+                            showToast(`Error: ${data.message || data.error || data.details || 'No se pudo enviar.'}`, 'error');
+                          }
+                        } catch (err: any) {
+                          showToast(`Error de servidor: ${err.message}`, 'error');
+                        }
+                      }}
+                      className="w-full bg-amber-600 hover:bg-amber-700 text-white font-black uppercase text-[9.5px] tracking-wider py-3.5 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      📧 Probar Alerta de Vencimientos por Correo
+                    </button>
+                  </div>
+
+                  <div className="space-y-4 pt-4 border-t border-border">
+                    <div>
+                      <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Enviar Correo de Prueba SMTP a:</label>
+                      <input
+                        type="email"
+                        placeholder="ejemplo@correo.com"
+                        value={testEmailDest}
+                        onChange={(e) => setTestEmailDest(e.target.value)}
+                        className="w-full bg-gray-50 border border-border rounded-xl p-3 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all"
+                      />
+                    </div>
+
+                    <button
+                      onClick={async () => {
+                        if (!testEmailDest) {
+                          showToast('Ingresa un correo de destino para la prueba', 'error');
+                          return;
+                        }
+                        setLoading(true);
+                        setLoadingStatus('Enviando correo de prueba...');
+                        try {
+                          const res = await fetch('/api/send-report', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              to: testEmailDest,
+                              subject: 'Punto Propiedades - Prueba de Correo SMTP',
+                              body: '¡Éxito! Tu configuración de servidor de correo en Punto Propiedades funciona correctamente.',
+                              smtpConfig: {
+                                host: smtpHost,
+                                port: smtpPort,
+                                user: smtpUser,
+                                pass: smtpPass
+                              }
+                            })
+                          });
+                          const text = await res.text();
+                          let data: any;
+                          try {
+                            data = JSON.parse(text);
+                          } catch (e) {
+                            showToast(`Respuesta (${res.status}): ${text.substring(0, 80)}`, 'error');
+                            return;
+                          }
+                          if (res.ok && data.success) {
+                            showToast('✓ Correo de prueba enviado con éxito', 'success');
+                          } else {
+                            showToast(`Error: ${data.message || data.error || 'Fallo en la prueba.'}`, 'error');
+                          }
+                        } catch (err: any) {
+                          showToast(`Error: ${err.message}`, 'error');
+                        } finally {
+                          setLoading(false);
+                        }
+                      }}
+                      className="w-full bg-slate-800 hover:bg-slate-900 text-white font-black uppercase text-[9.5px] tracking-wider py-3.5 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      ✉️ Enviar Correo Individual de Prueba
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB CONTENT 3: ESTADO & CANALES MULTICANAL */}
+            {networksTab === 'status' && (
+              <div className="bg-white p-6 md:p-8 rounded-[28px] border border-border shadow-sm space-y-6 animate-in fade-in duration-300 max-w-4xl mx-auto">
+                <div className="text-center space-y-2">
+                  <h4 className="text-lg font-black uppercase text-ink tracking-wider">Estado Global de Conexiones Multicanal</h4>
+                  <p className="text-xs text-muted font-bold">Monitoreo activo de tus integraciones automáticas para despachos de fondo.</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* WhatsApp Status Card */}
+                  <div className="p-6 rounded-[24px] bg-emerald-50/40 border border-emerald-200/80 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-2xl">💬</span>
+                      <span className="bg-emerald-100 text-emerald-800 text-[9px] font-black uppercase px-3 py-1 rounded-full border border-emerald-200">
+                        Activo & Aprobado
+                      </span>
+                    </div>
+                    <div>
+                      <h5 className="text-sm font-black text-emerald-950 uppercase">Meta WhatsApp Cloud API</h5>
+                      <p className="text-[11px] text-emerald-800/80 font-bold mt-1">
+                        Destino: {whatsappPhone || '+56950125765'}
+                      </p>
+                      <p className="text-[10px] text-emerald-700/70 font-mono mt-0.5">
+                        Plantilla Aprobada: alerta_vencimiento_cc (Español / Emojis)
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Email SMTP Status Card */}
+                  <div className="p-6 rounded-[24px] bg-amber-50/40 border border-amber-200/80 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-2xl">📧</span>
+                      <span className="bg-amber-100 text-amber-800 text-[9px] font-black uppercase px-3 py-1 rounded-full border border-amber-200">
+                        {smtpHost ? 'Configurado' : 'Modo Simulación'}
+                      </span>
+                    </div>
+                    <div>
+                      <h5 className="text-sm font-black text-amber-950 uppercase">Servidor Emisor SMTP</h5>
+                      <p className="text-[11px] text-amber-800/80 font-bold mt-1">
+                        Servidor: {smtpHost || 'Simulación Local'} ({smtpPort || '587'})
+                      </p>
+                      <p className="text-[10px] text-amber-700/70 font-mono mt-0.5">
+                        Receptor: {reportEmail || smtpUser || 'Sin definir'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
