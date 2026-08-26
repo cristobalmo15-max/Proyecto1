@@ -78,19 +78,34 @@ export default async function handler(req: any, res: any) {
         // Format rich property parameter for Spanish custom template {{1}}
         let richPropParam = '';
         if (expiringProps.length === 0) {
-          richPropParam = 'No hay contratos por vencer en el período seleccionado.';
-        } else if (expiringProps.length === 1) {
-          const firstProp = expiringProps[0];
-          const formattedVal = typeof firstProp.valor === 'number' 
-            ? `$${firstProp.valor.toLocaleString('es-CL')}` 
-            : (firstProp.valor ? `$${firstProp.valor}` : 'N/A');
-          richPropParam = `${firstProp.direccion || 'Propiedad'} (Dueño: ${firstProp.dueno || 'N/A'}) - Canon: ${formattedVal} - VENCIDO (${firstProp.termino || 'Por Vencer'})`;
+          richPropParam = 'No hay contratos vencidos ni por vencer en el período seleccionado.';
         } else {
-          const listSummary = expiringProps.slice(0, 3).map((p: any, i: number) => {
-            const val = typeof p.valor === 'number' ? `$${p.valor.toLocaleString('es-CL')}` : (p.valor || 'N/A');
-            return `${i + 1}. ${p.direccion || 'Propiedad'} (${val} - ${p.termino || 'Por vencer'})`;
-          }).join('; ');
-          richPropParam = `Total ${expiringProps.length} contratos por vencer: ${listSummary}`;
+          const today = new Date();
+          today.setHours(0,0,0,0);
+          
+          const expiredItems: string[] = [];
+          const upcomingItems: string[] = [];
+
+          expiringProps.forEach((p: any) => {
+            const val = typeof p.valor === 'number' ? `$${p.valor.toLocaleString('es-CL')}` : (p.valor ? `$${p.valor}` : 'N/A');
+            const isExp = p.termino ? new Date(p.termino + 'T12:00:00') <= today : false;
+            const str = `${p.direccion || 'Propiedad'} (${val} - ${p.termino || 'Sin Fecha'})`;
+            if (isExp) {
+              expiredItems.push(str);
+            } else {
+              upcomingItems.push(str);
+            }
+          });
+
+          let summaryParts = [];
+          if (expiredItems.length > 0) {
+            summaryParts.push(`🚨 ${expiredItems.length} VENCIDOS: ${expiredItems.slice(0, 2).join(', ')}`);
+          }
+          if (upcomingItems.length > 0) {
+            summaryParts.push(`⏳ ${upcomingItems.length} POR VENCER: ${upcomingItems.slice(0, 2).join(', ')}`);
+          }
+          
+          richPropParam = `Reporte Total (${expiringProps.length}): ${summaryParts.join(' | ')}`;
         }
 
         // 1. Attempt custom approved Spanish template matching
