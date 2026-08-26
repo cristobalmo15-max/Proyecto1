@@ -194,9 +194,19 @@ export default async function handler(req: any, res: any) {
           });
         }
 
+        const errCode = templateData.error?.code || spanishData?.error?.code;
+        const errDetails = templateData.error?.message || spanishData?.error?.message || 'Error de API Meta';
+
+        if (errCode === 131030) {
+          return res.status(200).json({
+            success: false,
+            error: `⚠️ Meta Cloud API (Sandbox): El número +${formattedPhone} no está en la lista de destinatarios de prueba de la consola Meta. Por favor presiona "💬 Abrir Resumen en WhatsApp Web" para enviarlo directamente.`
+          });
+        }
+
         return res.status(200).json({
           success: false,
-          error: `Meta Cloud API Error (${templateData.error?.code}): ${templateData.error?.message}`
+          error: `Meta Cloud API Error (${errCode}): ${errDetails}`
         });
       } catch (metaErr: any) {
         console.error('[Meta Cloud API Fetch Exception]:', metaErr);
