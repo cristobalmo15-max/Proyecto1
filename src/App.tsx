@@ -778,39 +778,38 @@ export default function App() {
 
   useEffect(() => {
     if (!user) return;
-    const settingsRef = doc(db, 'settings', user.uid);
-    const unsubscribe = onSnapshot(settingsRef, (snapshot) => {
-      console.log('[DEBUG] onSnapshot update:', snapshot.data());
-      if (snapshot.exists()) {
-        setAppSettings(snapshot.data() as any);
+    const globalRef = doc(db, 'settings', 'global');
+    const userRef = doc(db, 'settings', user.uid);
+
+    const unsubGlobal = onSnapshot(globalRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        console.log('[DEBUG] Global settings synced:', data);
+        setAppSettings(curr => ({ ...curr, ...data }));
       }
     });
-    return () => unsubscribe();
-  }, [user]);
 
-  useEffect(() => {
-    if (!user || properties.length === 0) return;
-    
-    // Check for deep link to specific property
-    const params = new URLSearchParams(window.location.search);
-    const propId = params.get('propId');
-    if (propId) {
-      const target = properties.find(p => p.id === propId);
-      if (target) {
-        setSelectedProp(target);
-        setActiveModule('properties');
-        showToast(`Cargando: ${target.direccion}`);
-        // Clean URL to avoid re-triggering
-        window.history.replaceState({}, '', window.location.pathname);
+    const unsubUser = onSnapshot(userRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        console.log('[DEBUG] User settings synced:', data);
+        setAppSettings(curr => ({ ...curr, ...data }));
       }
-    }
-  }, [user, properties]);
+    });
+
+    return () => {
+      unsubGlobal();
+      unsubUser();
+    };
+  }, [user]);
 
   const updateAppSettings = async (newSettings: any) => {
     if (!user) return;
     try {
+      // Guardar a nivel global y a nivel usuario para sincro total de sub-cuentas
+      await setDoc(doc(db, 'settings', 'global'), newSettings, { merge: true });
       await setDoc(doc(db, 'settings', user.uid), newSettings, { merge: true });
-      showToast('Configuraciones guardadas');
+      showToast('Configuraciones guardadas a nivel global');
     } catch (err) {
       showToast('Error al guardar configuraciones', 'error');
     }
@@ -4482,30 +4481,43 @@ if (!isAuthReady) return null;
                   </div>
 
                   <div className="space-y-4">
+                    {!isAdmin && (
+                      <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-1">
+                        <div className="flex items-center gap-2 text-emerald-800 font-black text-xs uppercase">
+                          <span>🌐 Conexión Centralizada de Empresa</span>
+                        </div>
+                        <p className="text-[10px] text-emerald-900/80 font-medium leading-relaxed">
+                          La integración con <strong>Meta WhatsApp Cloud API</strong> está administrada centralmente por el Administrador General (Cristóbal Morales). Tu cuenta utiliza automáticamente las credenciales oficiales de la empresa para todas las alertas y pruebas.
+                        </p>
+                      </div>
+                    )}
+
                     <div>
                       <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Número Destino de Alertas (Con Código País)</label>
                       <input
                         type="text"
                         placeholder="Ej: +56950125765"
-                        value={whatsappPhone}
+                        value={whatsappPhone || '56950125765'}
                         onChange={(e) => setWhatsappPhone(e.target.value)}
                         className="w-full bg-emerald-50/40 border border-emerald-200/80 rounded-xl p-3.5 text-xs font-bold outline-none focus:bg-white focus:border-emerald-500 transition-all text-emerald-900 font-mono"
                       />
                     </div>
 
-                    <div>
-                      <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Token Permanente / API Key de Meta WhatsApp (Opcional)</label>
-                      <input
-                        type="password"
-                        placeholder="•••••••••••••••• (Utiliza el token por defecto del servidor si se omite)"
-                        value={whatsappApiKey}
-                        onChange={(e) => setWhatsappApiKey(e.target.value)}
-                        className="w-full bg-gray-50 border border-border rounded-xl p-3.5 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all font-mono"
-                      />
-                      <p className="text-[9px] text-emerald-700/80 font-semibold mt-1">
-                        💡 Las plantillas oficiales aprobadas por Meta (en español y con emojis) se despachan de fondo sin requerir interacción manual.
-                      </p>
-                    </div>
+                    {isAdmin && (
+                      <div>
+                        <label className="text-[9px] font-black uppercase text-muted tracking-widest block mb-1">Token Permanente / API Key de Meta WhatsApp (Administrador)</label>
+                        <input
+                          type="password"
+                          placeholder="•••••••••••••••• (Token de Usuario de Sistema de Meta)"
+                          value={whatsappApiKey}
+                          onChange={(e) => setWhatsappApiKey(e.target.value)}
+                          className="w-full bg-gray-50 border border-border rounded-xl p-3.5 text-xs font-semibold outline-none focus:bg-white focus:border-accent transition-all font-mono"
+                        />
+                        <p className="text-[9px] text-emerald-700/80 font-semibold mt-1">
+                          💡 Al actualizar este token como Administrador, quedará activo automáticamente para todas las cuentas vinculadas.
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   {/* BLOQUE DE CONTROL PERSONALIZADO: X PLAZO Y X DÍAS */}
