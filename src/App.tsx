@@ -4501,6 +4501,9 @@ if (!isAuthReady) return null;
                         onChange={(e) => setWhatsappPhone(e.target.value)}
                         className="w-full bg-emerald-50/40 border border-emerald-200/80 rounded-xl p-3.5 text-xs font-bold outline-none focus:bg-white focus:border-emerald-500 transition-all text-emerald-900 font-mono"
                       />
+                      <p className="text-[9px] text-muted font-semibold mt-1">
+                        💡 <strong>Para enviar a cualquier número sin restricciones de Meta Sandbox:</strong> Presiona el botón <em>"💬 Abrir Resumen en WhatsApp Web"</em> a la derecha.
+                      </p>
                     </div>
 
                     {isAdmin && (
