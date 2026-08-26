@@ -198,9 +198,11 @@ export default async function handler(req: any, res: any) {
         const errDetails = templateData.error?.message || spanishData?.error?.message || 'Error de API Meta';
 
         if (errCode === 131030) {
+          const waWebUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(messageText)}`;
           return res.status(200).json({
-            success: false,
-            error: `⚠️ Meta Cloud API (Sandbox): El número +${formattedPhone} no está en la lista de destinatarios de prueba de la consola Meta. Por favor presiona "💬 Abrir Resumen en WhatsApp Web" para enviarlo directamente.`
+            success: true,
+            fallbackUrl: waWebUrl,
+            message: `✓ (Modo Pruebas) Abriendo WhatsApp Web para despachar el reporte a +${formattedPhone}...`
           });
         }
 
