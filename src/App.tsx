@@ -781,19 +781,38 @@ export default function App() {
     const globalRef = doc(db, 'settings', 'global');
     const userRef = doc(db, 'settings', user.uid);
 
+    let globalData: any = {};
+    let userData: any = {};
+
+    const syncCombined = () => {
+      const combined = {
+        ...globalData,
+        ...userData,
+        // Master API token inherited from global if not overridden by user
+        whatsappApiKey: userData?.whatsappApiKey || globalData?.whatsappApiKey || '',
+        // Master SMTP host/user inherited if not overridden
+        smtpHost: userData?.smtpHost || globalData?.smtpHost || '',
+        smtpPort: userData?.smtpPort || globalData?.smtpPort || '587',
+        smtpUser: userData?.smtpUser || globalData?.smtpUser || '',
+        smtpPass: userData?.smtpPass || globalData?.smtpPass || '',
+        // Individual destination phone per account
+        whatsappPhone: userData?.whatsappPhone || globalData?.whatsappPhone || '56950125765',
+        whatsappAutoReport: userData?.whatsappAutoReport || globalData?.whatsappAutoReport
+      };
+      setAppSettings(combined);
+    };
+
     const unsubGlobal = onSnapshot(globalRef, (snap) => {
       if (snap.exists()) {
-        const data = snap.data();
-        console.log('[DEBUG] Global settings synced:', data);
-        setAppSettings(curr => ({ ...curr, ...data }));
+        globalData = snap.data();
+        syncCombined();
       }
     });
 
     const unsubUser = onSnapshot(userRef, (snap) => {
       if (snap.exists()) {
-        const data = snap.data();
-        console.log('[DEBUG] User settings synced:', data);
-        setAppSettings(curr => ({ ...curr, ...data }));
+        userData = snap.data();
+        syncCombined();
       }
     });
 
@@ -806,12 +825,22 @@ export default function App() {
   const updateAppSettings = async (newSettings: any) => {
     if (!user) return;
     try {
-      // Guardar a nivel global y a nivel usuario para sincro total de sub-cuentas
-      await setDoc(doc(db, 'settings', 'global'), newSettings, { merge: true });
+      if (isAdmin) {
+        // As admin (cristobalmo15), update global master credentials for all accounts
+        await setDoc(doc(db, 'settings', 'global'), {
+          whatsappApiKey: newSettings.whatsappApiKey || '',
+          smtpHost: newSettings.smtpHost || '',
+          smtpPort: newSettings.smtpPort || '587',
+          smtpUser: newSettings.smtpUser || '',
+          smtpPass: newSettings.smtpPass || '',
+          whatsappAutoReport: newSettings.whatsappAutoReport
+        }, { merge: true });
+      }
+      // Save individual account settings (such as personal target phone)
       await setDoc(doc(db, 'settings', user.uid), newSettings, { merge: true });
-      showToast('Configuraciones guardadas a nivel global');
+      showToast('Configuración guardada correctamente');
     } catch (err) {
-      showToast('Error al guardar configuraciones', 'error');
+      showToast('Error al guardar configuración', 'error');
     }
   };
 
