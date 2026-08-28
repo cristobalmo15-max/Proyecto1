@@ -121,14 +121,14 @@ export default async function handler(req: any, res: any) {
           const sectionLines: string[] = [];
 
           if (expiredList.length > 0) {
-            sectionLines.push(`🚨 *CONTRATOS VENCIDOS (${expiredList.length}):*\n\n` + expiredList.join('\n\n'));
+            sectionLines.push(`🚨 *CONTRATOS VENCIDOS (${expiredList.length}):*\n` + expiredList.join('\n'));
           }
 
           if (upcomingList.length > 0) {
-            sectionLines.push(`⏳ *CONTRATOS POR VENCER (${upcomingList.length}):*\n\n` + upcomingList.join('\n\n'));
+            sectionLines.push(`⏳ *CONTRATOS POR VENCER (${upcomingList.length}):*\n` + upcomingList.join('\n'));
           }
 
-          richPropParam = sectionLines.join('\n\n');
+          richPropParam = sectionLines.join('\n');
         }
 
         // 1. Attempt custom approved Spanish template matching
@@ -154,13 +154,23 @@ export default async function handler(req: any, res: any) {
                     {
                       type: 'body',
                       parameters: [
-                        { type: 'text', text: richPropParam.substring(0, 900) }
+                        { type: 'text', text: richPropParam.substring(0, 480) }
                       ]
                     }
                   ]
                 }
               })
             });
+
+            const spanishData = await spanishRes.json();
+            if (spanishRes.ok && spanishData.messages) {
+              return res.status(200).json({
+                success: true,
+                message: `✓ Alerta oficial de WhatsApp en Español enviada a +${formattedPhone}. (Plantilla: '${tName}', ID: ${spanishData.messages[0]?.id})`
+              });
+            }
+          }
+        }
 
             const spanishData = await spanishRes.json();
             if (spanishRes.ok && spanishData.messages) {
