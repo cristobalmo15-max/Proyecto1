@@ -94,37 +94,60 @@ export default async function handler(req: any, res: any) {
           return `$${Number(clean).toLocaleString('es-CL')}`;
         };
 
+        const formatChileanDate = (dateStr?: string) => {
+          if (!dateStr) return 'Sin fecha';
+          if (dateStr.includes('-')) {
+            const parts = dateStr.split('-');
+            if (parts.length === 3 && parts[0].length === 4) {
+              return `${parts[2]}/${parts[1]}/${parts[0]}`;
+            }
+          }
+          return dateStr;
+        };
+
+        const formatClp = (val?: any) => {
+          if (typeof val === 'number') return `$${val.toLocaleString('es-CL')}`;
+          if (!val) return '$0';
+          const clean = String(val).replace(/[^0-9]/g, '');
+          if (!clean) return `$${val}`;
+          return `$${Number(clean).toLocaleString('es-CL')}`;
+        };
+
         // Format rich property parameter for Spanish custom template {{1}}
         let richPropParam = '';
         if (expiringProps.length === 0) {
-          richPropParam = 'No hay contratos vencidos ni por vencer en el período seleccionado.';
+          richPropParam = '✅ No hay contratos vencidos ni por vencer en el período seleccionado.';
         } else {
           const today = new Date();
           today.setHours(0,0,0,0);
           
-          const expiredItems: string[] = [];
-          const upcomingItems: string[] = [];
+          const expiredList: string[] = [];
+          const upcomingList: string[] = [];
 
           expiringProps.forEach((p: any) => {
-            const val = typeof p.valor === 'number' ? `$${p.valor.toLocaleString('es-CL')}` : (p.valor ? `$${p.valor}` : 'N/A');
             const isExp = p.termino ? new Date(p.termino + 'T12:00:00') <= today : false;
-            const str = `${p.direccion || 'Propiedad'} (${val} - ${p.termino || 'Sin Fecha'})`;
+            const valFormatted = formatClp(p.valor);
+            const dateFormatted = formatChileanDate(p.termino);
+            const itemStr = `• *${p.direccion || 'Propiedad'}* (${valFormatted} • ${dateFormatted})`;
+
             if (isExp) {
-              expiredItems.push(str);
+              expiredList.push(itemStr);
             } else {
-              upcomingItems.push(str);
+              upcomingList.push(itemStr);
             }
           });
 
-          let summaryParts = [];
-          if (expiredItems.length > 0) {
-            summaryParts.push(`🚨 ${expiredItems.length} VENCIDOS: ${expiredItems.slice(0, 2).join(', ')}`);
+          const summaryParts: string[] = [];
+
+          if (expiredList.length > 0) {
+            summaryParts.push(`🚨 *VENCIDOS (${expiredList.length})*: ${expiredList.join(' ➔ ')}`);
           }
-          if (upcomingItems.length > 0) {
-            summaryParts.push(`⏳ ${upcomingItems.length} POR VENCER: ${upcomingItems.slice(0, 2).join(', ')}`);
+
+          if (upcomingList.length > 0) {
+            summaryParts.push(`⏳ *POR VENCER (${upcomingList.length})*: ${upcomingList.join(' ➔ ')}`);
           }
-          
-          richPropParam = `Reporte Total (${expiringProps.length}): ${summaryParts.join(' | ')}`;
+
+          richPropParam = `📋 Total: ${expiringProps.length} Contratos ➔ ${summaryParts.join(' | ')}`;
         }
 
         // 1. Attempt custom approved Spanish template matching
