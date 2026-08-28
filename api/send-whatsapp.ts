@@ -97,14 +97,14 @@ export default async function handler(req: any, res: any) {
         // Format rich property parameter for Spanish custom template {{1}}
         let richPropParam = '';
         let multiLinePropParam = '';
+        const expiredList: string[] = [];
+        const upcomingList: string[] = [];
+
         if (expiringProps.length === 0) {
           richPropParam = '✅ No hay contratos vencidos ni por vencer en el período seleccionado.';
         } else {
           const today = new Date();
           today.setHours(0,0,0,0);
-          
-          const expiredList: string[] = [];
-          const upcomingList: string[] = [];
 
           expiringProps.forEach((p: any) => {
             const isExp = p.termino ? new Date(p.termino + 'T12:00:00') <= today : false;
@@ -150,17 +150,47 @@ export default async function handler(req: any, res: any) {
         const customLangs = ['es', 'es_LA', 'es_ES', 'es_MX', 'es_CL'];
         let lastSpanishData: any = null;
 
-            const safeTruncate = (str: string, maxLen: number) => {
-              if (str.length <= maxLen) return str;
-              const sub = str.substring(0, maxLen - 12);
-              const lastSep = sub.lastIndexOf(' ➔ ');
-              if (lastSep > 20) {
-                return sub.substring(0, lastSep) + ' (+ más...)';
-              }
-              return sub + '...';
-            };
+        const safeTruncate = (str: string, maxLen: number) => {
+          if (str.length <= maxLen) return str;
+          const sub = str.substring(0, maxLen - 12);
+          const lastSep = sub.lastIndexOf(' ➔ ');
+          if (lastSep > 20) {
+            return sub.substring(0, lastSep) + ' (+ más...)';
+          }
+          return sub + '...';
+        };
 
-            const paramToSend = (tName === 'alerta_vencimiento_multilinea' && multiLinePropParam) ? multiLinePropParam : richPropParam;
+        for (const tName of customNames) {
+          for (const cLang of customLangs) {
+            let templateComponents: any[] = [];
+
+            if (tName === 'alerta_vencimiento_multilinea') {
+              const expiredText = expiredList.length > 0 
+                ? safeTruncate(expiredList.join('\n'), 450) 
+                : '• Ningún contrato vencido';
+              const upcomingText = upcomingList.length > 0 
+                ? safeTruncate(upcomingList.join('\n'), 450) 
+                : '• Ningún contrato por vencer';
+
+              templateComponents = [
+                {
+                  type: 'body',
+                  parameters: [
+                    { type: 'text', text: expiredText },
+                    { type: 'text', text: upcomingText }
+                  ]
+                }
+              ];
+            } else {
+              templateComponents = [
+                {
+                  type: 'body',
+                  parameters: [
+                    { type: 'text', text: safeTruncate(richPropParam, 780) }
+                  ]
+                }
+              ];
+            }
 
             const spanishRes = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
               method: 'POST',
@@ -175,14 +205,7 @@ export default async function handler(req: any, res: any) {
                 template: {
                   name: tName,
                   language: { code: cLang },
-                  components: [
-                    {
-                      type: 'body',
-                      parameters: [
-                        { type: 'text', text: safeTruncate(paramToSend, 780) }
-                      ]
-                    }
-                  ]
+                  components: templateComponents
                 }
               })
             });
