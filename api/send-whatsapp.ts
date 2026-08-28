@@ -94,25 +94,6 @@ export default async function handler(req: any, res: any) {
           return `$${Number(clean).toLocaleString('es-CL')}`;
         };
 
-        const formatChileanDate = (dateStr?: string) => {
-          if (!dateStr) return 'Sin fecha';
-          if (dateStr.includes('-')) {
-            const parts = dateStr.split('-');
-            if (parts.length === 3 && parts[0].length === 4) {
-              return `${parts[2]}/${parts[1]}/${parts[0]}`;
-            }
-          }
-          return dateStr;
-        };
-
-        const formatClp = (val?: any) => {
-          if (typeof val === 'number') return `$${val.toLocaleString('es-CL')}`;
-          if (!val) return '$0';
-          const clean = String(val).replace(/[^0-9]/g, '');
-          if (!clean) return `$${val}`;
-          return `$${Number(clean).toLocaleString('es-CL')}`;
-        };
-
         // Format rich property parameter for Spanish custom template {{1}}
         let richPropParam = '';
         let multiLinePropParam = '';
@@ -167,6 +148,7 @@ export default async function handler(req: any, res: any) {
         // 1. Attempt custom approved Spanish template matching
         const customNames = ['alerta_vencimiento_multilinea', 'alerta_vencimiento_contrato', 'alerta_vencimiento_contra', 'alerta_vencimiento_co', 'alerta_vencimiento_cc', 'alerta_vencimiento'];
         const customLangs = ['es', 'es_LA', 'es_ES', 'es_MX', 'es_CL'];
+        let lastSpanishData: any = null;
 
         for (const tName of customNames) {
           for (const cLang of customLangs) {
@@ -198,6 +180,7 @@ export default async function handler(req: any, res: any) {
             });
 
             const spanishData = await spanishRes.json();
+            lastSpanishData = spanishData;
             if (spanishRes.ok && spanishData.messages) {
               return res.status(200).json({
                 success: true,
@@ -252,8 +235,8 @@ export default async function handler(req: any, res: any) {
           });
         }
 
-        const errCode = templateData.error?.code || spanishData?.error?.code;
-        const errDetails = templateData.error?.message || spanishData?.error?.message || 'Error de API Meta';
+        const errCode = templateData.error?.code || lastSpanishData?.error?.code;
+        const errDetails = templateData.error?.message || lastSpanishData?.error?.message || 'Error de API Meta';
 
         if (errCode === 131030) {
           const waWebUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(messageText)}`;
