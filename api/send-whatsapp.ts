@@ -115,6 +115,7 @@ export default async function handler(req: any, res: any) {
 
         // Format rich property parameter for Spanish custom template {{1}}
         let richPropParam = '';
+        let multiLinePropParam = '';
         if (expiringProps.length === 0) {
           richPropParam = '✅ No hay contratos vencidos ni por vencer en el período seleccionado.';
         } else {
@@ -148,14 +149,26 @@ export default async function handler(req: any, res: any) {
           }
 
           richPropParam = `📋 Total: ${expiringProps.length} Contratos ➔ ${summaryParts.join(' | ')}`;
+
+          // Build multiline layout for multiline template
+          const multiSections: string[] = [];
+          if (expiredList.length > 0) {
+            multiSections.push(`🚨 *CONTRATOS VENCIDOS (${expiredList.length}):*\n\n` + expiredList.join('\n\n'));
+          }
+          if (upcomingList.length > 0) {
+            multiSections.push(`⏳ *CONTRATOS POR VENCER (${upcomingList.length}):*\n\n` + upcomingList.join('\n\n'));
+          }
+          multiLinePropParam = multiSections.join('\n\n');
         }
 
         // 1. Attempt custom approved Spanish template matching
-        const customNames = ['alerta_vencimiento_contrato', 'alerta_vencimiento_contra', 'alerta_vencimiento_co', 'alerta_vencimiento_cc', 'alerta_vencimiento'];
+        const customNames = ['alerta_vencimiento_multilinea', 'alerta_vencimiento_contrato', 'alerta_vencimiento_contra', 'alerta_vencimiento_co', 'alerta_vencimiento_cc', 'alerta_vencimiento'];
         const customLangs = ['es', 'es_LA', 'es_ES', 'es_MX', 'es_CL'];
 
         for (const tName of customNames) {
           for (const cLang of customLangs) {
+            const paramToSend = (tName === 'alerta_vencimiento_multilinea' && multiLinePropParam) ? multiLinePropParam : richPropParam;
+
             const spanishRes = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
               method: 'POST',
               headers: {
@@ -173,7 +186,7 @@ export default async function handler(req: any, res: any) {
                     {
                       type: 'body',
                       parameters: [
-                        { type: 'text', text: richPropParam.substring(0, 480) }
+                        { type: 'text', text: paramToSend.substring(0, 800) }
                       ]
                     }
                   ]
