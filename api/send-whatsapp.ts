@@ -172,16 +172,6 @@ export default async function handler(req: any, res: any) {
           }
         }
 
-            const spanishData = await spanishRes.json();
-            if (spanishRes.ok && spanishData.messages) {
-              return res.status(200).json({
-                success: true,
-                message: `✓ Alerta oficial de WhatsApp en Español enviada a +${formattedPhone}. (Plantilla: '${tName}', ID: ${spanishData.messages[0]?.id})`
-              });
-            }
-          }
-        }
-
         // 2. Fallback to jaspers_market_order_confirmation_v1 if custom template language is resolving
         const p1 = 'Punto Propiedades';
         const p2 = `${expiringProps.length} Contrato(s) por Vencer`;
