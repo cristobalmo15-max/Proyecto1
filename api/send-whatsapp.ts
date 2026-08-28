@@ -129,7 +129,10 @@ export default async function handler(req: any, res: any) {
             const isExp = p.termino ? new Date(p.termino + 'T12:00:00') <= today : false;
             const valFormatted = formatClp(p.valor);
             const dateFormatted = formatChileanDate(p.termino);
-            const itemStr = `• *${p.direccion || 'Propiedad'}* (${valFormatted} • ${dateFormatted})`;
+            const duenoName = p.dueno || 'Dueño N/A';
+            const arrendatarioName = p.arrendatario || 'Arrendatario N/A';
+
+            const itemStr = `• 👤 *${duenoName}* ➔ 🔑 *${arrendatarioName}* (${valFormatted} • Vence: ${dateFormatted})`;
 
             if (isExp) {
               expiredList.push(itemStr);
