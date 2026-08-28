@@ -150,8 +150,16 @@ export default async function handler(req: any, res: any) {
         const customLangs = ['es', 'es_LA', 'es_ES', 'es_MX', 'es_CL'];
         let lastSpanishData: any = null;
 
-        for (const tName of customNames) {
-          for (const cLang of customLangs) {
+            const safeTruncate = (str: string, maxLen: number) => {
+              if (str.length <= maxLen) return str;
+              const sub = str.substring(0, maxLen - 12);
+              const lastSep = sub.lastIndexOf(' ➔ ');
+              if (lastSep > 20) {
+                return sub.substring(0, lastSep) + ' (+ más...)';
+              }
+              return sub + '...';
+            };
+
             const paramToSend = (tName === 'alerta_vencimiento_multilinea' && multiLinePropParam) ? multiLinePropParam : richPropParam;
 
             const spanishRes = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
@@ -171,7 +179,7 @@ export default async function handler(req: any, res: any) {
                     {
                       type: 'body',
                       parameters: [
-                        { type: 'text', text: paramToSend.substring(0, 800) }
+                        { type: 'text', text: safeTruncate(paramToSend, 780) }
                       ]
                     }
                   ]
