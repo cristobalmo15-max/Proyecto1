@@ -121,11 +121,11 @@ export default async function handler(req: any, res: any) {
           const sectionLines: string[] = [];
 
           if (expiredList.length > 0) {
-            sectionLines.push(`🚨 *CONTRATOS VENCIDOS (${expiredList.length}):*\n` + expiredList.join('\n'));
+            sectionLines.push(`🚨 *CONTRATOS VENCIDOS (${expiredList.length}):*\n\n` + expiredList.join('\n\n'));
           }
 
           if (upcomingList.length > 0) {
-            sectionLines.push(`⏳ *CONTRATOS POR VENCER (${upcomingList.length}):*\n` + upcomingList.join('\n'));
+            sectionLines.push(`⏳ *CONTRATOS POR VENCER (${upcomingList.length}):*\n\n` + upcomingList.join('\n\n'));
           }
 
           richPropParam = sectionLines.join('\n\n');
