@@ -97,38 +97,34 @@ export default async function handler(req: any, res: any) {
         // Format rich property parameter for Spanish custom template {{1}}
         let richPropParam = '';
         if (expiringProps.length === 0) {
-          richPropParam = '✅ No hay contratos vencidos ni por vencer en el período seleccionado.';
+          richPropParam = 'No hay contratos vencidos ni por vencer en el período seleccionado.';
         } else {
           const today = new Date();
           today.setHours(0,0,0,0);
           
-          const expiredList: string[] = [];
-          const upcomingList: string[] = [];
+          const expiredItems: string[] = [];
+          const upcomingItems: string[] = [];
 
           expiringProps.forEach((p: any) => {
+            const val = typeof p.valor === 'number' ? `$${p.valor.toLocaleString('es-CL')}` : (p.valor ? `$${p.valor}` : 'N/A');
             const isExp = p.termino ? new Date(p.termino + 'T12:00:00') <= today : false;
-            const valFormatted = formatClp(p.valor);
-            const dateFormatted = formatChileanDate(p.termino);
-            const itemLine = `• *${p.direccion || 'Propiedad'}* (${valFormatted} - Término: ${dateFormatted})`;
-
+            const str = `${p.direccion || 'Propiedad'} (${val} - ${p.termino || 'Sin Fecha'})`;
             if (isExp) {
-              expiredList.push(itemLine);
+              expiredItems.push(str);
             } else {
-              upcomingList.push(itemLine);
+              upcomingItems.push(str);
             }
           });
 
-          const sectionLines: string[] = [];
-
-          if (expiredList.length > 0) {
-            sectionLines.push(`🚨 *CONTRATOS VENCIDOS (${expiredList.length}):*\n` + expiredList.join('\n'));
+          let summaryParts = [];
+          if (expiredItems.length > 0) {
+            summaryParts.push(`🚨 ${expiredItems.length} VENCIDOS: ${expiredItems.slice(0, 2).join(', ')}`);
           }
-
-          if (upcomingList.length > 0) {
-            sectionLines.push(`⏳ *CONTRATOS POR VENCER (${upcomingList.length}):*\n` + upcomingList.join('\n'));
+          if (upcomingItems.length > 0) {
+            summaryParts.push(`⏳ ${upcomingItems.length} POR VENCER: ${upcomingItems.slice(0, 2).join(', ')}`);
           }
-
-          richPropParam = sectionLines.join('\n');
+          
+          richPropParam = `Reporte Total (${expiringProps.length}): ${summaryParts.join(' | ')}`;
         }
 
         // 1. Attempt custom approved Spanish template matching
