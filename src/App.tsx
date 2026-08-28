@@ -4725,6 +4725,10 @@ if (!isAuthReady) return null;
                         const phoneToUse = whatsappPhone || '56950125765';
                         showToast(`Procesando envío con plazo personalizado de ${waPlazoDias} días a ${phoneToUse}...`, 'success');
                         try {
+                          if (whatsappPhone && user) {
+                            updateAppSettings({ ...appSettings, whatsappPhone });
+                          }
+
                           const today = new Date();
                           today.setHours(0,0,0,0);
                           const maxDate = new Date(today);
@@ -4760,7 +4764,10 @@ if (!isAuthReady) return null;
                           const data = await res.json();
                           if (res.ok && data.success) {
                             if (data.fallbackUrl) {
-                              window.open(data.fallbackUrl, '_blank');
+                              const win = window.open(data.fallbackUrl, '_blank');
+                              if (!win || win.closed || typeof win.closed === 'undefined') {
+                                window.location.href = data.fallbackUrl;
+                              }
                             }
                             showToast(`✓ ${data.message || 'Envío de WhatsApp procesado.'}`, 'success');
                           } else {
