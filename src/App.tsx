@@ -822,25 +822,33 @@ export default function App() {
     };
   }, [user]);
 
-  const updateAppSettings = async (newSettings: any) => {
+  const updateAppSettings = async (newSettings: any, silent: boolean = false) => {
     if (!user) return;
     try {
+      const cleanData = JSON.parse(JSON.stringify(newSettings));
       if (isAdmin) {
-        // As admin (cristobalmo15), update global master credentials for all accounts
-        await setDoc(doc(db, 'settings', 'global'), {
-          whatsappApiKey: newSettings.whatsappApiKey || '',
-          smtpHost: newSettings.smtpHost || '',
-          smtpPort: newSettings.smtpPort || '587',
-          smtpUser: newSettings.smtpUser || '',
-          smtpPass: newSettings.smtpPass || '',
-          whatsappAutoReport: newSettings.whatsappAutoReport
-        }, { merge: true });
+        try {
+          await setDoc(doc(db, 'settings', 'global'), {
+            whatsappApiKey: cleanData.whatsappApiKey || '',
+            smtpHost: cleanData.smtpHost || '',
+            smtpPort: cleanData.smtpPort || '587',
+            smtpUser: cleanData.smtpUser || '',
+            smtpPass: cleanData.smtpPass || '',
+            whatsappAutoReport: cleanData.whatsappAutoReport || null
+          }, { merge: true });
+        } catch (globalErr) {
+          console.warn('[Firestore] Global settings write warning:', globalErr);
+        }
       }
-      // Save individual account settings (such as personal target phone)
-      await setDoc(doc(db, 'settings', user.uid), newSettings, { merge: true });
-      showToast('Configuración guardada correctamente');
+      await setDoc(doc(db, 'settings', user.uid), cleanData, { merge: true });
+      if (!silent) {
+        showToast('Configuración guardada correctamente');
+      }
     } catch (err) {
-      showToast('Error al guardar configuración', 'error');
+      console.error('[Firestore] User settings write error:', err);
+      if (!silent) {
+        showToast('Error al guardar configuración', 'error');
+      }
     }
   };
 
@@ -4726,7 +4734,7 @@ if (!isAuthReady) return null;
                         showToast(`Procesando envío con plazo personalizado de ${waPlazoDias} días a ${phoneToUse}...`, 'success');
                         try {
                           if (whatsappPhone && user) {
-                            updateAppSettings({ ...appSettings, whatsappPhone });
+                            updateAppSettings({ ...appSettings, whatsappPhone }, true);
                           }
 
                           const today = new Date();
