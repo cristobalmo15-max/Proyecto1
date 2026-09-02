@@ -145,7 +145,7 @@ export default async function handler(req: any, res: any) {
             summaryParts.push(`⏳ *POR VENCER (${upcomingList.length})*: ${upcomingList.join(' ➔ ')}`);
           }
 
-          richPropParam = `📋 Total: ${expiringProps.length} Contratos (👤 Dueño • 🔑 Arrendatario) ➔ ${summaryParts.join(' | ')}`;
+          richPropParam = `📋 Total: ${expiringProps.length} Contratos ➔ ${summaryParts.join(' | ')}`;
 
           // Build multiline layout for multiline template
           const multiSections: string[] = [];
