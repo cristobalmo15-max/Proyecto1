@@ -94,6 +94,19 @@ export default async function handler(req: any, res: any) {
           return `$${Number(clean).toLocaleString('es-CL')}`;
         };
 
+        const trimSecondSurname = (fullName?: string) => {
+          if (!fullName) return '';
+          const trimmed = String(fullName).trim();
+          if (/spa|eirl|ltda|fundacion|logistica|transporte|gys|verano|epc|sa/i.test(trimmed)) {
+            return trimmed;
+          }
+          const parts = trimmed.split(/\s+/);
+          if (parts.length >= 3) {
+            return parts.slice(0, parts.length - 1).join(' ');
+          }
+          return trimmed;
+        };
+
         // Format rich property parameter for Spanish custom template {{1}}
         let richPropParam = '';
         let multiLinePropParam = '';
@@ -110,8 +123,8 @@ export default async function handler(req: any, res: any) {
             const isExp = p.termino ? new Date(p.termino + 'T12:00:00') <= today : false;
             const valFormatted = formatClp(p.valor);
             const dateFormatted = formatChileanDate(p.termino);
-            const duenoName = p.dueno || 'Dueño N/A';
-            const arrendatarioName = p.arrendatario || 'Arrendatario N/A';
+            const duenoName = trimSecondSurname(p.dueno) || 'Dueño N/A';
+            const arrendatarioName = trimSecondSurname(p.arrendatario) || 'Arrendatario N/A';
 
             const itemStr = `• 👤 *${duenoName}* ➔ 🔑 *${arrendatarioName}* (${valFormatted} • Vence: ${dateFormatted})`;
 
@@ -132,7 +145,7 @@ export default async function handler(req: any, res: any) {
             summaryParts.push(`⏳ *POR VENCER (${upcomingList.length})*: ${upcomingList.join(' ➔ ')}`);
           }
 
-          richPropParam = `📋 Total: ${expiringProps.length} Contratos ➔ ${summaryParts.join(' | ')}`;
+          richPropParam = `📋 Total: ${expiringProps.length} Contratos (👤 Dueño • 🔑 Arrendatario) ➔ ${summaryParts.join(' | ')}`;
 
           // Build multiline layout for multiline template
           const multiSections: string[] = [];
