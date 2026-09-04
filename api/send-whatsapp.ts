@@ -60,8 +60,8 @@ export default async function handler(req: any, res: any) {
     const defaultMetaToken = 'EAATRAbIZAIJ4BSBu7qh0geLq3O4a1WJfs9rvs3r9kt4F2isDK7ujvH08zQMZCfZCOlr2JQWJXY4MuCeXLZBuC2EWDt0jRVYLdDQxZAKP7fWOCbQuGoEb0v6i4blo2EIH6brvT7dkPMapPhWmx7jlMCsOGu8hKdYpLLMzGcJrKS6bRnVx9uL20k1LgVPT8kmnvswZDZD';
     const defaultPhoneId = '1304689292724838';
 
-    const metaToken = bodyData.metaToken || queryData.metaToken || (apiKey && apiKey.startsWith('EAA') ? apiKey : null) || process.env.META_WHATSAPP_TOKEN || defaultMetaToken;
-    const metaPhoneId = bodyData.metaPhoneId || queryData.metaPhoneId || bodyData.phoneId || queryData.phoneId || process.env.META_PHONE_NUMBER_ID || defaultPhoneId;
+    const metaToken = process.env.META_WHATSAPP_TOKEN || defaultMetaToken;
+    const metaPhoneId = process.env.META_PHONE_NUMBER_ID || defaultPhoneId;
 
     if (metaToken && metaPhoneId) {
       try {
@@ -248,23 +248,6 @@ export default async function handler(req: any, res: any) {
 
         const errCode = lastSpanishData?.error?.code;
         const errDetails = lastSpanishData?.error?.message || 'Error de API Meta Cloud';
-
-        // Seamless WhatsApp Web fallback if Meta API returns any sandbox or phone restriction
-        const waWebUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(messageText)}`;
-        return res.status(200).json({
-          success: true,
-          fallbackUrl: waWebUrl,
-          message: `✓ Abriendo WhatsApp Web para despachar el reporte a +${formattedPhone}...`
-        });
-
-        if (errCode === 131030) {
-          const waWebUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(messageText)}`;
-          return res.status(200).json({
-            success: true,
-            fallbackUrl: waWebUrl,
-            message: `✓ (Modo Pruebas) Abriendo WhatsApp Web para despachar el reporte a +${formattedPhone}...`
-          });
-        }
 
         return res.status(200).json({
           success: false,
