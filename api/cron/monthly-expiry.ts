@@ -235,16 +235,52 @@ export default async function handler(req: any, res: any) {
 </html>
       `;
 
-      await transporter.sendMail({
-        from: `Punto Propiedades <${targetEmail}>`,
-        to: targetEmail,
-        subject: `Alerta: ${expiringProps.length} arriendos vencidos o por vencer`,
-        html: emailHtml
-      });
+      // Dispatch WhatsApp Alert via Meta Cloud API
+      let wspResult = null;
+      try {
+        const defaultMetaToken = 'EAATRAbIZAIJ4BSBu7qh0geLq3O4a1WJfs9rvs3r9kt4F2isDK7ujvH08zQMZCfZCOlr2JQWJXY4MuCeXLZBuC2EWDt0jRVYLdDQxZAKP7fWOCbQuGoEb0v6i4blo2EIH6brvT7dkPMapPhWmx7jlMCsOGu8hKdYpLLMzGcJrKS6bRnVx9uL20k1LgVPT8kmnvswZDZD';
+        const defaultPhoneId = '1304689292724838';
+        const metaToken = process.env.META_WHATSAPP_TOKEN || defaultMetaToken;
+        const metaPhoneId = process.env.META_PHONE_NUMBER_ID || defaultPhoneId;
+        const targetWspPhone = process.env.WHATSAPP_ADMIN_PHONE || '56950125765';
+
+        const summaryText = `🚨 VENCIMIENTO (Cron 26 del mes): ${expiringProps.length} contrato(s) requieren atención en el próximo mes.`;
+        const detailsText = expiringProps.map(p => `• 👤 ${p.dueno || 'N/A'} ➔ 🔑 ${p.arrendatario || 'N/A'} (${p.valor || '$0'} • Vence: ${p.termino || 'Sin fecha'})`).join(' | ').substring(0, 380);
+
+        const wspRes = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${metaToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            to: targetWspPhone,
+            type: 'template',
+            template: {
+              name: 'alerta_ahorasiqsi1',
+              language: { code: 'en' },
+              components: [
+                {
+                  type: 'body',
+                  parameters: [
+                    { type: 'text', text: summaryText },
+                    { type: 'text', text: detailsText || ' ' }
+                  ]
+                }
+              ]
+            }
+          })
+        });
+        wspResult = await wspRes.json();
+      } catch (wspErr: any) {
+        console.error('[Cron WhatsApp Dispatch Error]:', wspErr);
+      }
 
       return res.status(200).json({
         success: true,
-        message: `Reporte de vencimientos enviado con éxito a ${targetEmail}.`
+        message: `Reporte de vencimientos enviado con éxito los 26 del mes.`,
+        whatsapp: wspResult
       });
     } catch (smtpErr: any) {
       return res.status(200).json({
