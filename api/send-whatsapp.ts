@@ -200,48 +200,12 @@ export default async function handler(req: any, res: any) {
                 ? safeTruncate(upcomingList.join(' ➔ '), 450) 
                 : '• Ningún contrato por vencer';
 
-              // Try 2-parameter structure ({{1}} Vencidos, {{2}} Por Vencer)
-              const res2Param = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${metaToken}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  messaging_product: 'whatsapp',
-                  to: formattedPhone,
-                  type: 'template',
-                  template: {
-                    name: tName,
-                    language: { code: cLang },
-                    components: [
-                      {
-                        type: 'body',
-                        parameters: [
-                          { type: 'text', text: expiredText },
-                          { type: 'text', text: upcomingText }
-                        ]
-                      }
-                    ]
-                  }
-                })
-              });
-
-              const data2Param = await res2Param.json();
-              lastSpanishData = data2Param;
-              if (res2Param.ok && data2Param.messages) {
-                return res.status(200).json({
-                  success: true,
-                  message: `✓ Alerta multilínea oficial enviada a +${formattedPhone}. (Plantilla: '${tName}', ID: ${data2Param.messages[0]?.id})`
-                });
-              }
-
-              // Fallback to 1-parameter multiline format
               templateComponents = [
                 {
                   type: 'body',
                   parameters: [
-                    { type: 'text', text: safeTruncate(multiLinePropParam, 780) }
+                    { type: 'text', text: expiredText },
+                    { type: 'text', text: upcomingText }
                   ]
                 }
               ];
