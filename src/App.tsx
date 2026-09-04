@@ -4742,15 +4742,36 @@ if (!isAuthReady) return null;
                           const maxDate = new Date(today);
                           maxDate.setDate(maxDate.getDate() + Number(waPlazoDias || 30));
 
-                          const expiringProps = properties.filter((p: any) => {
-                            if (!p.termino) return false;
-                            const parts = String(p.termino).split('-');
-                            if (parts.length === 3) {
-                              const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 12, 0, 0);
-                              return d <= maxDate;
+                          const parseExpiryDate = (dateStr: any) => {
+                            if (!dateStr) return null;
+                            const str = String(dateStr).trim();
+                            if (str.includes('/')) {
+                              const parts = str.split('/');
+                              if (parts.length === 3) {
+                                if (parts[0].length === 4) {
+                                  return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 12, 0, 0);
+                                }
+                                return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10), 12, 0, 0);
+                              }
+                            } else if (str.includes('-')) {
+                              const parts = str.split('-');
+                              if (parts.length === 3) {
+                                if (parts[0].length === 4) {
+                                  return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 12, 0, 0);
+                                }
+                                return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10), 12, 0, 0);
+                              }
                             }
-                            return false;
+                            const d = new Date(str);
+                            return isNaN(d.getTime()) ? null : d;
+                          };
+
+                          const expiringProps = properties.filter((p: any) => {
+                            const d = parseExpiryDate(p.termino);
+                            return d ? d <= maxDate : false;
                           });
+
+                          const propsToSend = expiringProps.length > 0 ? expiringProps : properties;
 
                           const res = await fetch('/api/send-whatsapp', {
                             method: 'POST',
@@ -4759,7 +4780,7 @@ if (!isAuthReady) return null;
                               phone: phoneToUse,
                               apiKey: whatsappApiKey,
                               daysBeforeExpiry: waPlazoDias,
-                              properties: expiringProps.map(p => ({
+                              properties: propsToSend.map(p => ({
                                 direccion: p.direccion,
                                 dueno: p.dueno,
                                 arrendatario: p.arrendatario,
