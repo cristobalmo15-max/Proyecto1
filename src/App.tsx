@@ -4789,9 +4789,6 @@ if (!isAuthReady) return null;
 
                           const data = await res.json();
                           if (res.ok && data.success) {
-                            if (data.fallbackUrl) {
-                              window.open(data.fallbackUrl, '_blank');
-                            }
                             showToast(`✓ ${data.message || 'Envío de WhatsApp procesado.'}`, 'success');
                           } else {
                             showToast(`Error: ${data.error || 'Fallo en envío de WhatsApp.'}`, 'error');
@@ -4802,100 +4799,40 @@ if (!isAuthReady) return null;
                       }}
                       className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[9.5px] tracking-wider py-3.5 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                     >
-                      🤖 Probar Envío Automático (Plazo {waPlazoDias} Días)
+                      🤖 Probar Envío Automático Meta Cloud API (Plazo {waPlazoDias} Días)
                     </button>
 
                     <button
-                      onClick={() => {
-                        const phoneToUse = (whatsappPhone || '56950125765').replace(/[^0-9]/g, '');
-                        const targetPhone = phoneToUse.startsWith('56') ? phoneToUse : `56${phoneToUse}`;
-                        const today = new Date();
-                        today.setHours(0,0,0,0);
-                        const maxDate = new Date(today);
-                        maxDate.setDate(maxDate.getDate() + Number(waPlazoDias || 30));
-
-                        const expiredProps = properties.filter((p: any) => {
-                          if (!p.termino) return false;
-                          const parts = String(p.termino).split('-');
-                          if (parts.length === 3) {
-                            const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 12, 0, 0);
-                            return d <= today;
+                      onClick={async () => {
+                        try {
+                          const phoneToUse = (whatsappPhone || '56950125765').replace(/[^0-9]/g, '');
+                          const res = await fetch('/api/send-whatsapp', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              phone: phoneToUse,
+                              properties: properties.map(p => ({
+                                direccion: p.direccion,
+                                dueno: p.dueno,
+                                arrendatario: p.arrendatario,
+                                valor: p.valor,
+                                termino: p.termino
+                              }))
+                            })
+                          });
+                          const data = await res.json();
+                          if (res.ok && data.success) {
+                            showToast(`✓ ${data.message || 'Envío directo a Meta Cloud API completado.'}`, 'success');
+                          } else {
+                            showToast(`Error: ${data.error || 'Fallo en envío a Meta Cloud API.'}`, 'error');
                           }
-                          return false;
-                        });
-
-                        const upcomingProps = properties.filter((p: any) => {
-                          if (!p.termino) return false;
-                          const parts = String(p.termino).split('-');
-                          if (parts.length === 3) {
-                            const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 12, 0, 0);
-                            return d > today && d <= maxDate;
-                          }
-                          return false;
-                        });
-
-                        const trimSecondSurname = (fullName?: string) => {
-                          if (!fullName) return '';
-                          const trimmed = String(fullName).trim();
-                          if (/spa|eirl|ltda|fundacion|logistica|transporte|gys|verano|epc|sa/i.test(trimmed)) {
-                            return trimmed;
-                          }
-                          const parts = trimmed.split(/\s+/);
-                          if (parts.length >= 3) {
-                            return parts.slice(0, parts.length - 1).join(' ');
-                          }
-                          return trimmed;
-                        };
-
-                        const formatClp = (val?: any) => {
-                          if (typeof val === 'number') return `$${val.toLocaleString('es-CL')}`;
-                          if (!val) return '$0';
-                          const clean = String(val).replace(/[^0-9]/g, '');
-                          if (!clean) return `$${val}`;
-                          return `$${Number(clean).toLocaleString('es-CL')}`;
-                        };
-
-                        const formatChileanDate = (dateStr?: string) => {
-                          if (!dateStr) return 'Sin fecha';
-                          if (dateStr.includes('-')) {
-                            const parts = dateStr.split('-');
-                            if (parts.length === 3 && parts[0].length === 4) {
-                              return `${parts[2]}/${parts[1]}/${parts[0]}`;
-                            }
-                          }
-                          return dateStr;
-                        };
-
-                        const expiredList: string[] = expiredProps.map((p: any) => {
-                          const duenoName = trimSecondSurname(p.dueno) || 'Dueño N/A';
-                          const arrendatarioName = trimSecondSurname(p.arrendatario) || 'Arrendatario N/A';
-                          return `• 👤 *${duenoName}* ➔ 🔑 *${arrendatarioName}* (${formatClp(p.valor)} • Vence: ${formatChileanDate(p.termino)})`;
-                        });
-
-                        const upcomingList: string[] = upcomingProps.map((p: any) => {
-                          const duenoName = trimSecondSurname(p.dueno) || 'Dueño N/A';
-                          const arrendatarioName = trimSecondSurname(p.arrendatario) || 'Arrendatario N/A';
-                          return `• 👤 *${duenoName}* ➔ 🔑 *${arrendatarioName}* (${formatClp(p.valor)} • Vence: ${formatChileanDate(p.termino)})`;
-                        });
-
-                        const multiSections: string[] = [];
-                        if (expiredList.length > 0) {
-                          multiSections.push(`🚨 *CONTRATOS VENCIDOS (${expiredList.length}):*\n\n` + expiredList.join('\n\n'));
+                        } catch (err: any) {
+                          showToast(`Error: ${err.message}`, 'error');
                         }
-                        if (upcomingList.length > 0) {
-                          multiSections.push(`⏳ *CONTRATOS POR VENCER (${upcomingList.length}):*\n\n` + upcomingList.join('\n\n'));
-                        }
-
-                        const bodyDetails = multiSections.length > 0 ? multiSections.join('\n\n') : '✅ *No hay contratos vencidos ni por vencer en el período.*';
-                        const msg = `🚨 *PUNTO PROPIEDADES - CONTROL PREDICTIVO*\n------------------------------------------\n📊 *ALERTA DE VENCIMIENTOS DE ARRIENDO*\n\n${bodyDetails}\n------------------------------------------\n🔗 *Acceder al Panel:*\nhttps://proyecto1-chi-gules.vercel.app`;
-
-                        const waUrl = `https://api.whatsapp.com/send?phone=${targetPhone}&text=${encodeURIComponent(msg)}`;
-                        window.open(waUrl, '_blank');
-                        showToast('✓ Abriendo informe de vencidos y próximos en WhatsApp...', 'success');
                       }}
                       className="w-full bg-slate-800 hover:bg-slate-900 text-white font-black uppercase text-[9.5px] tracking-wider py-3.5 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                     >
-                      💬 Abrir Resumen Personalizado en WhatsApp Web
+                      📱 Despachar Directo a Meta Cloud API (+56950125765)
                     </button>
                   </div>
                 </div>
