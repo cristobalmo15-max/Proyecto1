@@ -2544,26 +2544,26 @@ if (!isAuthReady) return null;
     return (
       <div className="min-h-screen bg-white text-ink font-sans selection:bg-primary/20">
         {/* Navigation */}
-        <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-border">
-          <div className="flex justify-between items-center px-8 py-4 max-w-7xl mx-auto">
-            <div className="text-xl font-black tracking-tighter flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white">P</div>
-              PUNTO PROPIEDADES
+        <nav className="fixed top-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-border">
+          <div className="flex justify-between items-center px-4 md:px-8 py-3 md:py-4 max-w-7xl mx-auto">
+            <div className="text-sm md:text-xl font-black tracking-tighter flex items-center gap-2 shrink-0">
+              <div className="w-7 h-7 md:w-8 md:h-8 bg-primary rounded-lg flex items-center justify-center text-white text-xs md:text-sm">P</div>
+              <span>PUNTO PROPIEDADES</span>
             </div>
-            <div className="flex items-center gap-8">
-              <a href="#features" className="text-sm font-bold text-muted hover:text-primary transition-colors">Características</a>
-              <a href="#market" className="text-sm font-bold text-muted hover:text-primary transition-colors">Mercado</a>
+            <div className="flex items-center gap-3 md:gap-8">
+              <a href="#features" className="hidden md:block text-sm font-bold text-muted hover:text-primary transition-colors">Características</a>
+              <a href="#market" className="hidden md:block text-sm font-bold text-muted hover:text-primary transition-colors">Mercado</a>
               {showEmailInput ? (
                 <button 
                   onClick={() => setShowEmailInput(false)}
-                  className="text-sm font-bold text-muted hover:text-ink transition-colors"
+                  className="text-xs md:text-sm font-bold text-muted hover:text-ink transition-colors px-2 py-1"
                 >
                   Atrás
                 </button>
               ) : (
                 <button 
                   onClick={handleLogin}
-                  className="bg-primary hover:bg-red-700 text-white px-6 py-2.5 rounded-full font-bold text-sm transition-all shadow-lg shadow-primary/20"
+                  className="bg-primary hover:bg-red-700 text-white px-3.5 sm:px-6 py-2 md:py-2.5 rounded-full font-bold text-xs md:text-sm transition-all shadow-lg shadow-primary/20 shrink-0"
                 >
                   Ingresar / Registrarse
                 </button>
