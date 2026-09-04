@@ -394,6 +394,14 @@ export default function App() {
   const [selectedExpiryProp, setSelectedExpiryProp] = useState<Property | null>(null);
   const [showExpiryModal, setShowExpiryModal] = useState(false);
 
+  useEffect(() => {
+    if (selectedProp) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      const mainEl = document.querySelector('main');
+      if (mainEl) mainEl.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [selectedProp]);
+
 
   const logActivity = async (actionText: string, isMass = false, details = null) => {
     if (!user) return;
