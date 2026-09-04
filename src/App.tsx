@@ -396,9 +396,24 @@ export default function App() {
 
   useEffect(() => {
     if (selectedProp) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      const mainEl = document.querySelector('main');
-      if (mainEl) mainEl.scrollTo({ top: 0, behavior: 'smooth' });
+      const resetScroll = () => {
+        window.scrollTo(0, 0);
+        if (document.documentElement) document.documentElement.scrollTop = 0;
+        if (document.body) document.body.scrollTop = 0;
+        document.querySelectorAll('main, div').forEach((el) => {
+          if (el.scrollTop > 0) {
+            el.scrollTop = 0;
+          }
+        });
+      };
+      
+      resetScroll();
+      const t1 = setTimeout(resetScroll, 10);
+      const t2 = setTimeout(resetScroll, 100);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
     }
   }, [selectedProp]);
 
