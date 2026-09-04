@@ -4789,6 +4789,9 @@ if (!isAuthReady) return null;
 
                           const data = await res.json();
                           if (res.ok && data.success) {
+                            if (data.fallbackUrl) {
+                              window.open(data.fallbackUrl, '_blank');
+                            }
                             showToast(`✓ ${data.message || 'Envío de WhatsApp procesado.'}`, 'success');
                           } else {
                             showToast(`Error: ${data.error || 'Fallo en envío de WhatsApp.'}`, 'error');
@@ -4831,29 +4834,60 @@ if (!isAuthReady) return null;
                           return false;
                         });
 
-                        let propDetails = '';
-                        if (expiredProps.length > 0) {
-                          propDetails += `\n🚨 *CONTRATOS YA VENCIDOS (${expiredProps.length}):*\n`;
-                          expiredProps.forEach((p: any, idx: number) => {
-                            const val = typeof p.valor === 'number' ? `$${p.valor.toLocaleString('es-CL')}` : (p.valor || 'N/A');
-                            propDetails += `  ${idx + 1}. 🏠 *${p.direccion || 'Sin Dirección'}*\n     • Arrendatario: ${p.arrendatario || 'N/A'} (Dueño: ${p.dueno || 'N/A'})\n     • Canon: ${val} | 🛑 *Venció: ${p.termino}*\n`;
-                          });
+                        const trimSecondSurname = (fullName?: string) => {
+                          if (!fullName) return '';
+                          const trimmed = String(fullName).trim();
+                          if (/spa|eirl|ltda|fundacion|logistica|transporte|gys|verano|epc|sa/i.test(trimmed)) {
+                            return trimmed;
+                          }
+                          const parts = trimmed.split(/\s+/);
+                          if (parts.length >= 3) {
+                            return parts.slice(0, parts.length - 1).join(' ');
+                          }
+                          return trimmed;
+                        };
+
+                        const formatClp = (val?: any) => {
+                          if (typeof val === 'number') return `$${val.toLocaleString('es-CL')}`;
+                          if (!val) return '$0';
+                          const clean = String(val).replace(/[^0-9]/g, '');
+                          if (!clean) return `$${val}`;
+                          return `$${Number(clean).toLocaleString('es-CL')}`;
+                        };
+
+                        const formatChileanDate = (dateStr?: string) => {
+                          if (!dateStr) return 'Sin fecha';
+                          if (dateStr.includes('-')) {
+                            const parts = dateStr.split('-');
+                            if (parts.length === 3 && parts[0].length === 4) {
+                              return `${parts[2]}/${parts[1]}/${parts[0]}`;
+                            }
+                          }
+                          return dateStr;
+                        };
+
+                        const expiredList: string[] = expiredProps.map((p: any) => {
+                          const duenoName = trimSecondSurname(p.dueno) || 'Dueño N/A';
+                          const arrendatarioName = trimSecondSurname(p.arrendatario) || 'Arrendatario N/A';
+                          return `• 👤 *${duenoName}* ➔ 🔑 *${arrendatarioName}* (${formatClp(p.valor)} • Vence: ${formatChileanDate(p.termino)})`;
+                        });
+
+                        const upcomingList: string[] = upcomingProps.map((p: any) => {
+                          const duenoName = trimSecondSurname(p.dueno) || 'Dueño N/A';
+                          const arrendatarioName = trimSecondSurname(p.arrendatario) || 'Arrendatario N/A';
+                          return `• 👤 *${duenoName}* ➔ 🔑 *${arrendatarioName}* (${formatClp(p.valor)} • Vence: ${formatChileanDate(p.termino)})`;
+                        });
+
+                        const multiSections: string[] = [];
+                        if (expiredList.length > 0) {
+                          multiSections.push(`🚨 *CONTRATOS VENCIDOS (${expiredList.length}):*\n\n` + expiredList.join('\n\n'));
+                        }
+                        if (upcomingList.length > 0) {
+                          multiSections.push(`⏳ *CONTRATOS POR VENCER (${upcomingList.length}):*\n\n` + upcomingList.join('\n\n'));
                         }
 
-                        if (upcomingProps.length > 0) {
-                          propDetails += `\n⏳ *CONTRATOS POR VENCER (PRÓXIMOS ${waPlazoDias} DÍAS - TOTAL ${upcomingProps.length}):*\n`;
-                          upcomingProps.forEach((p: any, idx: number) => {
-                            const val = typeof p.valor === 'number' ? `$${p.valor.toLocaleString('es-CL')}` : (p.valor || 'N/A');
-                            propDetails += `  ${idx + 1}. 🏠 *${p.direccion || 'Sin Dirección'}*\n     • Arrendatario: ${p.arrendatario || 'N/A'} (Dueño: ${p.dueno || 'N/A'})\n     • Canon: ${val} | ⏳ *Vence: ${p.termino}*\n`;
-                          });
-                        }
-
-                        if (!propDetails) {
-                          propDetails = `\n✅ *No hay contratos vencidos ni por vencer en los próximos ${waPlazoDias} días.*`;
-                        }
-
-                        const totalCount = expiredProps.length + upcomingProps.length;
-                        const msg = `🚨 *PUNTO PROPIEDADES - CONTROL PREDICTIVO*\n------------------------------------------\n📊 *ALERTA DE VENCIMIENTOS DE ARRIENDO*\n\nSe identificaron *${totalCount} Contrato(s)* en seguimiento:\n${propDetails}\n------------------------------------------\n🔗 *Acceder al Panel de Gestión:*\nhttps://proyecto1-chi-gules.vercel.app`;
+                        const bodyDetails = multiSections.length > 0 ? multiSections.join('\n\n') : '✅ *No hay contratos vencidos ni por vencer en el período.*';
+                        const msg = `🚨 *PUNTO PROPIEDADES - CONTROL PREDICTIVO*\n------------------------------------------\n📊 *ALERTA DE VENCIMIENTOS DE ARRIENDO*\n\n${bodyDetails}\n------------------------------------------\n🔗 *Acceder al Panel:*\nhttps://proyecto1-chi-gules.vercel.app`;
 
                         const waUrl = `https://api.whatsapp.com/send?phone=${targetPhone}&text=${encodeURIComponent(msg)}`;
                         window.open(waUrl, '_blank');
