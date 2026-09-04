@@ -2457,22 +2457,22 @@ export default function App() {
                         </div>
 
                       {/* Property Footer - SOPHISTICATED MINIMALISM */}
-                      <div className="mt-auto px-10 py-8 border-t border-border/10 bg-white/50 backdrop-blur-sm flex justify-between items-center h-24">
-                        <div className="flex items-center gap-6">
+                      <div className="mt-auto px-4 sm:px-10 py-4 sm:py-8 border-t border-border/10 bg-white/50 backdrop-blur-sm flex flex-col sm:flex-row justify-between items-center gap-4 w-full min-w-0">
+                        <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-6 text-center sm:text-left">
                           <div className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-                            <p className="text-[10px] font-black text-ink/20 uppercase tracking-[0.3em] font-mono">Operations Active</p>
+                            <p className="text-[9px] sm:text-[10px] font-black text-ink/40 uppercase tracking-[0.2em] font-mono">Operatividad Activa</p>
                           </div>
-                          <div className="w-px h-4 bg-border/20" />
-                          <p className="text-[10px] font-medium text-ink/10 uppercase tracking-widest italic">Document Engineering by PNT</p>
+                          <div className="hidden sm:block w-px h-4 bg-border/20" />
+                          <p className="text-[9px] sm:text-[10px] font-medium text-ink/30 uppercase tracking-widest italic">Document Engineering by PNT</p>
                         </div>
                         
                         <button 
                           onClick={() => setShowConfirmDelete({ type: 'property', id: selectedProp.id })}
-                          className="group flex items-center gap-3 px-6 py-3 rounded-2xl border border-danger/5 text-danger/20 hover:text-danger hover:border-danger hover:bg-danger/5 transition-all text-[11px] font-black uppercase tracking-[0.2em] shadow-sm hover:shadow-xl active:scale-95"
+                          className="group w-full sm:w-auto justify-center flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl border border-red-200 text-red-600 bg-red-50/50 hover:bg-red-100 transition-all text-[10px] sm:text-[11px] font-black uppercase tracking-wider shadow-xs active:scale-95 cursor-pointer"
                         >
                           <Trash2 className="w-4 h-4 transition-transform group-hover:rotate-12" /> 
-                          <span>Decommission Asset</span>
+                          <span>Eliminar Ficha</span>
                         </button>
                       </div>
                     </div>
