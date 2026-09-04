@@ -173,19 +173,20 @@ export default async function handler(req: any, res: any) {
           return sub + '...';
         };
 
-        const safeTruncateMultiline = (lines: string[], maxLen: number) => {
-          if (lines.length === 0) return '• Ningún contrato registrado';
+        const safeTruncateItems = (items: string[], maxLen: number) => {
+          if (!items || items.length === 0) return '• Ningún contrato registrado';
           let result = '';
           let count = 0;
-          for (const line of lines) {
-            if ((result + line + '\n').length > maxLen - 30) {
-              const remaining = lines.length - count;
-              return (result + `• (+ ${remaining} contrato(s) más)`).trim();
+          for (const item of items) {
+            const nextStr = result ? `${result} ➔ ${item}` : item;
+            if (nextStr.length > maxLen - 25) {
+              const remaining = items.length - count;
+              return `${result} ➔ (+ ${remaining} contrato(s) más)`;
             }
-            result += line + '\n';
+            result = nextStr;
             count++;
           }
-          return result.trim();
+          return result;
         };
 
         for (const tName of customNames) {
@@ -193,12 +194,8 @@ export default async function handler(req: any, res: any) {
             let templateComponents: any[] = [];
 
             if (tName === 'alerta_ahorasiqsi1' || tName === 'alerta_vencimiento_multilinea') {
-              const expiredText = expiredList.length > 0 
-                ? safeTruncate(expiredList.join(' ➔ '), 450) 
-                : '• Ningún contrato vencido';
-              const upcomingText = upcomingList.length > 0 
-                ? safeTruncate(upcomingList.join(' ➔ '), 450) 
-                : '• Ningún contrato por vencer';
+              const expiredText = safeTruncateItems(expiredList, 450);
+              const upcomingText = safeTruncateItems(upcomingList, 450);
 
               templateComponents = [
                 {
