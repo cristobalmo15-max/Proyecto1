@@ -238,8 +238,21 @@ export default async function handler(req: any, res: any) {
             const spanishData = await spanishRes.json();
             lastSpanishData = spanishData;
             if (spanishRes.ok && spanishData.messages) {
+              // Build clean multiline messageText for web fallback guarantee
+              const multiSections: string[] = [];
+              if (expiredList.length > 0) {
+                multiSections.push(`🚨 *CONTRATOS VENCIDOS (${expiredList.length}):*\n\n` + expiredList.join('\n\n'));
+              }
+              if (upcomingList.length > 0) {
+                multiSections.push(`⏳ *CONTRATOS POR VENCER (${upcomingList.length}):*\n\n` + upcomingList.join('\n\n'));
+              }
+              const bodyDetails = multiSections.length > 0 ? multiSections.join('\n\n') : '✅ *No hay contratos vencidos ni por vencer en el período.*';
+              const cleanMsg = `🚨 *PUNTO PROPIEDADES - CONTROL PREDICTIVO*\n------------------------------------------\n📊 *ALERTA DE VENCIMIENTOS DE ARRIENDO*\n\n${bodyDetails}\n------------------------------------------\n🔗 *Acceder al Panel:*\nhttps://proyecto1-chi-gules.vercel.app`;
+              const waWebUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(cleanMsg)}`;
+
               return res.status(200).json({
                 success: true,
+                fallbackUrl: waWebUrl,
                 message: `✓ Alerta multilínea oficial entregada a +${formattedPhone}. (ID: ${spanishData.messages[0]?.id})`
               });
             }
