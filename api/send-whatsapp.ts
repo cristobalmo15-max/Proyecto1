@@ -120,6 +120,22 @@ export default async function handler(req: any, res: any) {
       return sub + '...';
     };
 
+    const safeTruncateItems = (items: string[], maxLen: number = 350) => {
+      if (!items || items.length === 0) return '• Ningún contrato registrado';
+      let result = '';
+      let count = 0;
+      for (const item of items) {
+        const nextStr = result ? `${result} ➔ ${item}` : item;
+        if (nextStr.length > maxLen - 25) {
+          const remaining = items.length - count;
+          return `${result} ➔ (+ ${remaining} contrato(s) más)`;
+        }
+        result = nextStr;
+        count++;
+      }
+      return result;
+    };
+
     const expiredText = safeTruncateStr(fullParam1, 380);
     const upcomingText = upcomingList.length > 0 ? safeTruncateStr(`⏳ POR VENCER (${upcomingList.length}): ${upcomingList.join(' ➔ ')}`, 380) : ' ';
 
