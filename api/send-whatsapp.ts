@@ -149,8 +149,8 @@ export default async function handler(req: any, res: any) {
       }
     ];
 
-    // Meta WhatsApp Cloud API Direct Dispatch (Dual dispatch for guaranteed Sandbox delivery)
-    const metaRes1 = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
+    // Meta WhatsApp Cloud API Direct Dispatch (Template: alerta_ahorasiqsi1)
+    const metaRes = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${metaToken}`,
@@ -167,40 +167,10 @@ export default async function handler(req: any, res: any) {
         }
       })
     });
-    const metaData1 = await metaRes1.json();
+    const metaData = await metaRes.json();
 
-    // Guaranteed Sandbox delivery template jaspers_market_order_confirmation_v1
-    const combinedSummary = safeTruncateItems(expiredList.concat(upcomingList), 350);
-    const metaRes2 = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${metaToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        to: formattedPhone,
-        type: 'template',
-        template: {
-          name: 'jaspers_market_order_confirmation_v1',
-          language: { code: 'en_US' },
-          components: [
-            {
-              type: 'body',
-              parameters: [
-                { type: 'text', text: 'Punto Propiedades' },
-                { type: 'text', text: `${expiringProps.length} Contrato(s) en Seguimiento` },
-                { type: 'text', text: combinedSummary }
-              ]
-            }
-          ]
-        }
-      })
-    });
-    const metaData2 = await metaRes2.json();
-
-    if ((metaRes1.ok && metaData1.messages) || (metaRes2.ok && metaData2.messages)) {
-      const messageId = metaData2.messages?.[0]?.id || metaData1.messages?.[0]?.id;
+    if (metaRes.ok && metaData.messages) {
+      const messageId = metaData.messages[0].id;
       return res.status(200).json({
         success: true,
         messageId: messageId,
@@ -209,8 +179,8 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    const errCode = metaData1?.error?.code || metaData2?.error?.code;
-    const errDetails = metaData1?.error?.message || metaData2?.error?.message || 'Error en respuesta de Meta Graph API';
+    const errCode = metaData?.error?.code;
+    const errDetails = metaData?.error?.message || 'Error en respuesta de Meta Graph API';
     return res.status(400).json({
       success: false,
       error: `Meta Cloud API Error (${errCode}): ${errDetails}`,
