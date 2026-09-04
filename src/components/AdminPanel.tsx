@@ -205,31 +205,34 @@ export const AdminPanel = ({
 
   return (
     <div className="space-y-6">
-      {/* Nuevo buscador de depuración */}
-      <div className="bg-white p-6 rounded-2xl border border-red-200 shadow-sm">
-        <h3 className="text-sm font-bold text-red-600 mb-4">Depuración de Propiedades (Buscar Propiedad Perdida)</h3>
-        <div className="flex gap-4">
+      {/* Buscador de depuración */}
+      <div className="bg-white p-4 sm:p-6 rounded-2xl border border-red-200 shadow-sm">
+        <h3 className="text-xs sm:text-sm font-bold text-red-600 mb-3">Depuración de Propiedades (Buscar Propiedad Perdida)</h3>
+        <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-4">
           <input
             type="text"
             value={debugSearch}
             onChange={(e) => setDebugSearch(e.target.value)}
-            className="flex-1 bg-gray-50 border border-border rounded-xl px-4 py-3"
+            className="w-full sm:flex-1 bg-gray-50 border border-border rounded-xl px-4 py-2.5 text-xs text-ink outline-none"
             placeholder="Dirección..."
           />
-          <button onClick={searchDebug} className="bg-red-600 text-white px-6 py-3 rounded-xl font-black uppercase text-xs flex items-center gap-2">
+          <button 
+            onClick={searchDebug} 
+            className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl font-black uppercase text-xs flex items-center justify-center gap-2 shrink-0 shadow-sm active:scale-95 transition-all"
+          >
             <Search className="w-4 h-4" /> Buscar en BD
           </button>
         </div>
         <div className="mt-4 space-y-2">
           {debugResults.map(res => (
-            <div key={res.id} className="p-4 border border-border rounded-lg text-xs space-y-1 flex justify-between items-center">
-                <div>
-                    <div className="font-bold">{res.direccion}</div>
-                    <div>ID: {res.id}</div>
-                    <div>Arrendatario: {res.arrendatario}</div>
-                    <div>Owner: {res.ownerUid}</div>
+            <div key={res.id} className="p-3 sm:p-4 border border-border rounded-xl text-xs space-y-1 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 bg-gray-50/40">
+                <div className="space-y-0.5">
+                    <div className="font-bold text-ink">{res.direccion}</div>
+                    <div className="text-[10px] text-muted">ID: {res.id}</div>
+                    <div className="text-[10px] text-muted">Arrendatario: {res.arrendatario}</div>
+                    <div className="text-[10px] text-muted">Owner: {res.ownerUid}</div>
                 </div>
-                <button onClick={() => deleteProperty(res.id)} className="bg-red-100 text-red-600 p-2 rounded-lg">
+                <button onClick={() => deleteProperty(res.id)} className="self-end sm:self-auto bg-red-100 text-red-600 p-2 rounded-lg hover:bg-red-200 transition-colors">
                     <Trash2 className="w-4 h-4" />
                 </button>
             </div>
@@ -237,104 +240,112 @@ export const AdminPanel = ({
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-2xl border border-border shadow-sm">
-        <h3 className="text-sm font-bold text-ink mb-4">Administración General de Usuarios</h3>
-        <div className="space-y-4">
+      {/* Administración de Usuarios */}
+      <div className="bg-white p-4 sm:p-6 rounded-2xl border border-border shadow-sm">
+        <h3 className="text-xs sm:text-sm font-bold text-ink mb-4">Administración General de Usuarios</h3>
+        <div className="space-y-3">
           {users.map((user) => (
-            <div key={user.uid} className="flex items-center gap-4 p-4 border border-border rounded-xl">
+            <div key={user.uid} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-3.5 sm:p-4 border border-border/80 rounded-xl bg-gray-50/50">
               <div className="flex-1 min-w-0 space-y-2">
                 {user.email === 'Sin email' || !user.email ? (
                   <div>
-                    <label className="block text-[9px] font-black text-amber-600 uppercase tracking-widest">Asociar Correo Electrónico</label>
+                    <label className="block text-[9px] font-black text-amber-600 uppercase tracking-widest mb-1">Asociar Correo Electrónico</label>
                     <input 
                       type="email"
                       placeholder="correo@ejemplo.com"
-                      className="w-full bg-amber-50/20 border border-amber-200 rounded-lg p-2 text-xs text-ink outline-none mt-1"
+                      className="w-full bg-white border border-amber-200 rounded-lg px-3 py-2 text-xs text-ink outline-none"
                       value={user.email === 'Sin email' ? '' : user.email}
                       onChange={(e) => setUsers(users.map(u => u.uid === user.uid ? { ...u, email: e.target.value } : u))}
                     />
                   </div>
                 ) : (
-                  <p className="text-[10px] font-bold text-muted uppercase">{user.email}</p>
+                  <p className="text-[10px] font-bold text-muted uppercase truncate">{user.email}</p>
                 )}
                 
                 <input 
                   type="text"
                   placeholder="Nombre de usuario"
-                  className="w-full bg-gray-50 border border-border/50 rounded-lg p-2 text-xs text-ink outline-none"
+                  className="w-full bg-white border border-border/60 rounded-lg px-3 py-2 text-xs text-ink outline-none"
                   value={user.name}
                   onChange={(e) => setUsers(users.map(u => u.uid === user.uid ? { ...u, name: e.target.value } : u))}
                 />
               </div>
-              <button 
-                className="p-2 text-primary hover:bg-primary/10 rounded-lg"
-                onClick={() => saveName(user.uid, user.name, user.email)}
-                title="Guardar cambios"
-              >
-                <Save className="w-4 h-4" />
-              </button>
-              
-              {/* Botón específico para traspasar propiedades visibles al usuario de esta fila */}
-              <button
-                className="bg-amber-50 hover:bg-amber-100 text-amber-700 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all"
-                onClick={() => vincularPropiedadesA(user.uid, user.email, properties)}
-                title={`Asignar las ${properties.length} propiedades en pantalla a este usuario`}
-              >
-                Traspasar ({properties.length})
-              </button>
 
-              <button 
-                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold ${currentImpersonatedUid === user.uid ? 'bg-primary text-white' : 'bg-gray-100'}`}
-                onClick={() => setImpersonatedUid(user.uid === currentImpersonatedUid ? null : user.uid)}
-              >
-                {currentImpersonatedUid === user.uid ? 'Implementado' : 'Implementar'}
-              </button>
+              <div className="flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/40 justify-end shrink-0">
+                <button 
+                  className="p-2 text-primary hover:bg-primary/10 rounded-lg border border-primary/20 shrink-0"
+                  onClick={() => saveName(user.uid, user.name, user.email)}
+                  title="Guardar cambios"
+                >
+                  <Save className="w-4 h-4" />
+                </button>
+                
+                <button
+                  className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 px-3 py-2 rounded-lg text-[10px] font-bold transition-all shrink-0"
+                  onClick={() => vincularPropiedadesA(user.uid, user.email, properties)}
+                  title={`Asignar las ${properties.length} propiedades en pantalla a este usuario`}
+                >
+                  Traspasar ({properties.length})
+                </button>
+
+                <button 
+                  className={`px-3 py-2 rounded-lg text-[10px] font-bold transition-all shrink-0 ${currentImpersonatedUid === user.uid ? 'bg-primary text-white shadow-sm' : 'bg-gray-200 text-ink hover:bg-gray-300'}`}
+                  onClick={() => setImpersonatedUid(user.uid === currentImpersonatedUid ? null : user.uid)}
+                >
+                  {currentImpersonatedUid === user.uid ? 'Implementado' : 'Implementar'}
+                </button>
+              </div>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-2xl border border-border shadow-sm">
-        <h3 className="text-sm font-bold text-ink mb-4">Configuración de Informes por Correo</h3>
-        <label className="block text-xs font-black text-muted uppercase tracking-widest mb-2">Correo para recepción de reportes</label>
-        <div className="flex gap-4 mb-4">
+      {/* Configuración de SMTP e Informes */}
+      <div className="bg-white p-4 sm:p-6 rounded-2xl border border-border shadow-sm space-y-4">
+        <h3 className="text-xs sm:text-sm font-bold text-ink">Configuración de Informes por Correo</h3>
+        <div>
+          <label className="block text-[10px] font-black text-muted uppercase tracking-widest mb-1.5">Correo para recepción de reportes</label>
           <input
             type="email"
             value={reportEmail}
             onChange={(e) => setReportEmail(e.target.value)}
-            className="flex-1 bg-gray-50 border border-border rounded-xl px-4 py-3"
+            className="w-full bg-gray-50 border border-border rounded-xl px-4 py-2.5 text-xs text-ink outline-none"
             placeholder="ejemplo@correo.com"
           />
         </div>
-        <label className="block text-xs font-black text-muted uppercase tracking-widest mb-2">Configuración SMTP</label>
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <input type="text" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} className="bg-gray-50 border border-border rounded-xl px-4 py-3" placeholder="SMTP Host (ej: smtp.gmail.com)" />
-          <input type="text" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} className="bg-gray-50 border border-border rounded-xl px-4 py-3" placeholder="SMTP Port (ej: 587)" />
-          <input type="text" value={smtpUser} onChange={(e) => setSmtpUser(e.target.value)} className="bg-gray-50 border border-border rounded-xl px-4 py-3" placeholder="SMTP Usuario" />
-          <input type="password" value={smtpPass} onChange={(e) => setSmtpPass(e.target.value)} className="bg-gray-50 border border-border rounded-xl px-4 py-3" placeholder="SMTP Contraseña" />
+
+        <div>
+          <label className="block text-[10px] font-black text-muted uppercase tracking-widest mb-1.5">Configuración SMTP</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <input type="text" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} className="bg-gray-50 border border-border rounded-xl px-4 py-2.5 text-xs text-ink outline-none" placeholder="SMTP Host (ej: smtp.gmail.com)" />
+            <input type="text" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} className="bg-gray-50 border border-border rounded-xl px-4 py-2.5 text-xs text-ink outline-none" placeholder="SMTP Port (ej: 587)" />
+            <input type="text" value={smtpUser} onChange={(e) => setSmtpUser(e.target.value)} className="bg-gray-50 border border-border rounded-xl px-4 py-2.5 text-xs text-ink outline-none" placeholder="SMTP Usuario" />
+            <input type="password" value={smtpPass} onChange={(e) => setSmtpPass(e.target.value)} className="bg-gray-50 border border-border rounded-xl px-4 py-2.5 text-xs text-ink outline-none" placeholder="SMTP Contraseña" />
+          </div>
         </div>
-        <div className="flex flex-wrap justify-end gap-3">
+
+        <div className="flex flex-col sm:flex-row flex-wrap justify-end gap-2.5 pt-2">
           <button
             onClick={testMonthlyExpiryCron}
-            className="bg-amber-50 text-amber-800 border border-amber-300 px-5 py-3 rounded-xl font-black uppercase text-xs hover:bg-amber-100 transition-all flex items-center gap-2"
+            className="w-full sm:w-auto justify-center bg-amber-50 text-amber-800 border border-amber-300 px-4 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-wider hover:bg-amber-100 transition-all flex items-center gap-2"
             title="Probar el cron de alerta de contratos vencidos o por vencer"
           >
              Probar Alerta Vencimientos
           </button>
           <button
             onClick={sendTestEmail}
-            className="bg-white text-primary border border-primary px-6 py-3 rounded-xl font-black uppercase text-xs hover:bg-gray-50 transition-all flex items-center gap-2"
+            className="w-full sm:w-auto justify-center bg-white text-primary border border-primary px-4 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-wider hover:bg-gray-50 transition-all flex items-center gap-2"
           >
              Probar Correo
           </button>
           <button
             onClick={saveEmailSettings}
-            className="bg-primary text-white px-6 py-3 rounded-xl font-black uppercase text-xs hover:bg-primary/90 transition-all flex items-center gap-2"
+            className="w-full sm:w-auto justify-center bg-primary text-white px-5 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-wider hover:bg-primary/90 transition-all flex items-center gap-2 shadow-sm"
           >
-            <Save className="w-4 h-4" /> Guardar Configuración
+            <Save className="w-3.5 h-3.5" /> Guardar Configuración
           </button>
         </div>
-        <p className="text-[10px] text-muted font-medium mt-3 italic">Nota: Asegúrate de tener un proveedor de correo (SMTP) configurado en el servidor para que los mensajes sean enviados.</p>
+        <p className="text-[10px] text-muted font-medium italic">Nota: Asegúrate de tener un proveedor de correo (SMTP) configurado en el servidor para que los mensajes sean enviados.</p>
       </div>
     </div>
   );
