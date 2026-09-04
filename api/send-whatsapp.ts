@@ -246,53 +246,22 @@ export default async function handler(req: any, res: any) {
           }
         }
 
-        // 2. Fallback to jaspers_market_order_confirmation_v1 if custom template language is resolving
-        const p1 = 'Punto Propiedades';
-        const p2 = `${expiringProps.length} Contrato(s) por Vencer`;
-        
-        let p3Short = 'Sin contratos pendientes.';
-        if (expiringProps.length > 0) {
-          const firstProp = expiringProps[0];
-          p3Short = `${firstProp.direccion || 'Propiedad'} (${firstProp.dueno || 'Dueño'}) - ${firstProp.valor || 'Canon'} - VENCIDO`;
-        }
+        const errCode = lastSpanishData?.error?.code;
+        const errDetails = lastSpanishData?.error?.message || 'Error de API Meta Cloud';
 
-        const templateRes = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${metaToken}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            messaging_product: 'whatsapp',
-            to: formattedPhone,
-            type: 'template',
-            template: {
-              name: 'jaspers_market_order_confirmation_v1',
-              language: { code: 'en_US' },
-              components: [
-                {
-                  type: 'body',
-                  parameters: [
-                    { type: 'text', text: p1.substring(0, 50) },
-                    { type: 'text', text: p2.substring(0, 50) },
-                    { type: 'text', text: p3Short.substring(0, 100) }
-                  ]
-                }
-              ]
-            }
-          })
-        });
-
-        const templateData = await templateRes.json();
-        if (templateRes.ok && templateData.messages) {
+        if (errCode === 131030) {
+          const waWebUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(messageText)}`;
           return res.status(200).json({
             success: true,
-            message: `✓ Alerta oficial de WhatsApp enviada a +${formattedPhone}. (ID: ${templateData.messages[0]?.id})`
+            fallbackUrl: waWebUrl,
+            message: `✓ (Modo Pruebas) Abriendo WhatsApp Web para despachar el reporte a +${formattedPhone}...`
           });
         }
 
-        const errCode = templateData.error?.code || lastSpanishData?.error?.code;
-        const errDetails = templateData.error?.message || lastSpanishData?.error?.message || 'Error de API Meta';
+        return res.status(200).json({
+          success: false,
+          error: `Error Meta API (${errCode || 'Desconocido'}): ${errDetails}`
+        });
 
         if (errCode === 131030) {
           const waWebUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(messageText)}`;
