@@ -158,9 +158,9 @@ export default async function handler(req: any, res: any) {
           multiLinePropParam = multiSections.join('\n\n');
         }
 
-        // 1. Attempt custom approved Spanish template matching
-        const customNames = ['alerta_vencimiento_multilinea', 'alerta_vencimiento_contrato', 'alerta_vencimiento_contra', 'alerta_vencimiento_co', 'alerta_vencimiento_cc', 'alerta_vencimiento'];
-        const customLangs = ['es', 'es_LA', 'es_ES', 'es_MX', 'es_CL'];
+        // 1. Attempt custom approved Spanish & English template matching
+        const customNames = ['alerta_ahorasiqsi1', 'alerta_vencimiento_multilinea', 'alerta_vencimiento_contrato', 'alerta_vencimiento_contra', 'alerta_vencimiento_co', 'alerta_vencimiento_cc', 'alerta_vencimiento'];
+        const customLangs = ['en', 'en_US', 'es', 'es_LA', 'es_ES', 'es_MX', 'es_CL'];
         let lastSpanishData: any = null;
 
         const safeTruncate = (str: string, maxLen: number) => {
@@ -177,7 +177,7 @@ export default async function handler(req: any, res: any) {
           for (const cLang of customLangs) {
             let templateComponents: any[] = [];
 
-            if (tName === 'alerta_vencimiento_multilinea') {
+            if (tName === 'alerta_ahorasiqsi1' || tName === 'alerta_vencimiento_multilinea') {
               const expiredText = expiredList.length > 0 
                 ? safeTruncate(expiredList.join('\n'), 450) 
                 : '• Ningún contrato vencido';
