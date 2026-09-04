@@ -194,8 +194,8 @@ export default async function handler(req: any, res: any) {
             let templateComponents: any[] = [];
 
             if (tName === 'alerta_ahorasiqsi1' || tName === 'alerta_vencimiento_multilinea') {
-              const expiredText = safeTruncateItems(expiredList, 450);
-              const upcomingText = safeTruncateItems(upcomingList, 450);
+              const expiredText = safeTruncateItems(expiredList, 300);
+              const upcomingText = safeTruncateItems(upcomingList, 300);
 
               templateComponents = [
                 {
