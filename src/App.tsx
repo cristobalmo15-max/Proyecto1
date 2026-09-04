@@ -277,6 +277,29 @@ export default function App() {
   const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
   const [emails, setEmails] = useState<any[]>([]);
 
+  // Handle direct deep-link URLs (e.g. ?module=reports&sub=expiries or #reports)
+  useEffect(() => {
+    const handleDeepLink = () => {
+      const params = new URLSearchParams(window.location.search);
+      const modParam = params.get('module') || (window.location.hash ? window.location.hash.replace('#', '') : null);
+      const subParam = params.get('sub');
+
+      if (modParam === 'reports' || modParam === 'vencimientos') {
+        setActiveModule('reports');
+        setReportsSubModule('expiries');
+      } else if (modParam && ['dashboard', 'properties', 'ai', 'reports', 'support', 'meetings', 'settings', 'admin'].includes(modParam)) {
+        setActiveModule(modParam as any);
+        if (subParam === 'expiries' || subParam === 'vencimientos') {
+          setReportsSubModule('expiries');
+        }
+      }
+    };
+
+    handleDeepLink();
+    window.addEventListener('hashchange', handleDeepLink);
+    return () => window.removeEventListener('hashchange', handleDeepLink);
+  }, []);
+
   const startConnectionFlow = (provider: 'gmail' | 'outlook') => {
     if (!customEmailInput.includes('@')) {
       showToast('Ingrese un correo institucional válido', 'error');
