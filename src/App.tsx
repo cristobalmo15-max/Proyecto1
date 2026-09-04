@@ -3873,9 +3873,6 @@ if (!isAuthReady) return null;
 
                           const data = await res.json();
                           if (res.ok && data.success) {
-                            if (data.fallbackUrl) {
-                              window.open(data.fallbackUrl, '_blank');
-                            }
                             showToast(`✓ WhatsApp: ${data.message || 'Procesado'}`, 'success');
                           } else {
                             showToast(`Error WhatsApp: ${data.error || 'Fallo en envío.'}`, 'error');
@@ -4792,12 +4789,6 @@ if (!isAuthReady) return null;
 
                           const data = await res.json();
                           if (res.ok && data.success) {
-                            if (data.fallbackUrl) {
-                              const win = window.open(data.fallbackUrl, '_blank');
-                              if (!win || win.closed || typeof win.closed === 'undefined') {
-                                window.location.href = data.fallbackUrl;
-                              }
-                            }
                             showToast(`✓ ${data.message || 'Envío de WhatsApp procesado.'}`, 'success');
                           } else {
                             showToast(`Error: ${data.error || 'Fallo en envío de WhatsApp.'}`, 'error');
