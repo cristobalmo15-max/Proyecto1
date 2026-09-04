@@ -3877,16 +3877,16 @@ if (!isAuthReady) return null;
             });
             
             return (
-              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-6 duration-700 max-w-7xl mx-auto py-4">
-                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 mb-4">
-                  <div className="space-y-2">
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-6 duration-700 max-w-7xl mx-auto py-2 sm:py-4">
+                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-4 md:gap-6 mb-4">
+                  <div className="space-y-1 sm:space-y-2">
                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-accent">Centro de Notificaciones</h4>
-                     <p className="text-4xl lg:text-5xl font-bold text-ink uppercase tracking-tight">
+                     <p className="text-2xl sm:text-4xl lg:text-5xl font-bold text-ink uppercase tracking-tight">
                         Reportes <span className="opacity-30">Mensuales</span>
                      </p>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
                     {/* Botón rápido para probar la alerta de vencimientos por correo */}
                     <button
                       onClick={async () => {
@@ -3911,7 +3911,7 @@ if (!isAuthReady) return null;
                           showToast(`Error de servidor: ${err.message}`, 'error');
                         }
                       }}
-                      className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-xs active:scale-95"
+                      className="w-full sm:w-auto justify-center bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-xs active:scale-95"
                       title="Ejecutar prueba instantánea del correo de vencimientos de contrato"
                     >
                       📧 Probar Alerta Correo
@@ -3956,62 +3956,62 @@ if (!isAuthReady) return null;
 
                           const data = await res.json();
                           if (res.ok && data.success) {
-                            showToast(`✓ WhatsApp: ${data.message || 'Procesado'}`, 'success');
+                            showToast(`✓ Mensaje oficial despachado a WhatsApp (+${data.recipient}).`, 'success');
                           } else {
-                            showToast(`Error WhatsApp: ${data.error || 'Fallo en envío.'}`, 'error');
+                            showToast(`Error Meta API: ${data.error || 'Fallo de entrega.'}`, 'error');
                           }
                         } catch (err: any) {
-                          showToast(`Error: ${err.message}`, 'error');
+                          showToast(`Error al enviar WhatsApp: ${err.message}`, 'error');
                         }
                       }}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-xs active:scale-95"
-                      title="Despachar alerta de WhatsApp de fondo con contratos vencidos y próximos a vencer"
+                      className="w-full sm:w-auto justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-md active:scale-95"
+                      title="Probar envío directo de alerta de WhatsApp con Meta Cloud API"
                     >
                       💬 Probar Alerta WhatsApp
                     </button>
-
-                    {/* Submodule Switcher */}
-                    <div className="flex bg-gray-100 p-1 rounded-2xl border border-border shrink-0 self-stretch sm:self-auto">
-                      <button
-                        onClick={() => setReportsSubModule('expenses')}
-                        className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${
-                          reportsSubModule === 'expenses'
-                            ? 'bg-white text-primary shadow-sm'
-                            : 'text-muted hover:text-ink'
-                        }`}
-                      >
-                        Registro de Gastos
-                      </button>
-                      <button
-                        onClick={() => setReportsSubModule('expiries')}
-                        className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${
-                          reportsSubModule === 'expiries'
-                            ? 'bg-white text-primary shadow-sm'
-                            : 'text-muted hover:text-ink'
-                        }`}
-                      >
-                        Vencimientos ({expiringProperties.length})
-                      </button>
-                    </div>
                   </div>
+                </div>
+
+                {/* Submodule Navigation Tabs */}
+                <div className="flex bg-gray-100 p-1 rounded-2xl border border-border shrink-0 max-w-full overflow-x-auto custom-scrollbar">
+                  <button
+                    onClick={() => setReportsSubModule('expenses')}
+                    className={`flex-1 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 whitespace-nowrap ${
+                      reportsSubModule === 'expenses'
+                        ? 'bg-white text-ink shadow-sm'
+                        : 'text-muted hover:text-ink'
+                    }`}
+                  >
+                    Registro de Gastos
+                  </button>
+                  <button
+                    onClick={() => setReportsSubModule('expiries')}
+                    className={`flex-1 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 whitespace-nowrap ${
+                      reportsSubModule === 'expiries'
+                        ? 'bg-white text-primary shadow-sm'
+                        : 'text-muted hover:text-ink'
+                    }`}
+                  >
+                    Vencimientos ({expiringProperties.length})
+                  </button>
                 </div>
 
                 {reportsSubModule === 'expiries' ? (
                   /* SECCION VENCIMIENTOS DE ARRIENDO */
-                  <div className="bg-white rounded-3xl border border-border shadow-sm p-8 space-y-6 animate-in fade-in duration-500">
+                  <div className="bg-white rounded-2xl sm:rounded-3xl border border-border shadow-sm p-4 sm:p-8 space-y-6 animate-in fade-in duration-500">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-border/60">
                       <div>
-                        <h3 className="text-lg font-black uppercase tracking-tight text-ink">Arriendos que vencen este mes y el próximo</h3>
+                        <h3 className="text-base sm:text-lg font-black uppercase tracking-tight text-ink">Arriendos que vencen este mes y el próximo</h3>
                         <p className="text-[10px] text-muted font-bold mt-1">Control predictivo de finalizaciones de contratos de arrendamiento.</p>
                       </div>
 
                       {/* Filter por Estado */}
-                      <div className="flex bg-gray-100 p-1 rounded-xl border border-border self-stretch sm:self-auto">
+                      <div className="flex bg-gray-100 p-1 rounded-xl border border-border w-full sm:w-auto">
                         {(['all', 'expired', 'upcoming'] as const).map((filterVal) => (
                           <button
                             key={filterVal}
                             onClick={() => setExpiryFilter(filterVal)}
-                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+                            className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
                               expiryFilter === filterVal
                                 ? 'bg-white text-primary shadow-xs'
                                 : 'text-muted hover:text-ink'
@@ -4036,7 +4036,7 @@ if (!isAuthReady) return null;
 
                       if (filteredExpiries.length === 0) {
                         return (
-                          <div className="text-center py-20 bg-gray-50/50 rounded-2xl border border-dashed border-border/60">
+                          <div className="text-center py-16 bg-gray-50/50 rounded-2xl border border-dashed border-border/60">
                             <FileText className="w-10 h-10 text-muted/30 mx-auto mb-4" />
                             <p className="text-xs font-bold uppercase tracking-widest text-muted">Sin registros para este filtro</p>
                           </div>
@@ -4044,13 +4044,13 @@ if (!isAuthReady) return null;
                       }
 
                       return (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                           {filteredExpiries.map((p, idx) => {
                             if (!p) return null;
                             const { isExpired, daysRemaining } = getExpiryStatus(p.termino);
                             return (
-                              <div key={p.id || idx} className="bg-white p-6 rounded-[28px] border border-border/80 hover:border-red-200/50 hover:shadow-lg transition-all duration-300 flex flex-col justify-between gap-6 relative group">
-                                <div className="space-y-4">
+                              <div key={p.id || idx} className="bg-white p-4 sm:p-6 rounded-2xl sm:rounded-[28px] border border-border/80 hover:border-red-200/50 hover:shadow-lg transition-all duration-300 flex flex-col justify-between gap-4 relative group">
+                                <div className="space-y-3">
                                   <div className="flex justify-between items-start">
                                     <span className={`text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full ${
                                       isExpired ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-amber-50 text-amber-600 border border-amber-200'
@@ -4060,9 +4060,9 @@ if (!isAuthReady) return null;
                                     <span className="text-[10px] font-bold text-ink font-mono">{formatDateDMY(p.termino)}</span>
                                   </div>
 
-                                  <div className="space-y-2">
-                                    <h4 className="text-sm font-black text-ink uppercase tracking-tight line-clamp-2 leading-snug group-hover:text-red-600 transition-colors">{p.direccion}</h4>
-                                    <div className="text-[10.5px] text-muted space-y-1">
+                                  <div className="space-y-1.5">
+                                    <h4 className="text-xs sm:text-sm font-black text-ink uppercase tracking-tight break-words leading-snug group-hover:text-red-600 transition-colors">{p.direccion}</h4>
+                                    <div className="text-[10px] text-muted space-y-0.5">
                                       <p>Propietario: <span className="font-extrabold text-slate-700">{p.dueno || 'Sin Registrar'}</span></p>
                                       <p>Inquilino: <span className="font-extrabold text-slate-700">{p.arrendatario || 'Sin Registrar'}</span></p>
                                       <p>Plazo Contrato: <span className="font-bold">{p.duracion || 'N/A'}</span></p>
