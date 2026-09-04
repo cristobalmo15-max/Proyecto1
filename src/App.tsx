@@ -264,6 +264,7 @@ export default function App() {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [activeModule, setActiveModule] = useState<'dashboard' | 'properties' | 'ai' | 'expenses' | 'reports' | 'support' | 'meetings' | 'settings' | 'email' | 'admin'>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isHoveredSidebar, setIsHoveredSidebar] = useState(false);
   const [networksTab, setNetworksTab] = useState<'whatsapp' | 'email' | 'status'>('whatsapp');
   const [isEmailConnected, setIsEmailConnected] = useState(false);
@@ -2871,12 +2872,92 @@ if (!isAuthReady) return null;
   const isExpanded = sidebarOpen || isHoveredSidebar;
 
   return (
-    <div className="flex h-screen bg-[#faf9f6]/40 text-[#1a1a1a] overflow-hidden selection:bg-primary/20">
-      {/* Sidebar: Instagram Web Style - Hover Expand */}
+    <div className="flex flex-col md:flex-row min-h-screen md:h-screen bg-[#faf9f6]/40 text-[#1a1a1a] overflow-x-hidden md:overflow-hidden selection:bg-primary/20">
+      {/* Mobile Top Header */}
+      <header className="flex md:hidden sticky top-0 z-50 bg-white border-b border-border px-4 py-3 justify-between items-center shadow-xs shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-red-600 to-red-500 flex items-center justify-center shrink-0 shadow-md">
+            <span className="text-white font-bold text-xs">P</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-ink font-black text-xs uppercase tracking-tight leading-none">Punto Propiedades</span>
+            <span className="text-primary font-bold text-[9px] tracking-widest uppercase leading-none mt-0.5">
+              {activeModule === 'dashboard' && 'Panel Control'}
+              {activeModule === 'properties' && 'Propiedades'}
+              {activeModule === 'ai' && 'Procesador IA'}
+              {activeModule === 'reports' && 'Reportes'}
+              {activeModule === 'meetings' && 'Reuniones'}
+              {activeModule === 'support' && 'Soporte'}
+              {activeModule === 'settings' && 'Redes & Canales'}
+              {activeModule === 'admin' && 'Admin'}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {user && (
+            <img src={user.photoURL || ''} className="w-7 h-7 rounded-full border border-border" referrerPolicy="no-referrer" alt="" />
+          )}
+          <button 
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 text-ink hover:bg-slate-100 rounded-xl transition-all active:scale-95 border border-border/60"
+            aria-label="Abrir Menú"
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
+      </header>
+
+      {/* Mobile Menu Dropdown Drawer */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="md:hidden sticky top-[53px] z-40 bg-white border-b border-border shadow-xl overflow-hidden px-4 py-3 space-y-1.5 shrink-0"
+          >
+            {[
+              { id: 'dashboard', icon: <LayoutDashboard className="w-4 h-4" />, label: 'Panel de Control' },
+              { id: 'properties', icon: <Building2 className="w-4 h-4" />, label: 'Propiedades Activas' },
+              { id: 'ai', icon: <Zap className="w-4 h-4" />, label: 'Procesador IA' },
+              { id: 'reports', icon: <PieChart className="w-4 h-4" />, label: 'Reportes Mensuales' },
+              { id: 'meetings', icon: <Video className="w-4 h-4" />, label: 'Reuniones & Meet' },
+              { id: 'support', icon: <Headset className="w-4 h-4" />, label: 'Mesa de Soporte' },
+              { id: 'settings', icon: <Share2 className="w-4 h-4" />, label: 'Redes & Canales' },
+              ...(isAdmin ? [{ id: 'admin', icon: <ShieldCheck className="w-4 h-4" />, label: 'Admin Master' }] : [])
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setActiveModule(item.id as any);
+                  setMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-xs transition-all ${
+                  activeModule === item.id 
+                    ? 'bg-red-600 text-white shadow-md' 
+                    : 'text-muted hover:text-ink hover:bg-slate-50'
+                }`}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+              </button>
+            ))}
+            <div className="pt-2 border-t border-border flex justify-between items-center">
+              <span className="text-[10px] text-muted font-bold truncate max-w-[200px]">{user?.email}</span>
+              <button onClick={() => auth.signOut()} className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-bold uppercase">
+                Salir
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Desktop Sidebar: Instagram Web Style - Hover Expand */}
       <aside 
         onMouseEnter={() => setIsHoveredSidebar(true)}
         onMouseLeave={() => setIsHoveredSidebar(false)}
-        className={`bg-white transition-all duration-300 ease-in-out flex flex-col z-40 relative border-r border-border/50 shadow-sm hover:shadow-xl ${isExpanded ? 'w-[260px]' : 'w-[80px]'}`}
+        className={`hidden md:flex bg-white transition-all duration-300 ease-in-out flex-col z-40 relative border-r border-border/50 shadow-sm hover:shadow-xl ${isExpanded ? 'w-[260px]' : 'w-[80px]'}`}
       >
         <div className={`py-6 mb-4 flex items-center transition-all duration-300 ${isExpanded ? 'px-6 justify-between' : 'px-4 justify-center gap-3'}`}>
           <div className={`flex items-center gap-3 transition-all duration-300 ${!isExpanded && 'scale-105'}`}>
@@ -2974,7 +3055,7 @@ if (!isAuthReady) return null;
       </aside>
 
       {/* Main Content */}
-      <main className={`flex-1 flex flex-col ${activeModule === 'properties' ? 'overflow-hidden' : 'overflow-y-auto'} ${activeModule === 'properties' ? 'p-3 md:p-6' : activeModule === 'settings' || activeModule === 'support' || activeModule === 'meetings' || activeModule === 'admin' ? 'p-6 pt-4' : 'p-8'} relative`}>
+      <main className={`flex-1 flex flex-col ${activeModule === 'properties' ? 'overflow-x-hidden md:overflow-hidden' : 'overflow-y-auto'} p-3 sm:p-4 md:p-6 lg:p-8 relative min-w-0`}>
         {activeModule !== 'properties' && activeModule !== 'ai' && activeModule !== 'reports' && (
           <header className={`flex justify-between items-center ${activeModule === 'settings' || activeModule === 'support' || activeModule === 'meetings' || activeModule === 'admin' ? 'mb-4' : 'mb-8'}`}>
             <div className="flex items-center gap-4">
