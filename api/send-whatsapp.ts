@@ -193,8 +193,12 @@ export default async function handler(req: any, res: any) {
             let templateComponents: any[] = [];
 
             if (tName === 'alerta_ahorasiqsi1' || tName === 'alerta_vencimiento_multilinea') {
-              const expiredText = safeTruncateMultiline(expiredList, 450);
-              const upcomingText = safeTruncateMultiline(upcomingList, 450);
+              const expiredText = expiredList.length > 0 
+                ? safeTruncate(expiredList.join(' ➔ '), 450) 
+                : '• Ningún contrato vencido';
+              const upcomingText = upcomingList.length > 0 
+                ? safeTruncate(upcomingList.join(' ➔ '), 450) 
+                : '• Ningún contrato por vencer';
 
               // Try 2-parameter structure ({{1}} Vencidos, {{2}} Por Vencer)
               const res2Param = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
