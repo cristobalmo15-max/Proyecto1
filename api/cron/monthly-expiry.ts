@@ -209,8 +209,8 @@ export default async function handler(req: any, res: any) {
           <!-- CALL TO ACTION BUTTON -->
           <tr>
             <td align="center" style="padding: 0 40px 36px 40px;">
-              <a href="https://proyecto1-chi-gules.vercel.app" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #ffffff; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; text-decoration: none; padding: 16px 36px; border-radius: 14px; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);">
-                Acceder al Panel de Gestión →
+              <a href="https://proyecto1-chi-gules.vercel.app/?module=reports&sub=expiries" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #ffffff; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; text-decoration: none; padding: 16px 36px; border-radius: 14px; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);">
+                Acceder a Reportes de Vencimientos →
               </a>
             </td>
           </tr>
