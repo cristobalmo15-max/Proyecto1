@@ -158,8 +158,8 @@ export default async function handler(req: any, res: any) {
           multiLinePropParam = multiSections.join('\n\n');
         }
 
-        // 1. Attempt custom approved Spanish & English template matching
-        const customNames = ['alerta_ahorasiqsi1', 'alerta_vencimiento_multilinea', 'alerta_vencimiento_contrato', 'alerta_vencimiento_contra', 'alerta_vencimiento_co', 'alerta_vencimiento_cc', 'alerta_vencimiento'];
+        // 1. Attempt custom approved multiline template matching exclusively
+        const customNames = ['alerta_ahorasiqsi1', 'alerta_vencimiento_multilinea'];
         const customLangs = ['en', 'en_US', 'es', 'es_LA', 'es_ES', 'es_MX', 'es_CL'];
         let lastSpanishData: any = null;
 
