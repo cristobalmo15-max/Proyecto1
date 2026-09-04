@@ -173,17 +173,28 @@ export default async function handler(req: any, res: any) {
           return sub + '...';
         };
 
+        const safeTruncateMultiline = (lines: string[], maxLen: number) => {
+          if (lines.length === 0) return '• Ningún contrato registrado';
+          let result = '';
+          let count = 0;
+          for (const line of lines) {
+            if ((result + line + '\n').length > maxLen - 30) {
+              const remaining = lines.length - count;
+              return (result + `• (+ ${remaining} contrato(s) más)`).trim();
+            }
+            result += line + '\n';
+            count++;
+          }
+          return result.trim();
+        };
+
         for (const tName of customNames) {
           for (const cLang of customLangs) {
             let templateComponents: any[] = [];
 
             if (tName === 'alerta_ahorasiqsi1' || tName === 'alerta_vencimiento_multilinea') {
-              const expiredText = expiredList.length > 0 
-                ? safeTruncate(expiredList.join('\n'), 450) 
-                : '• Ningún contrato vencido';
-              const upcomingText = upcomingList.length > 0 
-                ? safeTruncate(upcomingList.join('\n'), 450) 
-                : '• Ningún contrato por vencer';
+              const expiredText = safeTruncateMultiline(expiredList, 450);
+              const upcomingText = safeTruncateMultiline(upcomingList, 450);
 
               // Try 2-parameter structure ({{1}} Vencidos, {{2}} Por Vencer)
               const res2Param = await fetch(`https://graph.facebook.com/v20.0/${metaPhoneId}/messages`, {
