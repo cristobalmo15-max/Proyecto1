@@ -2756,26 +2756,26 @@ if (!isAuthReady) return null;
         </section>
 
         {/* Product Showcase Section */}
-        <section id="features" className="bg-ink text-white py-32">
-          <div className="max-w-7xl mx-auto px-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-16">
-              <div className="lg:col-span-1 space-y-6">
-                <h2 className="text-5xl font-black tracking-tight leading-none uppercase">Características <br /> de Elite.</h2>
-                <p className="text-white/60 text-lg leading-relaxed">
+        <section id="features" className="bg-ink text-white py-16 md:py-32">
+          <div className="max-w-7xl mx-auto px-4 md:px-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-16">
+              <div className="lg:col-span-1 space-y-4 md:space-y-6">
+                <h2 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight leading-none uppercase break-words">Características <br /> de Elite.</h2>
+                <p className="text-white/60 text-base md:text-lg leading-relaxed">
                   Diseñado por ingenieros para administradores que buscan la perfección operativa.
                 </p>
               </div>
-              <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-8">
                 {[
                   { icon: <ShieldCheck className="w-8 h-8" />, title: "Seguridad Bancaria", desc: "Cifrado de extremo a extremo para todos sus contratos y datos financieros." },
                   { icon: <Zap className="w-8 h-8" />, title: "IA Avanzada", desc: "El motor de IA más rápido del mundo procesando sus documentos en milisegundos." },
                   { icon: <Globe className="w-8 h-8" />, title: "Acceso Universal", desc: "Gestione su cartera desde cualquier lugar, en cualquier dispositivo, en tiempo real." },
                   { icon: <BarChart3 className="w-8 h-8" />, title: "Reportes Pro", desc: "Liquidaciones mensuales automáticas enviadas directamente al propietario." }
                 ].map((item, i) => (
-                  <div key={`line-1855-${i}`} className="bg-white/5 p-8 rounded-[32px] border border-white/10 hover:bg-white/10 transition-all group">
-                    <div className="text-primary mb-6 group-hover:scale-110 transition-transform">{item.icon}</div>
-                    <h3 className="text-xl font-bold mb-3">{item.title}</h3>
-                    <p className="text-white/50 text-sm leading-relaxed">{item.desc}</p>
+                  <div key={`line-1855-${i}`} className="bg-white/5 p-6 md:p-8 rounded-2xl md:rounded-[32px] border border-white/10 hover:bg-white/10 transition-all group">
+                    <div className="text-primary mb-4 md:mb-6 group-hover:scale-110 transition-transform">{item.icon}</div>
+                    <h3 className="text-lg md:text-xl font-bold mb-2 md:mb-3">{item.title}</h3>
+                    <p className="text-white/50 text-xs md:text-sm leading-relaxed">{item.desc}</p>
                   </div>
                 ))}
               </div>
@@ -2784,41 +2784,43 @@ if (!isAuthReady) return null;
         </section>
 
         {/* Market Competitiveness (Recipe 1) */}
-        <section id="market" className="py-32 max-w-7xl mx-auto px-8">
-          <div className="text-center mb-20">
-            <h2 className="text-4xl font-black tracking-tight uppercase mb-4">Análisis de Competitividad</h2>
-            <div className="h-1 w-20 bg-primary mx-auto"></div>
+        <section id="market" className="py-16 md:py-32 max-w-7xl mx-auto px-4 md:px-8">
+          <div className="text-center mb-10 md:mb-20">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight uppercase mb-3 md:mb-4">Análisis de Competitividad</h2>
+            <div className="h-1 w-16 md:w-20 bg-primary mx-auto"></div>
           </div>
-          <div className="border border-border rounded-[40px] overflow-hidden shadow-2xl">
-            <div className="grid grid-cols-4 bg-gray-50 p-6 border-b border-border text-[10px] font-black uppercase tracking-widest text-muted">
-              <div className="col-span-1">Funcionalidad</div>
-              <div className="text-center text-primary">Punto Propiedades</div>
-              <div className="text-center">Software Tradicional</div>
-              <div className="text-center">Excel / Manual</div>
-            </div>
-            {[
-              { label: 'Procesamiento IA', punto: '✓ Full', trad: '✗ No', manual: '✗ No' },
-              { label: 'Liquidación Automática', punto: '✓ 1-Click', trad: '⚠ Limitado', manual: '✗ Manual' },
-              { label: 'Gestión Documental', punto: '✓ Cloud', trad: '✓ Cloud', manual: '✗ Local' },
-              { label: 'Costo Operativo', punto: '↓ Mínimo', trad: '↑ Alto', manual: '↑↑ Máximo' }
-            ].map((row, i) => (
-              <div key={`line-1885-${i}`} className="grid grid-cols-4 p-8 border-b border-border hover:bg-gray-50 transition-all items-center">
-                <div className="text-sm font-bold text-ink">{row.label}</div>
-                <div className="text-center text-primary font-black">{row.punto}</div>
-                <div className="text-center text-muted font-bold">{row.trad}</div>
-                <div className="text-center text-muted font-bold">{row.manual}</div>
+          <div className="border border-border rounded-2xl md:rounded-[40px] overflow-x-auto custom-scrollbar shadow-2xl bg-white">
+            <div className="min-w-[580px]">
+              <div className="grid grid-cols-4 bg-gray-50 p-4 md:p-6 border-b border-border text-[9px] md:text-[10px] font-black uppercase tracking-widest text-muted">
+                <div className="col-span-1">Funcionalidad</div>
+                <div className="text-center text-primary">Punto Propiedades</div>
+                <div className="text-center">Software Tradicional</div>
+                <div className="text-center">Excel / Manual</div>
               </div>
-            ))}
+              {[
+                { label: 'Procesamiento IA', punto: '✓ Full', trad: '✗ No', manual: '✗ No' },
+                { label: 'Liquidación Automática', punto: '✓ 1-Click', trad: '⚠ Limitado', manual: '✗ Manual' },
+                { label: 'Gestión Documental', punto: '✓ Cloud', trad: '✓ Cloud', manual: '✗ Local' },
+                { label: 'Costo Operativo', punto: '↓ Mínimo', trad: '↑ Alto', manual: '↑↑ Máximo' }
+              ].map((row, i) => (
+                <div key={`line-1885-${i}`} className="grid grid-cols-4 p-4 md:p-8 border-b border-border hover:bg-gray-50 transition-all items-center text-xs md:text-sm">
+                  <div className="font-bold text-ink">{row.label}</div>
+                  <div className="text-center text-primary font-black">{row.punto}</div>
+                  <div className="text-center text-muted font-bold">{row.trad}</div>
+                  <div className="text-center text-muted font-bold">{row.manual}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
-        <footer className="bg-gray-50 border-t border-border py-16">
-          <div className="max-w-7xl mx-auto px-8 flex flex-col md:flex-row justify-between items-center gap-8">
-            <div className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+        <footer className="bg-gray-50 border-t border-border py-10 md:py-16">
+          <div className="max-w-7xl mx-auto px-4 md:px-8 flex flex-col md:flex-row justify-between items-center gap-6 md:gap-8 text-center md:text-left">
+            <div className="text-lg md:text-xl font-bold tracking-tight flex items-center gap-2.5">
               <div className="w-8 h-8 bg-primary rounded-xl flex items-center justify-center text-white text-xs shadow-lg shadow-primary/20">P</div>
               <span className="text-ink">PUNTO PROPIEDADES</span>
             </div>
-            <p className="text-muted text-sm font-bold uppercase tracking-widest">© 2026 Ingeniería Inmobiliaria de Clase Mundial.</p>
+            <p className="text-muted text-xs md:text-sm font-bold uppercase tracking-widest">© 2026 Ingeniería Inmobiliaria de Clase Mundial.</p>
             <div className="flex gap-6">
               <a href="#" className="text-muted hover:text-primary transition-colors"><Globe className="w-5 h-5" /></a>
               <a href="#" className="text-muted hover:text-primary transition-colors"><Mail className="w-5 h-5" /></a>
