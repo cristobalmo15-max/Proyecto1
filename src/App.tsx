@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Building2, 
@@ -63,11 +63,17 @@ import {
   UserCheck,
   FlaskConical,
   Flag,
-  TrendingUp
+  TrendingUp,
+  HelpCircle
 } from 'lucide-react';
-import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { ReportModal } from './components/ReportModal';
 import { AdminPanel } from './components/AdminPanel';
+import { AiProcessorView } from './features/ai-audit/AiProcessorView';
+import { ContractPreviewModal } from './features/ai-audit/ContractPreviewModal';
+import { OnboardingModal } from './components/OnboardingModal';
+import { formatRut, cleanRut } from './utils/rutUtils';
+import { formatDateDMY, parseExpiryDate, calculateExpiry, isExpired, getExpiryStatus } from './utils/dateUtils';
+import { normalizeAddress, normalizeText, getFileFingerprint, getSectionTitle } from './utils/addressUtils';
 import { auth, db, storage, loginWithGoogle, loginWithGoogleScopes, getLoginRedirectResult, logout, sendAccessLink, isSignInWithEmailLink, signInWithEmailLink, getAccessToken } from './lib/firebase';
 import { GoogleAuthProvider, onAuthStateChanged, User } from 'firebase/auth';
 import { 
@@ -154,34 +160,6 @@ const MONTHS = [
 ];
 
 const EXPENSE_TYPES = ['ARRIENDO', 'LUZ', 'AGUA', 'BASURA', 'GAS', 'OTROS'];
-
-// Helper para formatear RUT
-const formatRut = (rut: string): string => {
-  if (!rut || rut === 'N/A') return 'N/A';
-  const cleanRut = rut.replace(/[^0-9Kk]/g, '').toUpperCase();
-  if (cleanRut.length < 2) return cleanRut;
-  const dv = cleanRut.slice(-1);
-  const body = cleanRut.slice(0, -1);
-  return `${body.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}-${dv}`;
-};
-
-// Helper para formatear fecha YYYY-MM-DD → DD-MM-YYYY
-const formatDateDMY = (dateStr?: string): string => {
-  if (!dateStr) return 'N/A';
-  const parts = dateStr.split('-');
-  if (parts.length === 3) {
-    return `${parts[2]}-${parts[1]}-${parts[0]}`;
-  }
-  return dateStr;
-};
-
-const getSectionTitle = (names: string[], type: 'dueno' | 'arrendatario'): string => {
-  const fullNamesList = names.join(' ').toUpperCase();
-  if (fullNamesList.includes('SUCESION') || fullNamesList.includes('SUCESIÓN')) return 'PROPIEDAD: SUCESIÓN';
-  if (fullNamesList.includes('SOCIEDAD') || fullNamesList.includes('SPA') || fullNamesList.includes('LTDA') || fullNamesList.includes(' S . A .')) return 'SOCIEDAD / EMPRESA';
-  if (fullNamesList.includes('MUNICIPALIDAD')) return 'ENTIDAD PÚBLICA';
-  return type === 'dueno' ? 'PROPIETARIO / SOCIEDAD' : 'ARRENDATARIO / INQUILINOS';
-};
 
 // --- Components ---
 
@@ -419,24 +397,11 @@ export default function App() {
 
   useEffect(() => {
     if (selectedProp) {
-      const resetScroll = () => {
-        window.scrollTo(0, 0);
-        if (document.documentElement) document.documentElement.scrollTop = 0;
-        if (document.body) document.body.scrollTop = 0;
-        document.querySelectorAll('main, div').forEach((el) => {
-          if (el.scrollTop > 0) {
-            el.scrollTop = 0;
-          }
-        });
-      };
-      
-      resetScroll();
-      const t1 = setTimeout(resetScroll, 10);
-      const t2 = setTimeout(resetScroll, 100);
-      return () => {
-        clearTimeout(t1);
-        clearTimeout(t2);
-      };
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      const detailsContainer = document.getElementById('property-details-container');
+      if (detailsContainer) {
+        detailsContainer.scrollTop = 0;
+      }
     }
   }, [selectedProp]);
 
@@ -483,47 +448,6 @@ export default function App() {
   };
 
   // Helper para identificar contratos que vencen en el mes actual o siguiente
-  const getExpiryStatus = (terminoStr?: string) => {
-    if (!terminoStr) return { isExpiryCandidate: false, isExpired: false, daysRemaining: 0 };
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    let expiryDate: Date | null = null;
-    if (terminoStr.includes('/')) {
-      const parts = terminoStr.split('/');
-      if (parts.length === 3) {
-        expiryDate = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10), 12, 0, 0);
-      }
-    } else if (terminoStr.includes('-')) {
-      const parts = terminoStr.split('-');
-      if (parts.length === 3) {
-        if (parts[0].length === 4) {
-          expiryDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 12, 0, 0);
-        } else {
-          expiryDate = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10), 12, 0, 0);
-        }
-      }
-    }
-
-    if (!expiryDate || isNaN(expiryDate.getTime())) {
-      expiryDate = new Date(terminoStr);
-    }
-
-    if (isNaN(expiryDate.getTime())) {
-      return { isExpiryCandidate: false, isExpired: false, daysRemaining: 0 };
-    }
-    
-    // Candidatos: vencidos o que vencen hasta el fin del próximo mes
-    const maxDate = new Date(today.getFullYear(), today.getMonth() + 2, 0); // último día del próximo mes
-    const isExpiryCandidate = expiryDate <= maxDate;
-    const isExpired = expiryDate < today;
-    
-    const diffTime = expiryDate.getTime() - today.getTime();
-    const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    return { isExpiryCandidate, isExpired, daysRemaining };
-  };
-
   const expiringProperties = properties.filter(p => {
     const { isExpiryCandidate } = getExpiryStatus(p.termino);
     return isExpiryCandidate;
@@ -695,26 +619,16 @@ export default function App() {
 
   const [correoStep, setCorreoStep] = useState<number>(1);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
   const [previewPropId, setPreviewPropId] = useState<string>('');
   const [smtpError, setSmtpError] = useState<string | null>(null);
-
-  const getFileFingerprint = async (file: File): Promise<string> => {
-    try {
-      const chunk = file.slice(0, 64 * 1024);
-      const arrayBuffer = await chunk.arrayBuffer();
-      const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-      return `${file.size}-${hashHex}`;
-    } catch (err) {
-      return `${file.name}-${file.size}-${file.lastModified}`;
-    }
-  };
 
   const deleteDuplicates = () => {
     const originalCount = bulkData.length;
     const filteredData = bulkData.filter(item => !item.isDuplicate);
+    const validFileNames = new Set(filteredData.map(d => d.fileName));
     setBulkData(filteredData);
+    setBulkFiles(prev => prev.filter(f => validFileNames.has(f.name)));
     setHasDuplicates(false);
     showToast(`Se eliminaron ${originalCount - filteredData.length} duplicados`);
   };
@@ -729,9 +643,6 @@ export default function App() {
     boleta: '',
     file: null as File | null
   });
-
-  const geminiApiKey = process.env.GEMINI_API_KEY || '';
-  const ai = geminiApiKey ? new GoogleGenAI({ apiKey: geminiApiKey }) : null;
 
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => {
@@ -844,23 +755,21 @@ export default function App() {
         smtpPass: userData?.smtpPass || globalData?.smtpPass || '',
         // Individual destination phone per account
         whatsappPhone: userData?.whatsappPhone || globalData?.whatsappPhone || '56950125765',
-        whatsappAutoReport: userData?.whatsappAutoReport || globalData?.whatsappAutoReport
+        whatsappAutoReport: userData?.whatsappAutoReport || globalData?.whatsappAutoReport,
+        hasSeenTutorial: userData?.hasSeenTutorial === true,
+        isSettingsLoaded: true
       };
       setAppSettings(combined);
     };
 
     const unsubGlobal = onSnapshot(globalRef, (snap) => {
-      if (snap.exists()) {
-        globalData = snap.data();
-        syncCombined();
-      }
+      globalData = snap.exists() ? snap.data() : {};
+      syncCombined();
     });
 
     const unsubUser = onSnapshot(userRef, (snap) => {
-      if (snap.exists()) {
-        userData = snap.data();
-        syncCombined();
-      }
+      userData = snap.exists() ? snap.data() : {};
+      syncCombined();
     });
 
     return () => {
@@ -868,6 +777,59 @@ export default function App() {
       unsubUser();
     };
   }, [user]);
+
+  const tutorialCheckedRef = useRef(false);
+
+  // Control de tutorial de bienvenida para cuentas nuevas (una sola vez por cuenta)
+  useEffect(() => {
+    if (!user?.uid || !isAuthReady) return;
+    if (tutorialCheckedRef.current) return;
+
+    const localKey = `tutorial_seen_${user.uid}`;
+    const localSeen = localStorage.getItem(localKey) === 'true';
+
+    // Si localmente ya se marcó como visto en este navegador, no mostrar
+    if (localSeen) {
+      tutorialCheckedRef.current = true;
+      return;
+    }
+
+    const settingsLoaded = (appSettings as any)?.isSettingsLoaded === true;
+    const remoteSeen = (appSettings as any)?.hasSeenTutorial === true;
+
+    if (remoteSeen) {
+      tutorialCheckedRef.current = true;
+      return;
+    }
+
+    // Si Firestore ya cargó la configuración y no está visto, mostrar tutorial
+    if (settingsLoaded) {
+      tutorialCheckedRef.current = true;
+      setShowTutorial(true);
+    } else {
+      // Fallback de seguridad (1.2s) si Firestore tarda en responder
+      const timer = setTimeout(() => {
+        if (!tutorialCheckedRef.current && localStorage.getItem(localKey) !== 'true') {
+          tutorialCheckedRef.current = true;
+          setShowTutorial(true);
+        }
+      }, 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [user?.uid, isAuthReady, (appSettings as any)?.isSettingsLoaded, (appSettings as any)?.hasSeenTutorial]);
+
+  const handleCloseTutorial = async () => {
+    setShowTutorial(false);
+    if (user) {
+      const localKey = `tutorial_seen_${user.uid}`;
+      localStorage.setItem(localKey, 'true');
+      try {
+        await setDoc(doc(db, 'settings', user.uid), { hasSeenTutorial: true }, { merge: true });
+      } catch (err) {
+        console.error('Error al guardar estado de tutorial en Firebase:', err);
+      }
+    }
+  };
 
   const updateAppSettings = async (newSettings: any, silent: boolean = false) => {
     if (!user) return;
@@ -1208,71 +1170,29 @@ export default function App() {
     }
   };
 
-  const processContractWithGemini = async (file: File) => {
-    if (!ai) {
-      showToast('Error: La API Key de Gemini no está configurada en este entorno.', 'error');
-      throw new Error('Gemini API Key is not configured');
-    }
+  const processContractWithGemini = async (file: File, fileUrl?: string) => {
     const reader = new FileReader();
     return new Promise<any>((resolve, reject) => {
       reader.onload = async (e) => {
-        const base64 = (e.target?.result as string).split(',')[1];
         try {
-          const prompt = `Analiza este contrato de arriendo chileno y extrae la información clave en formato JSON. 
-          Si un dato no está presente, deja el campo como "".
-          CAMPOS REQUERIDOS:
-          - dir: Dirección de la propiedad.
-          - can: Canon de arriendo mensual (solo números, por ejemplo 850000 o 25 o 15.5; no metas letras ni símbolos, si está en UF ingresa solo el valor con punto decimal si aplica).
-          - tipo_mon: Tipo de moneda para el arriendo. Debe ser exactamente de dos opciones: "pesos" o "uf" (según lo que indique el contrato).
-          - f_ini: Fecha de inicio, firma o fecha de celebración del contrato, usualmente en la primera cláusula o al inicio (AAAA-MM-DD).
-          - dur_meses: Duración del contrato expresado únicamente en número entero de meses (ej: 6, 12, 18, 24, 36, 60, etc). Si indica 1 año pon 12, 2 años pon 24, etc.
-          - d_nom, d_rut, d_tel, d_mail: Nombre, RUT, Teléfono y Email del Arrendador (Dueño). IMPORTANTE MÁXIMA PRIORIDAD: Si se identifica que el Arrendador (Dueño) es una sociedad, empresa, o está representado por más de una persona, o existen múltiples copropietarios, extrae TODOS ellos y colócalos juntos separados obligatoriamente por una coma (,). Mantén exactamente el mismo orden de correspondencia para d_nom, d_rut, d_tel y d_mail de modo que queden alineados uno a uno. Ejemplo: d_nom: "Inmobiliaria S.A., Carlos Muñoz (repre)", d_rut: "76.452.122-K, 14.223.111-2", d_tel: "22345678, 912345678", d_mail: "contacto@inmobiliaria.cl, carlos@mail.com".
-          - a_nom, a_rut, a_tel, a_mail: Nombre, RUT, Teléfono y Email del Arrendatario. IMPORTANTE MÁXIMA PRIORIDAD: Si se identifica que el Arrendatario es una sociedad, empresa, o está representado por más de una persona, o existen múltiples arrendatarios/ocupantes, extrae TODOS ellos y colócalos juntos separados obligatoriamente por una coma (,). Mantén exactamente el mismo orden de correspondencia para a_nom, a_rut, a_tel y a_mail de modo que queden alineados uno a uno. Ejemplo: a_nom: "Constructora Beta S.A., Ana Gómez (repre)", a_rut: "77.123.456-7, 12.345.678-9", a_tel: "22876543, 987654321", a_mail: "contacto@beta.cl, ana@betacorp.cl".
-          - av_nom, av_rut, av_tel, av_mail: Nombre, RUT, Teléfono y Email del Aval / Codeudor Solidario.
-          
-          JSON SCHEMA: {"dir":"","can":"","tipo_mon":"pesos","f_ini":"","dur_meses":12,"d_nom":"","d_rut":"","d_tel":"","d_mail":"","a_nom":"","a_rut":"","a_tel":"","a_mail":"","av_nom":"","av_rut":"","av_tel":"","av_mail":""}`;
-
-          const response = await ai.models.generateContent({
-            model: "gemini-3.1-flash-lite-preview",
-            contents: [
-              { text: prompt },
-              { inlineData: { mimeType: "application/pdf", data: base64 } }
-            ],
-            config: {
-              responseMimeType: "application/json",
-              thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }
-            }
+          const base64 = (e.target?.result as string) || '';
+          const res = await fetch('/api/process-contract', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ base64, fileUrl })
           });
-
-          const result = JSON.parse(response.text || '{}');
-          resolve(result);
-        } catch (err) {
+          const json = await res.json();
+          if (!res.ok || !json.success) {
+            throw new Error(json.error || 'Error al procesar contrato con IA');
+          }
+          resolve(json.data);
+        } catch (err: any) {
           reject(err);
         }
       };
+      reader.onerror = (err) => reject(err);
       reader.readAsDataURL(file);
     });
-  };
-
-  const normalizeAddress = (addr: string) => {
-    if (!addr) return '';
-    return addr
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "") // Limpiar acentos
-      .replace(/\b(calle|av|avenida|pasaje|pje|nro|n|numero|num|de|la|el|los|las|departamento|depto|unidad|casa|block|lote|isla|maipo|comuna|region|metropolitana)\b/gi, '')
-      .replace(/[^a-z0-9]/g, '') // Ahora sí eliminar todo lo demás
-      .trim();
-  };
-
-  const normalizeText = (text: string) => {
-    if (!text) return '';
-    return text
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]/g, '')
-      .trim();
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1364,11 +1284,12 @@ export default function App() {
   };
 
   const handleBulkFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files: File[] = Array.from(e.target.files || []);
+    const inputElement = e.target;
+    const files: File[] = Array.from(inputElement.files || []);
     if (files.length === 0) return;
 
     setLoading(true);
-    setLoadingStatus('Iniciando análisis paralelo...');
+    setLoadingStatus(files.length === 1 ? 'Analizando contrato con IA...' : 'Iniciando análisis paralelo...');
     setProgress(0);
     
     // Process in chunks of 5 to avoid rate limits and memory issues
@@ -1380,15 +1301,28 @@ export default function App() {
     
     for (let i = 0; i < files.length; i += CHUNK_SIZE) {
       const chunkIndices = Array.from({ length: Math.min(CHUNK_SIZE, files.length - i) }, (_, k) => i + k);
-      setLoadingStatus(`Procesando lote ${Math.floor(i / CHUNK_SIZE) + 1} de ${Math.ceil(files.length / CHUNK_SIZE)}...`);
+      if (files.length > 1) {
+        setLoadingStatus(`Procesando lote ${Math.floor(i / CHUNK_SIZE) + 1} de ${Math.ceil(files.length / CHUNK_SIZE)}...`);
+      }
       
       const chunkPromises = chunkIndices.map(async (idx) => {
         const file = files[idx];
         try {
-          const [data, pdfUrl] = await Promise.all([
-            processContractWithGemini(file),
-            uploadFileToStorage(file, 'contracts')
-          ]);
+          let data: any = {};
+          let pdfUrl = '#';
+
+          try {
+            [data, pdfUrl] = await Promise.all([
+              processContractWithGemini(file),
+              uploadFileToStorage(file, 'contracts').catch(err => {
+                console.warn('Storage diferido para sincronización posterior:', err);
+                return '#';
+              })
+            ]);
+          } catch (geminiErr) {
+            console.error(`Error procesando ${file.name} con Gemini:`, geminiErr);
+            throw geminiErr;
+          }
 
           const extractedMonths = Number(data.dur_meses) || 12;
           const initialTipoMon = (data.tipo_mon === 'uf' || data.tipo_mon === 'pesos') ? data.tipo_mon : 'pesos';
@@ -1417,13 +1351,38 @@ export default function App() {
       setProgress(Math.round(((Math.min(i + CHUNK_SIZE, files.length)) / files.length) * 100));
     }
 
-    // Advanced Duplicate detection: Multi-Factor (Fingerprint, Address+Amount, Tenant)
-    const seenHashes = new Set();
-    const seenContentKeys = new Set();
+    if (results.length === 0) {
+      setLoading(false);
+      showToast('No se pudo extraer información del archivo', 'error');
+      if (inputElement) inputElement.value = '';
+      return;
+    }
+
+    // Advanced Duplicate detection: Multi-Factor (Fingerprint, Address+Amount, Tenant, RUT)
+    // Seed seen hashes and content keys from existing bulkData queue
+    const seenHashes = new Set(bulkData.map(d => d.fingerprint).filter(Boolean));
+    const seenContentKeys = new Set(bulkData.map(d => {
+      const normDir = normalizeAddress(d.dir);
+      const amountVal = (d.valor || '0').toString().replace(/[^0-9]/g, '');
+      return `${normDir}_${amountVal}`;
+    }).filter(k => k.length > 5));
+    const seenRutKeys = new Set(bulkData.map(d => cleanRut(d.a_rut)).filter(r => r && r.length >= 8));
     
-    // Create maps for existing data
-    const existingAddressMap = new Map(properties.map(p => [normalizeAddress(p.direccion), p.id]));
-    const existingTenantMap = new Map(properties.map(p => [normalizeText(p.arrendatario), p.id]));
+    // Create maps for existing data in DB
+    const existingAddressMap = new Map<string, string>();
+    const existingTenantMap = new Map<string, string>();
+    const existingRutMap = new Map<string, string>();
+
+    properties.forEach(p => {
+      if (p.id) {
+        const normDir = normalizeAddress(p.direccion);
+        if (normDir) existingAddressMap.set(normDir, p.id);
+        const normTen = normalizeText(p.arrendatario);
+        if (normTen) existingTenantMap.set(normTen, p.id);
+        const clRut = cleanRut(p.rutArr);
+        if (clRut) existingRutMap.set(clRut, p.id);
+      }
+    });
     
     let duplicatesOverall = 0;
     
@@ -1431,24 +1390,63 @@ export default function App() {
       if (!res) return null;
       const normDir = normalizeAddress(res.dir);
       const normTenant = normalizeText(res.a_nom);
+      const cleanTenantRut = cleanRut(res.a_rut);
       const amountVal = (res.valor || '0').toString().replace(/[^0-9]/g, '');
       const hashKey = res.fingerprint;
-      
-      // Key of address + amount for intra-batch detection
       const contentKey = `${normDir}_${amountVal}`;
       
-      const isAddressInDB = normDir ? existingAddressMap.has(normDir) : false;
-      const isTenantInDB = normTenant ? existingTenantMap.has(normTenant) : false;
+      let isAddressInDB = false;
+      let existingId: string | null = null;
+
+      if (normDir && normDir.length >= 6) {
+        if (existingAddressMap.has(normDir)) {
+          isAddressInDB = true;
+          existingId = existingAddressMap.get(normDir) || null;
+        } else {
+          for (const p of properties) {
+            const pNorm = normalizeAddress(p.direccion);
+            if (pNorm && pNorm.length >= 6 && (pNorm.includes(normDir) || normDir.includes(pNorm))) {
+              isAddressInDB = true;
+              existingId = p.id;
+              break;
+            }
+          }
+        }
+      }
+
+      let isRutInDB = false;
+      if (cleanTenantRut && cleanTenantRut.length >= 8 && existingRutMap.has(cleanTenantRut)) {
+        isRutInDB = true;
+        if (!existingId) existingId = existingRutMap.get(cleanTenantRut) || null;
+      }
+
+      let isTenantInDB = false;
+      if (normTenant && normTenant.length >= 5) {
+        if (existingTenantMap.has(normTenant) && amountVal !== '0') {
+          isTenantInDB = true;
+          if (!existingId) existingId = existingTenantMap.get(normTenant) || null;
+        } else {
+          for (const p of properties) {
+            const pTenant = normalizeText(p.arrendatario);
+            const pAmount = (p.valor || '0').toString().replace(/[^0-9]/g, '');
+            if (pTenant && pTenant.length >= 8 && (pTenant.includes(normTenant) || normTenant.includes(pTenant))) {
+              if (amountVal === '0' || pAmount === '0' || pAmount === amountVal) {
+                isTenantInDB = true;
+                if (!existingId) existingId = p.id;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      const isAlreadyInDB = isAddressInDB || isRutInDB || isTenantInDB;
       
-      // We consider it a duplicate in DB if:
-      // 1. Address matches EXACTLY (after normalization)
-      // 2. OR Tenant matches AND Amount matches (since tenant might have multiple properties, but rarely with same amount)
-      const isAlreadyInDB = isAddressInDB || (isTenantInDB && amountVal !== '0');
-      const existingId = isAddressInDB ? existingAddressMap.get(normDir) : (isTenantInDB ? existingTenantMap.get(normTenant) : null);
-      
-      // Duplicate if SAME fingerprint OR SAME content key in current batch
-      const isRelativelyDuplicate = (hashKey && seenHashes.has(hashKey)) || 
-                                    (contentKey && seenContentKeys.has(contentKey));
+      // Duplicate if SAME fingerprint OR SAME content key OR SAME RUT in current queue or current batch
+      const isRelativelyDuplicate = 
+        Boolean(hashKey && seenHashes.has(hashKey)) || 
+        Boolean(contentKey && contentKey.length > 5 && seenContentKeys.has(contentKey)) ||
+        Boolean(cleanTenantRut && cleanTenantRut.length >= 8 && seenRutKeys.has(cleanTenantRut));
 
       if (isAlreadyInDB || isRelativelyDuplicate) {
         duplicatesOverall++;
@@ -1457,19 +1455,27 @@ export default function App() {
       
       if (hashKey) seenHashes.add(hashKey);
       if (contentKey && contentKey.length > 5) seenContentKeys.add(contentKey);
+      if (cleanTenantRut && cleanTenantRut.length >= 8) seenRutKeys.add(cleanTenantRut);
       
       return { ...res, isDuplicate: false };
     }).filter(r => r !== null);
 
-    setBulkFiles(files);
-    setBulkData(processedResults);
-    setHasDuplicates(duplicatesOverall > 0);
+    const updatedBulkFiles = [...bulkFiles, ...files];
+    const updatedBulkData = [...bulkData, ...processedResults];
+
+    setBulkFiles(updatedBulkFiles);
+    setBulkData(updatedBulkData);
+    setHasDuplicates(updatedBulkData.some(d => d.isDuplicate));
     setLoading(false);
     
     if (duplicatesOverall > 0) {
-      showToast(`Hemos detectado ${duplicatesOverall} posibles duplicados`, 'error');
+      showToast(`Hemos detectado ${duplicatesOverall} posible${duplicatesOverall > 1 ? 's' : ''} duplicado${duplicatesOverall > 1 ? 's' : ''}`, 'error');
     } else {
-      showToast(`Analizados ${results.length} contratos correctamente`);
+      showToast(files.length === 1 ? 'Contrato analizado correctamente con IA' : `Analizados ${results.length} contratos correctamente`);
+    }
+
+    if (inputElement) {
+      inputElement.value = '';
     }
   };
 
@@ -1862,26 +1868,6 @@ export default function App() {
     return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(val));
   };
 
-  const isExpired = (dateStr: string) => {
-    if (!dateStr) return false;
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return false;
-    return date < new Date();
-  };
-
-  const addMonthsToDate = (startDateStr: string, months: number): string => {
-    if (!startDateStr) return '';
-    const date = new Date(startDateStr + 'T00:00:00');
-    if (isNaN(date.getTime())) return startDateStr;
-    date.setMonth(date.getMonth() + Number(months));
-    return date.toISOString().split('T')[0];
-  };
-
-  const calculateExpiry = (startDate: string, months: number = 12) => {
-    return addMonthsToDate(startDate, months);
-  };
-
-  
   const renderPropertyDetailsContent = () => {
     if (!selectedProp) return null;
     return (
@@ -2877,45 +2863,56 @@ if (!isAuthReady) return null;
     );
   }
 
-  const sortedProperties = [...filterProperties(properties, propSearch)]
-    .sort((a, b) => {
-    if (sortType === 'date-desc') {
-      const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
-      const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
-      return dateB - dateA;
-    }
-    if (sortType === 'date-asc') {
-      const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
-      const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
-      return dateA - dateB;
-    }
-    if (sortType === 'name-asc') {
-      return (a.direccion || '').localeCompare(b.direccion || '');
-    }
-    if (sortType === 'name-desc') {
-      return (b.direccion || '').localeCompare(a.direccion || '');
-    }
-    return 0;
-  });
-
-  const availableYears = Array.from(new Set(
-    properties
-      .map(p => {
-        if (!p.f_ini) return null;
-        const parts = p.f_ini.split('-');
-        return parts[0];
-      })
-      .filter(Boolean)
-  ))
-  .sort((a, b) => String(b!).localeCompare(String(a!)));
-
-  const filteredSidebarProps = filterProperties(properties, propSearch)
-    .filter(p => !onlyFlagged || !!p.flagged)
-    .filter(p => {
-      if (selectedYearFilter === 'all') return true;
-      if (!p.f_ini) return false;
-      return p.f_ini.startsWith(selectedYearFilter);
+  const sortedProperties = useMemo(() => {
+    return [...filterProperties(properties, propSearch)].sort((a, b) => {
+      if (sortType === 'date-desc') {
+        const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
+        const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
+        return dateB - dateA;
+      }
+      if (sortType === 'date-asc') {
+        const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
+        const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
+        return dateA - dateB;
+      }
+      if (sortType === 'name-asc') {
+        return (a.direccion || '').localeCompare(b.direccion || '');
+      }
+      if (sortType === 'name-desc') {
+        return (b.direccion || '').localeCompare(a.direccion || '');
+      }
+      return 0;
     });
+  }, [properties, propSearch, sortType]);
+
+  const availableYears = useMemo(() => {
+    const years = new Set<string>();
+    for (const p of properties) {
+      if (p.f_ini) {
+        const parts = p.f_ini.split('-');
+        if (parts[0]) years.add(parts[0]);
+      }
+    }
+    return Array.from(years).sort((a, b) => b.localeCompare(a));
+  }, [properties]);
+
+  const filteredSidebarProps = useMemo(() => {
+    return filterProperties(properties, propSearch)
+      .filter(p => !onlyFlagged || !!p.flagged)
+      .filter(p => {
+        if (selectedYearFilter === 'all') return true;
+        if (!p.f_ini) return false;
+        return p.f_ini.startsWith(selectedYearFilter);
+      })
+      .sort((a, b) => {
+        if (sortType === 'name-asc') return (a.direccion || '').localeCompare(b.direccion || '');
+        if (sortType === 'name-desc') return (b.direccion || '').localeCompare(a.direccion || '');
+        const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
+        const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
+        if (sortType === 'date-asc') return dateA - dateB;
+        return dateB - dateA;
+      });
+  }, [properties, propSearch, onlyFlagged, selectedYearFilter, sortType]);
   
   const isExpanded = sidebarOpen || isHoveredSidebar;
 
@@ -2960,9 +2957,10 @@ if (!isAuthReady) return null;
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
             className="md:hidden sticky top-[53px] z-40 bg-white border-b border-border shadow-xl overflow-hidden px-4 py-3 space-y-1.5 shrink-0"
           >
             {[
@@ -3069,6 +3067,28 @@ if (!isAuthReady) return null;
               )}
             </button>
           ))}
+          
+          <div className="pt-2 border-t border-border/40 mt-2">
+            <button
+              onClick={() => setShowTutorial(true)}
+              title={!isExpanded ? 'Guía de Inicio' : undefined}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-full font-bold text-[11px] tracking-wider text-muted hover:text-primary hover:bg-red-50/50 hover:translate-x-1 transition-all group cursor-pointer"
+            >
+              <div className="relative z-10 shrink-0 text-muted group-hover:text-primary transition-colors">
+                <HelpCircle className="w-4 h-4" />
+              </div>
+              {isExpanded && (
+                <motion.span
+                  initial={{ opacity: 0, x: -5 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="relative z-10 truncate whitespace-nowrap"
+                >
+                  Guía de Inicio
+                </motion.span>
+              )}
+            </button>
+          </div>
         </nav>
         
         <div className="px-4 py-6">
@@ -3393,7 +3413,7 @@ if (!isAuthReady) return null;
           <div className="flex flex-col lg:flex-row h-full overflow-hidden rounded-xl lg:rounded-[24px] border border-border/10 bg-white shadow-sm relative z-10">
             {/* Left: List - Stable width on desktop, full-width on mobile/zoom */}
             <div 
-              className={`overflow-hidden flex flex-col h-full w-full lg:w-[400px] shrink-0 border-r border-border/10 bg-white/40 backdrop-blur-md z-20 relative ${
+              className={`overflow-hidden flex flex-col h-full w-full lg:w-[400px] shrink-0 border-r border-border/10 bg-white z-20 relative ${
                 selectedProp ? 'hidden lg:flex' : 'flex'
               }`}
             >
@@ -3474,16 +3494,7 @@ if (!isAuthReady) return null;
 
               <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pt-0 space-y-3">
                 {filteredSidebarProps.length > 0 ? (
-                  filteredSidebarProps
-                    .sort((a, b) => {
-                      if (sortType === 'name-asc') return (a.direccion || '').localeCompare(b.direccion || '');
-                      if (sortType === 'name-desc') return (b.direccion || '').localeCompare(a.direccion || '');
-                      const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
-                      const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
-                      if (sortType === 'date-asc') return dateA - dateB;
-                      return dateB - dateA; // date-desc default
-                    })
-                    .map((p, i) => (
+                  filteredSidebarProps.map((p, i) => (
                       <div 
                       key={`prop-list-item-${p.id || 'virtual'}-${i}`} 
                       onClick={() => { setSelectedProp(p); setActiveTab('legal'); }} 
@@ -3565,267 +3576,22 @@ if (!isAuthReady) return null;
         )}
 
         {activeModule === 'ai' && (
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700 max-w-7xl mx-auto py-6 px-6 lg:px-10">
-                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 mb-8">
-                  <div className="space-y-2">
-                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-accent">Cognitive Processing</h4>
-                    <p className="text-3xl lg:text-4xl font-bold text-ink uppercase tracking-tight">
-                      Inteligencia <span className="text-accent underline decoration-4 underline-offset-8">Artificial</span>
-                    </p>
-                  </div>
-                  <div className="flex gap-3">
-                    <button onClick={bulkSync} disabled={loading} className="h-12 px-6 bg-primary text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-700 transition-all flex items-center gap-2">
-                      <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Sincronizar Todo
-                    </button>
-                    <button className="h-12 px-6 bg-white border border-border rounded-xl text-xs font-bold uppercase tracking-widest text-muted hover:bg-gray-50 transition-all flex items-center gap-2">
-                      <Download className="w-4 h-4" /> Exportar
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                   <div className="lg:col-span-4 space-y-6">
-                    <div className="bg-white p-8 rounded-3xl border border-border shadow-sm flex flex-col pt-10">
-                      <div className="mb-6 text-center">
-                         <div className="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-red-100 shadow-sm">
-                           <Upload className="w-8 h-8" />
-                         </div>
-                         <h4 className="text-lg font-black text-ink mb-1 uppercase tracking-tight">Carga de Documentos</h4>
-                         <p className="text-xs text-muted font-medium">Sube los contratos para iniciar la auditoría IA.</p>
-                      </div>
-                      <div className="space-y-4 max-w-sm mx-auto w-full pb-2">
-                        <label className="flex items-center justify-between w-full bg-bg border border-border rounded-2xl p-6 cursor-pointer hover:bg-gray-50 hover:border-red-200/50 hover:shadow-sm transition-all group">
-                          <div className="flex items-center gap-4">
-                             <div className="w-10 h-10 bg-white rounded-xl shadow-sm border border-border/50 flex items-center justify-center group-hover:text-red-600 transition-colors">
-                               <FileText className="w-5 h-5" />
-                             </div>
-                             <div className="text-left">
-                               <p className="text-sm font-bold text-ink">Subir Contrato Individual</p>
-                               <p className="text-[10px] text-muted mt-0.5">Archivo PDF (Máx 10MB)</p>
-                             </div>
-                          </div>
-                          <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm border border-border/50 group-hover:bg-red-50 group-hover:border-red-100 transition-colors">
-                            <Plus className="w-4 h-4 text-ink group-hover:text-red-600 transition-colors" />
-                          </div>
-                          <input type="file" accept="application/pdf" className="hidden" onChange={handleFileChange} />
-                        </label>
-                        
-                        <label className="flex items-center justify-between w-full bg-white border border-border rounded-2xl p-6 cursor-pointer hover:bg-gray-50 hover:border-red-200/50 hover:shadow-sm transition-all group relative overflow-hidden">
-                          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:scale-110 transition-transform">
-                             <Zap className="w-16 h-16" />
-                          </div>
-                          <div className="flex items-center gap-4 relative z-10">
-                             <div className="w-10 h-10 bg-red-50 text-red-600 rounded-xl shadow-sm border border-red-100 flex items-center justify-center group-hover:bg-red-100 transition-colors">
-                               <FileSearch className="w-5 h-5" />
-                             </div>
-                             <div className="text-left">
-                               <p className="text-sm font-bold text-ink group-hover:text-red-700 transition-colors">Procesamiento Masivo Lote</p>
-                               <p className="text-[10px] text-muted mt-0.5">Sube múltiples PDFs a la vez</p>
-                             </div>
-                          </div>
-                           <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center shadow-sm border border-red-100 group-hover:bg-red-600 group-hover:border-transparent transition-colors relative z-10">
-                            <Plus className="w-4 h-4 text-red-600 group-hover:text-white transition-colors" />
-                          </div>
-                          <input type="file" accept="application/pdf" multiple className="hidden" onChange={handleBulkFileChange} />
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="lg:col-span-8 bg-white rounded-3xl border border-border flex flex-col min-h-[700px] overflow-hidden shadow-sm">
-                    <div className="p-8 border-b border-border flex flex-col md:flex-row justify-between items-start md:items-center bg-gray-50/50 gap-6">
-                      <div>
-                        <h4 className="text-[10px] font-bold text-muted uppercase tracking-widest mb-1">Queue de Procesamiento</h4>
-                        <p className="text-xs font-medium text-ink">Extrayendo datos de contratos en tiempo real</p>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        {bulkData.length > 0 && (
-                          <div className="flex items-center gap-6">
-                            <div className="text-right">
-                              <p className="text-[10px] font-bold text-muted uppercase tracking-widest">Activos en cola</p>
-                              <p className="text-xl font-black text-primary leading-none">{bulkData.length}</p>
-                            </div>
-                            
-                            <div className="flex items-center gap-2">
-                              {hasDuplicates && (
-                                <button 
-                                  onClick={deleteDuplicates}
-                                  className="px-4 py-2 bg-orange-50 text-orange-600 rounded-xl hover:bg-orange-100 transition-all flex items-center gap-2 border border-orange-100 shadow-sm"
-                                >
-                                  <CopyX className="w-4 h-4" />
-                                  <span className="text-[10px] font-bold uppercase tracking-widest">Borrar Duplicados</span>
-                                </button>
-                              )}
-                              <button 
-                                onClick={() => { setBulkData([]); setBulkFiles([]); setHasDuplicates(false); }}
-                                className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-all flex items-center gap-2"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                                <span className="text-[10px] font-bold uppercase tracking-widest px-2">Limpiar</span>
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto p-8 space-y-4 custom-scrollbar bg-white">
-                      {bulkData.length > 0 ? (
-                        <div className="space-y-4">
-                          {bulkData.map((d, i) => (
-                            <motion.div 
-                              key={`bulk-${i}-${d.dir || 'virtual'}`} 
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className={`p-6 rounded-2xl border transition-all ${d.isDuplicate ? 'bg-gray-50 border-gray-100 opacity-60' : 'bg-white border-border hover:border-accent hover:shadow-md'}`}
-                            >
-                              <div className="flex items-center gap-6">
-                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${d.isDuplicate ? 'bg-gray-200 text-gray-400' : 'bg-accent/10 text-accent'}`}>
-                                   <FileText className="w-6 h-6" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                   <div className="flex items-center gap-2 mb-1">
-                                      <p className="text-sm font-bold text-ink truncate">
-                                         {d.dir || 'Dirección no detectada'}
-                                      </p>
-                                      {d.isDuplicate && (
-                                        <div className="px-2 py-0.5 bg-orange-100 text-orange-600 text-[8px] font-black uppercase tracking-widest rounded-md border border-orange-200 shrink-0">
-                                           Duplicado
-                                        </div>
-                                      )}
-                                   </div>
-                                   <div className="flex items-center gap-3">
-                                      <span className="text-[10px] text-muted font-bold uppercase tracking-widest">{d.a_nom || 'S/A'}</span>
-                                      <div className="w-1 h-1 rounded-full bg-gray-300" />
-                                      <span className="text-[10px] font-mono text-muted">{d.fileName}</span>
-                                   </div>
-                                </div>
-                                <div className="text-right shrink-0 px-6 border-l border-border flex flex-col items-end gap-2">
-                                   <p className="text-base font-bold text-ink">{formatMoney(d.can, d.tipoMonto)}</p>
-                                   <div className="flex items-center gap-2">
-                                      <button 
-                                        onClick={() => setPreviewData(d)}
-                                        className="p-1.5 hover:bg-bg rounded-lg text-muted hover:text-primary transition-colors"
-                                        title="Vista Previa"
-                                      >
-                                        <Eye className="w-4 h-4" />
-                                      </button>
-                                      <p className="text-[9px] font-bold text-accent uppercase tracking-widest">Verificado core</p>
-                                   </div>
-                                </div>
-                              </div>
-                            </motion.div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="h-full flex flex-col items-center justify-center text-center py-20 grayscale opacity-40">
-                          <RefreshCw className="w-12 h-12 text-muted mb-4 animate-spin-slow" />
-                          <h5 className="text-sm font-bold text-ink uppercase tracking-widest mb-1">Esperando Archivos</h5>
-                          <p className="text-[10px] text-muted uppercase tracking-widest">Sube contratos para iniciar el análisis automático</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {bulkData.length > 0 && (
-                       <div className="p-8 bg-gray-50 border-t border-border">
-                          <button 
-                             disabled={loading}
-                             onClick={async () => {
-                               if (!user) return;
-                           setLoading(true);
-                           setProgress(0);
-                           setLoadingStatus('Iniciando sincronización masiva...');
-                           
-                           try {
-                             const total = bulkData.length;
-                             setLoadingStatus(`Subiendo ${total} contratos en paralelo...`);
-                             setProgress(10);
-                             
-                             // Fully parallel for maximum speed
-                             const syncedData = await Promise.all(bulkData.map(async (d) => {
-                               let pdfUrl = d.pdf || '#';
-                               const file = bulkFiles.find(f => f.name === d.fileName);
-                               
-                               if (file && (pdfUrl === '#' || !pdfUrl)) {
-                                 try {
-                                   pdfUrl = await uploadFileToStorage(file, 'contracts/bulk');
-                                 } catch (e) {
-                                   console.error(`Error subiendo ${file.name}:`, e);
-                                 }
-                               }
-                               return { ...d, pdf: pdfUrl };
-                             }));
-
-                             setProgress(80);
-                             setLoadingStatus('Confirmando cambios en la base de datos...');
-                             const batch = writeBatch(db);
-                           
-                           syncedData.forEach(d => {
-                             const propData = {
-                               direccion: d.dir || '',
-                               valor: Number(d.can) || 0,
-                               termino: d.f_ven || d.f_ini || '',
-                               f_ini: d.f_ini || '',
-                               duracion: d.duracion || '12 meses',
-                               dueno: d.d_nom || '',
-                               rutDue: d.d_rut || '',
-                               telD: d.d_tel || '',
-                               mailD: d.d_mail || '',
-                               arrendatario: d.a_nom || '',
-                               rutArr: d.a_rut || '',
-                               telA: d.a_tel || '',
-                               mailA: d.a_mail || '',
-                               aval: d.av_nom || '',
-                               rutAval: d.av_rut || '',
-                               telAval: d.av_tel || '',
-                               mailAval: d.av_mail || '',
-                               ownerUid: user.uid,
-                               expenses: [],
-                               pdf: d.pdf || '#',
-                               updatedAt: serverTimestamp()
-                             };
-                             
-                             if (d.existingId) {
-                               const existingDocRef = doc(db, 'properties', d.existingId);
-                               batch.update(existingDocRef, propData);
-                             } else {
-                               const newDocRef = doc(collection(db, 'properties'));
-                               batch.set(newDocRef, { ...propData, createdAt: serverTimestamp() });
-                             }
-                           });
-
-                           await batch.commit();
-                           const totalContracts = syncedData.length;
-                           const totalAttachments = bulkFiles.length;
-                           await logActivity(`Subida masiva de ${totalContracts} contratos con ${totalAttachments} archivos adjuntos`, true);
-                           setBulkData([]);
-                           setBulkFiles([]);
-                           showToast('Sincronización masiva completada exitosamente');
-                           setActiveModule('properties');
-                         } catch (error) {
-                           console.error('Error in bulk sync:', error);
-                           showToast('Error en la sincronización', 'error');
-                         } finally {
-                           setLoading(false);
-                         }
-                       }}
-                       className="group relative w-full h-[100px] bg-ink text-white rounded-[40px] font-black uppercase text-[14px] tracking-[0.4em] hover:bg-accent transition-all shadow-[0_30px_60px_-10px_rgba(0,0,0,0.3)] active:scale-95 flex items-center justify-center gap-8 overflow-hidden"
-                    >
-                      <div className="absolute inset-0 bg-accent translate-y-full group-hover:translate-y-0 transition-transform duration-700" />
-                      <div className="relative z-10 flex items-center gap-8">
-                         {loading ? <RefreshCw className="w-8 h-8 animate-spin" /> : <ShieldCheck className="w-8 h-8 group-hover:scale-110 transition-transform duration-500" />}
-                         <span>{loading ? 'Ejecutando Sincronización...' : 'Finalizar Lote Operativo'}</span>
-                      </div>
-                    </button>
-                    <div className="mt-8 flex justify-between items-center px-4">
-                       <p className="text-[10px] font-black text-ink/20 uppercase tracking-[0.3em] font-mono">Consolidación Operativa</p>
-                       <p className="text-[10px] font-black text-ink/20 uppercase tracking-[0.3em] font-mono">Sistema Raíz</p>
-                    </div>
-                   </div>
-                )}
-              </div>
-            </div>
-          </div>
+          <AiProcessorView
+            handleFileChange={handleBulkFileChange}
+            handleBulkFileChange={handleBulkFileChange}
+            bulkData={bulkData}
+            bulkFiles={bulkFiles}
+            hasDuplicates={hasDuplicates}
+            deleteDuplicates={deleteDuplicates}
+            clearBulk={() => {
+              setBulkData([]);
+              setBulkFiles([]);
+              setHasDuplicates(false);
+            }}
+            setPreviewData={setPreviewData}
+            bulkSync={bulkSync}
+            loading={loading}
+          />
         )}
 
         {activeModule === 'reports' && (() => {
@@ -6069,317 +5835,69 @@ if (!isAuthReady) return null;
 
       <AnimatePresence>
         {previewData && (
-            <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 md:p-8">
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setPreviewData(null)} className="absolute inset-0 bg-ink/60 backdrop-blur-sm" />
-              <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-2xl bg-white rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                <div className="p-8 border-b border-border flex justify-between items-center bg-gray-50">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
-                      <FileSearch className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-black uppercase tracking-tight">Vista Previa de Extracción</h3>
-                      <div className="flex items-center gap-3 mt-0.5">
-                        <p className="text-[10px] text-muted font-bold uppercase tracking-widest">{previewData.fileName}</p>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const file = bulkFiles.find(f => f.name === previewData.fileName);
-                            if (file) {
-                              const url = URL.createObjectURL(file);
-                              window.open(url, '_blank');
-                            } else if (previewData.pdf && previewData.pdf !== '#') {
-                              viewContract(previewData.pdf, previewData.a_nom);
-                            }
-                          }}
-                          className="flex items-center gap-1.5 px-2 py-0.5 bg-primary/10 hover:bg-primary/20 text-primary rounded-full transition-all group"
-                        >
-                          <Eye className="w-2.5 h-2.5" />
-                          <span className="text-[8px] font-black uppercase tracking-widest">Ver PDF</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  <button onClick={() => setPreviewData(null)} className="p-2 hover:bg-white rounded-full transition-all">
-                    <X className="w-6 h-6" />
-                  </button>
-                </div>
+          <ContractPreviewModal
+            previewData={previewData}
+            setPreviewData={setPreviewData}
+            bulkFiles={bulkFiles}
+            viewContract={viewContract}
+            calculateExpiry={calculateExpiry}
+            isExpired={isExpired}
+            loading={loading}
+            onSyncProperty={async () => {
+              const dateCheck = validateDates(previewData.f_ini || '', previewData.f_ven || '');
+              if (!dateCheck.valid) {
+                showToast(dateCheck.message, 'error');
+                return;
+              }
+              setLoading(true);
+              setLoadingStatus('Sincronizando...');
+              try {
+                let pdfUrl = previewData.pdf || '#';
+                const file = bulkFiles.find(f => f.name === previewData.fileName);
+                
+                if (file && (pdfUrl === '#' || !pdfUrl)) {
+                  setLoadingStatus('Subiendo contrato a la nube...');
+                  pdfUrl = await uploadFileToStorage(file, 'contracts');
+                }
 
-                <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
-                  <div className="space-y-4">
-                    <h4 className="text-[10px] font-black text-primary uppercase tracking-widest border-b border-primary/10 pb-2">Ubicación y Canon</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="bg-gray-50 p-4 rounded-2xl focus-within:ring-2 ring-primary/20 transition-all md:col-span-1">
-                        <p className="text-[8px] text-muted uppercase font-black mb-1">Dirección Detectada</p>
-                        <input 
-                          type="text"
-                          value={previewData.dir || ''}
-                          onChange={(e) => setPreviewData({...previewData, dir: e.target.value})}
-                          className="w-full bg-transparent font-bold text-sm outline-none text-ink"
-                          placeholder="Ingrese dirección..."
-                        />
-                      </div>
-                      <div className="bg-gray-50 p-4 rounded-2xl focus-within:ring-2 ring-primary/20 transition-all md:col-span-1">
-                        <p className="text-[8px] text-muted uppercase font-black mb-1">Canon Mensual (Solo números)</p>
-                        <input 
-                          type="number"
-                          value={previewData.can || ''}
-                          onChange={(e) => setPreviewData({...previewData, can: e.target.value})}
-                          className="w-full bg-transparent font-black text-sm text-primary outline-none"
-                          placeholder="0"
-                        />
-                      </div>
-                      <div className="bg-gray-50 p-4 rounded-2xl focus-within:ring-2 ring-primary/20 transition-all md:col-span-1">
-                        <p className="text-[8px] text-muted uppercase font-black mb-1">Moneda</p>
-                        <select
-                          value={previewData.tipoMonto || 'pesos'}
-                          onChange={(e) => setPreviewData({...previewData, tipoMonto: e.target.value as 'pesos' | 'uf'})}
-                          className="w-full bg-transparent font-bold text-sm outline-none text-ink"
-                        >
-                          <option value="pesos">Pesos ($)</option>
-                          <option value="uf">UF</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="text-[10px] font-black text-primary uppercase tracking-widest border-b border-primary/10 pb-2">Vigencia del Contrato</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="bg-gray-50 p-4 rounded-2xl focus-within:ring-2 ring-primary/20 transition-all">
-                        <p className="text-[8px] text-muted uppercase font-black mb-1">Fecha Inicio</p>
-                        <input 
-                          type="date"
-                          value={previewData.f_ini || ''}
-                          onChange={(e) => {
-                            const newStart = e.target.value;
-                            const months = Number(previewData.duracionMeses) || 12;
-                            setPreviewData({
-                              ...previewData, 
-                              f_ini: newStart,
-                              f_ven: calculateExpiry(newStart, months)
-                            });
-                          }}
-                          className="w-full bg-transparent font-bold text-sm outline-none text-ink"
-                        />
-                      </div>
-                      <div className="bg-gray-50 p-4 rounded-2xl focus-within:ring-2 ring-primary/20 transition-all">
-                        <p className="text-[8px] text-muted uppercase font-black mb-1">Duración (Meses)</p>
-                        <select
-                          value={previewData.duracionMeses || 12}
-                          onChange={(e) => {
-                            const months = Number(e.target.value);
-                            setPreviewData({
-                              ...previewData,
-                              duracionMeses: months,
-                              duracion: `${months} meses`,
-                              f_ven: calculateExpiry(previewData.f_ini || '', months)
-                            });
-                          }}
-                          className="w-full bg-transparent font-bold text-sm outline-none text-ink"
-                        >
-                          <option value={6}>6 meses</option>
-                          <option value={12}>12 meses (1 año)</option>
-                          <option value={18}>18 meses</option>
-                          <option value={24}>24 meses (2 años)</option>
-                          <option value={30}>30 meses</option>
-                          <option value={36}>36 meses (3 años)</option>
-                          <option value={48}>48 meses (4 años)</option>
-                          <option value={60}>60 meses (5 años)</option>
-                          <option value={120}>120 meses (10 años)</option>
-                        </select>
-                      </div>
-                      <div className="bg-gray-50 p-4 rounded-2xl focus-within:ring-2 ring-primary/20 transition-all">
-                        <p className="text-[8px] text-muted uppercase font-black mb-1">Fecha Vencimiento (Recalculado)</p>
-                        <input 
-                          type="date"
-                          value={previewData.f_ven || ''}
-                          onChange={(e) => setPreviewData({...previewData, f_ven: e.target.value})}
-                          className={`w-full bg-transparent font-bold text-sm outline-none ${isExpired(previewData.f_ven) ? 'text-danger' : 'text-ink'}`}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="space-y-4">
-                      <h4 className="text-[10px] font-black text-primary uppercase tracking-widest border-b border-primary/10 pb-2">Arrendatario</h4>
-                      <div className="space-y-3">
-                        <div className="bg-gray-50 p-3 rounded-xl">
-                          <p className="text-[7px] text-muted uppercase font-black mb-1">Nombre</p>
-                          <textarea 
-                            value={previewData.a_nom || ''}
-                            onChange={(e) => setPreviewData({...previewData, a_nom: e.target.value})}
-                            className="w-full bg-transparent font-bold text-[10px] outline-none resize-none break-words min-h-[80px]"
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="bg-gray-50 p-3 rounded-xl">
-                            <p className="text-[7px] text-muted uppercase font-black mb-1">RUT</p>
-                            <input 
-                              type="text"
-                              value={previewData.a_rut || ''}
-                              onChange={(e) => setPreviewData({...previewData, a_rut: e.target.value})}
-                              className="w-full bg-transparent font-bold text-[10px] outline-none"
-                            />
-                          </div>
-                          <div className="bg-gray-50 p-3 rounded-xl">
-                            <p className="text-[7px] text-muted uppercase font-black mb-1">Teléfono</p>
-                            <input 
-                              type="text"
-                              value={previewData.a_tel || ''}
-                              onChange={(e) => setPreviewData({...previewData, a_tel: e.target.value})}
-                              className="w-full bg-transparent font-bold text-[10px] outline-none"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <h4 className="text-[10px] font-black text-primary uppercase tracking-widest border-b border-primary/10 pb-2">Aval / Codeudor</h4>
-                      <div className="space-y-3">
-                        <div className="bg-gray-50 p-3 rounded-xl">
-                          <p className="text-[7px] text-muted uppercase font-black mb-1">Nombre</p>
-                          <textarea 
-                            value={previewData.av_nom || ''}
-                            onChange={(e) => setPreviewData({...previewData, av_nom: e.target.value})}
-                            className="w-full bg-transparent font-bold text-[10px] outline-none resize-none break-words min-h-[80px]"
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="bg-gray-50 p-3 rounded-xl">
-                            <p className="text-[7px] text-muted uppercase font-black mb-1">RUT</p>
-                            <input 
-                              type="text"
-                              value={previewData.av_rut || ''}
-                              onChange={(e) => setPreviewData({...previewData, av_rut: e.target.value})}
-                              className="w-full bg-transparent font-bold text-[10px] outline-none"
-                            />
-                          </div>
-                          <div className="bg-gray-50 p-3 rounded-xl">
-                            <p className="text-[7px] text-muted uppercase font-black mb-1">Teléfono</p>
-                            <input 
-                              type="text"
-                              value={previewData.av_tel || ''}
-                              onChange={(e) => setPreviewData({...previewData, av_tel: e.target.value})}
-                              className="w-full bg-transparent font-bold text-[10px] outline-none"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-[10px] font-black text-primary uppercase tracking-widest border-b border-primary/10 pb-2">Propietario / Sociedad</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-gray-50 p-3 rounded-xl col-span-2">
-                      <p className="text-[7px] text-muted uppercase font-black mb-1">Nombre</p>
-                      <textarea 
-                        value={previewData.d_nom || ''}
-                        onChange={(e) => setPreviewData({...previewData, d_nom: e.target.value})}
-                        className="w-full bg-transparent font-bold text-[10px] outline-none resize-none break-words min-h-[80px]"
-                      />
-                    </div>
-                    <div className="bg-gray-50 p-3 rounded-xl">
-                      <p className="text-[7px] text-muted uppercase font-black mb-1">RUT</p>
-                      <input 
-                        type="text"
-                        value={previewData.d_rut || ''}
-                        onChange={(e) => setPreviewData({...previewData, d_rut: e.target.value})}
-                        className="w-full bg-transparent font-bold text-xs outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-                </div>
-
-                <div className="p-8 bg-gray-50 border-t border-border flex gap-4">
-                  <button 
-                    onClick={() => setPreviewData(null)}
-                    className="flex-1 px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest text-muted hover:bg-white transition-all"
-                  >
-                    Cerrar
-                  </button>
-                  <button 
-                    onClick={() => {
-                      const file = bulkFiles.find(f => f.name === previewData.fileName);
-                      if (file) {
-                        const url = URL.createObjectURL(file);
-                        window.open(url, '_blank');
-                      } else if (previewData.pdf && previewData.pdf !== '#') {
-                        viewContract(previewData.pdf, previewData.a_nom);
-                      }
-                    }}
-                    className="flex-1 px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest text-primary border border-primary/20 hover:bg-primary/5 transition-all flex items-center justify-center gap-2"
-                  >
-                    <Eye className="w-4 h-4" />
-                    Ver Contrato
-                  </button>
-                  <button 
-                    disabled={loading}
-                    onClick={async () => {
-                      const dateCheck = validateDates(previewData.f_ini || '', previewData.f_ven || '');
-                      if (!dateCheck.valid) {
-                        showToast(dateCheck.message, 'error');
-                        return;
-                      }
-                      setLoading(true);
-                      setLoadingStatus('Sincronizando...');
-                      try {
-                        let pdfUrl = previewData.pdf || '#';
-                        const file = bulkFiles.find(f => f.name === previewData.fileName);
-                        
-                        // If file exists and hasn't been uploaded yet (is #), upload it now
-                        if (file && (pdfUrl === '#' || !pdfUrl)) {
-                          setLoadingStatus('Subiendo contrato a la nube...');
-                          pdfUrl = await uploadFileToStorage(file, 'contracts');
-                        }
-
-                        await addDoc(collection(db, 'properties'), {
-                          direccion: previewData.dir || '',
-                          valor: Number(previewData.can) || 0,
-                          tipoMonto: previewData.tipoMonto || 'pesos',
-                          duracionMeses: Number(previewData.duracionMeses) || 12,
-                          termino: previewData.f_ven || previewData.f_ini || '',
-                          f_ini: previewData.f_ini || '',
-                          duracion: previewData.duracion || '12 meses',
-                          dueno: previewData.d_nom || '',
-                          rutDue: previewData.d_rut || '',
-                          telD: previewData.d_tel || '',
-                          mailD: previewData.d_mail || '',
-                          arrendatario: previewData.a_nom || '',
-                          rutArr: previewData.a_rut || '',
-                          telA: previewData.a_tel || '',
-                          mailA: previewData.a_mail || '',
-                          aval: previewData.av_nom || '',
-                          rutAval: previewData.av_rut || '',
-                          telAval: previewData.av_tel || '',
-                          mailAval: previewData.av_mail || '',
-                          ownerUid: user.uid,
-                          expenses: [],
-                          pdf: pdfUrl,
-                          createdAt: serverTimestamp()
-                        });
-                        setBulkData(bulkData.filter(d => d.fileName !== previewData.fileName));
-                        setPreviewData(null);
-                        showToast('Propiedad sincronizada con PDF');
-                      } catch (e) {
-                        console.error('Error syncing single property:', e);
-                        showToast('Error al sincronizar', 'error');
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
-                    className={`flex-[2] bg-primary text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-xl shadow-primary/20 ${loading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-600'}`}
-                  >
-                    {loading ? 'Procesando...' : 'Sincronizar Esta Unidad'}
-                  </button>
-                </div>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
+                await addDoc(collection(db, 'properties'), {
+                  direccion: previewData.dir || '',
+                  valor: Number(previewData.can) || 0,
+                  tipoMonto: previewData.tipoMonto || 'pesos',
+                  duracionMeses: Number(previewData.duracionMeses) || 12,
+                  termino: previewData.f_ven || previewData.f_ini || '',
+                  f_ini: previewData.f_ini || '',
+                  duracion: previewData.duracion || '12 meses',
+                  dueno: previewData.d_nom || '',
+                  rutDue: previewData.d_rut || '',
+                  telD: previewData.d_tel || '',
+                  mailD: previewData.d_mail || '',
+                  arrendatario: previewData.a_nom || '',
+                  rutArr: previewData.a_rut || '',
+                  telA: previewData.a_tel || '',
+                  mailA: previewData.a_mail || '',
+                  aval: previewData.av_nom || '',
+                  rutAval: previewData.av_rut || '',
+                  telAval: previewData.av_tel || '',
+                  mailAval: previewData.av_mail || '',
+                  ownerUid: user.uid,
+                  expenses: [],
+                  pdf: pdfUrl,
+                  createdAt: serverTimestamp()
+                });
+                setBulkData(bulkData.filter(d => d.fileName !== previewData.fileName));
+                setPreviewData(null);
+                showToast('Propiedad sincronizada con PDF');
+              } catch (e) {
+                console.error('Error syncing single property:', e);
+                showToast('Error al sincronizar', 'error');
+              } finally {
+                setLoading(false);
+              }
+            }}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {isAdding && (
@@ -6959,6 +6477,14 @@ if (!isAuthReady) return null;
           <ReportModal properties={properties} appSettings={appSettings} onClose={() => setShowReportModal(false)} />
         )}
       </AnimatePresence>
+
+      {showTutorial && (
+        <OnboardingModal
+          isOpen={showTutorial}
+          onClose={handleCloseTutorial}
+          userName={user?.displayName ? user.displayName.split(' ')[0] : undefined}
+        />
+      )}
 
       
       <AnimatePresence>
