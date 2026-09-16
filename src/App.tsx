@@ -508,12 +508,14 @@ export default function App() {
     try {
       await loginWithGoogle();
     } catch (err: any) {
-      console.error(err);
+      console.error('[Auth Error]', err);
       setIsLoggingIn(false);
       if (err.code === 'auth/popup-closed-by-user') {
         showToast('Validación cancelada por el usuario');
-      } else {
-        showToast('Error de conexión con el servidor seguro', 'error');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        showToast('Dominio no autorizado en Firebase Console', 'error');
+      } else if (err.code !== 'auth/popup-blocked') {
+        showToast(`Error de inicio de sesión: ${err?.message || 'Error de conexión'}`, 'error');
       }
     }
   };
@@ -649,8 +651,21 @@ export default function App() {
     return onAuthStateChanged(auth, (u) => {
       setUser(u);
       setIsAuthReady(true);
+      if (u) {
+        setIsLoggingIn(false);
+      }
     });
   }, []);
+
+  // Safety timer for login state
+  useEffect(() => {
+    if (isLoggingIn && !user) {
+      const timer = setTimeout(() => {
+        setIsLoggingIn(false);
+      }, 12000);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoggingIn, user]);
 
   // Handle redirect result after Google login (basic or with Calendar/Gmail scopes)
   useEffect(() => {
