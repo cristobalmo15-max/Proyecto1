@@ -647,6 +647,57 @@ export default function App() {
     file: null as File | null
   });
 
+  const sortedProperties = useMemo(() => {
+    return [...filterProperties(properties, propSearch)].sort((a, b) => {
+      if (sortType === 'date-desc') {
+        const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
+        const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
+        return dateB - dateA;
+      }
+      if (sortType === 'date-asc') {
+        const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
+        const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
+        return dateA - dateB;
+      }
+      if (sortType === 'name-asc') {
+        return (a.direccion || '').localeCompare(b.direccion || '');
+      }
+      if (sortType === 'name-desc') {
+        return (b.direccion || '').localeCompare(a.direccion || '');
+      }
+      return 0;
+    });
+  }, [properties, propSearch, sortType]);
+
+  const availableYears = useMemo(() => {
+    const years = new Set<string>();
+    for (const p of properties) {
+      if (p.f_ini) {
+        const parts = p.f_ini.split('-');
+        if (parts[0]) years.add(parts[0]);
+      }
+    }
+    return Array.from(years).sort((a, b) => b.localeCompare(a));
+  }, [properties]);
+
+  const filteredSidebarProps = useMemo(() => {
+    return filterProperties(properties, propSearch)
+      .filter(p => !onlyFlagged || !!p.flagged)
+      .filter(p => {
+        if (selectedYearFilter === 'all') return true;
+        if (!p.f_ini) return false;
+        return p.f_ini.startsWith(selectedYearFilter);
+      })
+      .sort((a, b) => {
+        if (sortType === 'name-asc') return (a.direccion || '').localeCompare(b.direccion || '');
+        if (sortType === 'name-desc') return (b.direccion || '').localeCompare(a.direccion || '');
+        const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
+        const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
+        if (sortType === 'date-asc') return dateA - dateB;
+        return dateB - dateA;
+      });
+  }, [properties, propSearch, onlyFlagged, selectedYearFilter, sortType]);
+
   useEffect(() => {
     const fallbackTimer = setTimeout(() => {
       setIsAuthReady(true);
@@ -2901,57 +2952,6 @@ export default function App() {
     );
   }
 
-  const sortedProperties = useMemo(() => {
-    return [...filterProperties(properties, propSearch)].sort((a, b) => {
-      if (sortType === 'date-desc') {
-        const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
-        const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
-        return dateB - dateA;
-      }
-      if (sortType === 'date-asc') {
-        const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
-        const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
-        return dateA - dateB;
-      }
-      if (sortType === 'name-asc') {
-        return (a.direccion || '').localeCompare(b.direccion || '');
-      }
-      if (sortType === 'name-desc') {
-        return (b.direccion || '').localeCompare(a.direccion || '');
-      }
-      return 0;
-    });
-  }, [properties, propSearch, sortType]);
-
-  const availableYears = useMemo(() => {
-    const years = new Set<string>();
-    for (const p of properties) {
-      if (p.f_ini) {
-        const parts = p.f_ini.split('-');
-        if (parts[0]) years.add(parts[0]);
-      }
-    }
-    return Array.from(years).sort((a, b) => b.localeCompare(a));
-  }, [properties]);
-
-  const filteredSidebarProps = useMemo(() => {
-    return filterProperties(properties, propSearch)
-      .filter(p => !onlyFlagged || !!p.flagged)
-      .filter(p => {
-        if (selectedYearFilter === 'all') return true;
-        if (!p.f_ini) return false;
-        return p.f_ini.startsWith(selectedYearFilter);
-      })
-      .sort((a, b) => {
-        if (sortType === 'name-asc') return (a.direccion || '').localeCompare(b.direccion || '');
-        if (sortType === 'name-desc') return (b.direccion || '').localeCompare(a.direccion || '');
-        const dateA = a.f_ini ? new Date(a.f_ini).getTime() : 0;
-        const dateB = b.f_ini ? new Date(b.f_ini).getTime() : 0;
-        if (sortType === 'date-asc') return dateA - dateB;
-        return dateB - dateA;
-      });
-  }, [properties, propSearch, onlyFlagged, selectedYearFilter, sortType]);
-  
   const isExpanded = sidebarOpen || isHoveredSidebar;
 
   return (
