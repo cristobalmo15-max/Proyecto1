@@ -242,6 +242,7 @@ export default function App() {
   const [impersonatedUid, setImpersonatedUid] = useState<string | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [activeModule, setActiveModule] = useState<'dashboard' | 'properties' | 'ai' | 'expenses' | 'reports' | 'support' | 'meetings' | 'settings' | 'email' | 'admin'>('dashboard');
+  const [reportsSubModule, setReportsSubModule] = useState<'expenses' | 'expiries'>('expenses');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isHoveredSidebar, setIsHoveredSidebar] = useState(false);
@@ -390,7 +391,6 @@ export default function App() {
   const [selectedReportPropId, setSelectedReportPropId] = useState<string | null>(null);
   const [selectedReportMonth, setSelectedReportMonth] = useState<string>(MONTHS_WITH_YEAR[0]);
   const [reportsTab, setReportsTab] = useState<'details' | 'preview'>('details');
-  const [reportsSubModule, setReportsSubModule] = useState<'expenses' | 'expiries'>('expenses');
   const [expiryFilter, setExpiryFilter] = useState<'all' | 'expired' | 'upcoming'>('all');
   const [returnToVencimientos, setReturnToVencimientos] = useState(false);
   const [selectedExpiryProp, setSelectedExpiryProp] = useState<Property | null>(null);
@@ -648,13 +648,22 @@ export default function App() {
   });
 
   useEffect(() => {
-    return onAuthStateChanged(auth, (u) => {
+    const fallbackTimer = setTimeout(() => {
+      setIsAuthReady(true);
+    }, 1500);
+
+    const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
       setIsAuthReady(true);
       if (u) {
         setIsLoggingIn(false);
       }
     });
+
+    return () => {
+      clearTimeout(fallbackTimer);
+      unsub();
+    };
   }, []);
 
   // Safety timer for login state
@@ -2519,7 +2528,20 @@ export default function App() {
     );
   };
 
-if (!isAuthReady) return null;
+  if (!isAuthReady) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-8 text-center font-sans">
+        <div className="w-14 h-14 bg-gradient-to-tr from-red-600 to-red-500 rounded-2xl flex items-center justify-center shadow-lg shadow-red-500/20 animate-pulse mb-4">
+          <span className="text-white font-black text-2xl">P</span>
+        </div>
+        <h2 className="text-base font-black uppercase tracking-widest text-ink mb-1">Punto Propiedades</h2>
+        <div className="flex items-center gap-2 mt-3">
+          <div className="w-2 h-2 rounded-full bg-red-600 animate-ping" />
+          <span className="text-xs font-bold text-muted uppercase tracking-wider">Cargando aplicación...</span>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoggingIn && !user) {
     return (
