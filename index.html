@@ -3,11 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>My Google AI Studio App</title>
+    <meta name="theme-color" content="#dc2626" />
+    <link rel="manifest" href="/manifest.json" />
+    <title>Punto Propiedades - Gestión Inmobiliaria</title>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((reg) => console.log('[ServiceWorker] Registered with scope:', reg.scope))
+            .catch((err) => console.error('[ServiceWorker] Registration failed:', err));
+        });
+      }
+    </script>
   </body>
 </html>
 
