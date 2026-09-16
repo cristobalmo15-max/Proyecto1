@@ -6,7 +6,13 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cache) => caches.delete(cache))
+      );
+    }).then(() => self.clients.claim())
+  );
 });
 
 // Listen for Web Push Notifications dispatched from server
