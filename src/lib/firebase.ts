@@ -39,16 +39,16 @@ googleProviderWithScopes.setCustomParameters({ prompt: 'select_account' });
 // Variable para cachear el token en memoria con respaldo en localStorage
 let cachedAccessToken: string | null = typeof window !== 'undefined' ? localStorage.getItem('google_access_token') : null;
 
-// Basic login with popup — no restricted scopes so Google won't reject it
 export const loginWithGoogle = async () => {
   try {
     const result = await signInWithPopup(auth, googleProvider);
     return result;
   } catch (err: any) {
-    // Fallback to redirect if popup is blocked
-    if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
+    console.warn('[Auth] signInWithPopup error:', err?.code, err?.message);
+    // Fallback to redirect ONLY if popup is blocked by browser policy
+    if (err.code === 'auth/popup-blocked') {
       sessionStorage.setItem('loginViaRedirect', 'true');
-      await signInWithRedirect(auth, googleProvider);
+      return await signInWithRedirect(auth, googleProvider);
     }
     throw err;
   }
