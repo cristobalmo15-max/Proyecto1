@@ -856,43 +856,13 @@ export default function App() {
 
   const tutorialCheckedRef = useRef(false);
 
-  // Control de tutorial de bienvenida para cuentas nuevas (una sola vez por cuenta)
+  // Control de tutorial de bienvenida (se abre al ingresar)
   useEffect(() => {
     if (!user?.uid || !isAuthReady) return;
     if (tutorialCheckedRef.current) return;
-
-    const localKey = `tutorial_seen_${user.uid}`;
-    const localSeen = localStorage.getItem(localKey) === 'true';
-
-    // Si localmente ya se marcó como visto en este navegador, no mostrar
-    if (localSeen) {
-      tutorialCheckedRef.current = true;
-      return;
-    }
-
-    const settingsLoaded = (appSettings as any)?.isSettingsLoaded === true;
-    const remoteSeen = (appSettings as any)?.hasSeenTutorial === true;
-
-    if (remoteSeen) {
-      tutorialCheckedRef.current = true;
-      return;
-    }
-
-    // Si Firestore ya cargó la configuración y no está visto, mostrar tutorial
-    if (settingsLoaded) {
-      tutorialCheckedRef.current = true;
-      setShowTutorial(true);
-    } else {
-      // Fallback de seguridad (1.2s) si Firestore tarda en responder
-      const timer = setTimeout(() => {
-        if (!tutorialCheckedRef.current && localStorage.getItem(localKey) !== 'true') {
-          tutorialCheckedRef.current = true;
-          setShowTutorial(true);
-        }
-      }, 1200);
-      return () => clearTimeout(timer);
-    }
-  }, [user?.uid, isAuthReady, (appSettings as any)?.isSettingsLoaded, (appSettings as any)?.hasSeenTutorial]);
+    tutorialCheckedRef.current = true;
+    setShowTutorial(true);
+  }, [user?.uid, isAuthReady]);
 
   const handleCloseTutorial = async () => {
     setShowTutorial(false);
@@ -3035,6 +3005,16 @@ export default function App() {
                 <span>{item.label}</span>
               </button>
             ))}
+            <button
+              onClick={() => {
+                setShowTutorial(true);
+                setMobileMenuOpen(false);
+              }}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-xs text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 transition-all cursor-pointer"
+            >
+              <HelpCircle className="w-4 h-4" />
+              <span>Ver Guía de Inicio Rápido</span>
+            </button>
             <div className="pt-2 border-t border-border flex justify-between items-center">
               <span className="text-[10px] text-muted font-bold truncate max-w-[200px]">{user?.email}</span>
               <button onClick={() => auth.signOut()} className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-bold uppercase">
