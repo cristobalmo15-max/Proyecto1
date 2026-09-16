@@ -246,6 +246,19 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isHoveredSidebar, setIsHoveredSidebar] = useState(false);
+  const sidebarHoverTimer = useRef<any>(null);
+
+  const handleSidebarMouseEnter = () => {
+    if (sidebarHoverTimer.current) clearTimeout(sidebarHoverTimer.current);
+    setIsHoveredSidebar(true);
+  };
+
+  const handleSidebarMouseLeave = () => {
+    if (sidebarHoverTimer.current) clearTimeout(sidebarHoverTimer.current);
+    sidebarHoverTimer.current = setTimeout(() => {
+      setIsHoveredSidebar(false);
+    }, 100);
+  };
   const [networksTab, setNetworksTab] = useState<'whatsapp' | 'email' | 'status'>('whatsapp');
   const [isEmailConnected, setIsEmailConnected] = useState(false);
   const [connectedEmail, setConnectedEmail] = useState('');
@@ -3025,28 +3038,21 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Desktop Sidebar: Instagram Web Style - Hover Expand */}
+      {/* Desktop Sidebar: Smooth 60fps GPU Hardware Accelerated */}
       <aside 
-        onMouseEnter={() => setIsHoveredSidebar(true)}
-        onMouseLeave={() => setIsHoveredSidebar(false)}
-        className={`hidden md:flex bg-white transition-all duration-300 ease-in-out flex-col z-40 relative border-r border-border/50 shadow-sm hover:shadow-xl ${isExpanded ? 'w-[260px]' : 'w-[80px]'}`}
+        onMouseEnter={handleSidebarMouseEnter}
+        onMouseLeave={handleSidebarMouseLeave}
+        className={`hidden md:flex bg-white flex-col z-40 relative border-r border-border/50 shadow-sm transition-[width] duration-200 cubic-bezier(0.16,1,0.3,1) will-change-[width] ${isExpanded ? 'w-[260px]' : 'w-[80px]'}`}
       >
-        <div className={`py-6 mb-4 flex items-center transition-all duration-300 ${isExpanded ? 'px-6 justify-between' : 'px-4 justify-center gap-3'}`}>
-          <div className={`flex items-center gap-3 transition-all duration-300 ${!isExpanded && 'scale-105'}`}>
+        <div className={`py-6 mb-4 flex items-center transition-all duration-200 ${isExpanded ? 'px-6 justify-between' : 'px-4 justify-center gap-3'}`}>
+          <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-red-600 to-red-500 flex items-center justify-center shrink-0 shadow-lg shadow-accent/20 cursor-pointer">
                <span className="text-white font-bold text-sm">P</span>
             </div>
-            {isExpanded && (
-              <motion.div 
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.2 }}
-                className="flex flex-col gap-0.5 min-w-0"
-              >
-                <span className="text-ink font-black text-sm tracking-tight leading-none uppercase truncate">Punto</span>
-                <span className="text-primary font-bold text-[8px] tracking-widest leading-none uppercase truncate">Propiedades</span>
-              </motion.div>
-            )}
+            <div className={`flex flex-col gap-0.5 min-w-0 transition-all duration-200 ${isExpanded ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2 w-0 overflow-hidden'}`}>
+              <span className="text-ink font-black text-sm tracking-tight leading-none uppercase truncate">Punto</span>
+              <span className="text-primary font-bold text-[8px] tracking-widest leading-none uppercase truncate">Propiedades</span>
+            </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             {user && (
@@ -3082,25 +3088,18 @@ export default function App() {
               key={item.id}
               onClick={() => setActiveModule(item.id as any)}
               title={!isExpanded ? item.label : undefined}
-              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-full font-bold text-[11px] tracking-wider relative group overflow-hidden smooth-transition ${
+              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-full font-bold text-[11px] tracking-wider relative group overflow-hidden transition-colors duration-150 ${
                 activeModule === item.id 
-                  ? 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-premium shadow-accent/20 scale-[1.02] glow-hover' 
-                  : 'text-muted hover:text-primary hover:bg-slate-50 hover:translate-x-1'
+                  ? 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-premium shadow-accent/20 scale-[1.02]' 
+                  : 'text-muted hover:text-primary hover:bg-slate-50'
               }`}
             >
               <div className="relative z-10 shrink-0">
                 {item.icon}
               </div>
-              {isExpanded && (
-                <motion.span 
-                  initial={{ opacity: 0, x: -5 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="relative z-10 truncate whitespace-nowrap"
-                >
-                  {item.label}
-                </motion.span>
-              )}
+              <span className={`relative z-10 truncate whitespace-nowrap transition-all duration-200 ${isExpanded ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2 w-0 overflow-hidden'}`}>
+                {item.label}
+              </span>
             </button>
           ))}
           
@@ -3108,21 +3107,14 @@ export default function App() {
             <button
               onClick={() => setShowTutorial(true)}
               title={!isExpanded ? 'Guía de Inicio' : undefined}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-full font-bold text-[11px] tracking-wider text-muted hover:text-primary hover:bg-red-50/50 hover:translate-x-1 transition-all group cursor-pointer"
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-full font-bold text-[11px] tracking-wider text-muted hover:text-primary hover:bg-red-50/50 transition-all group cursor-pointer"
             >
               <div className="relative z-10 shrink-0 text-muted group-hover:text-primary transition-colors">
                 <HelpCircle className="w-4 h-4" />
               </div>
-              {isExpanded && (
-                <motion.span
-                  initial={{ opacity: 0, x: -5 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="relative z-10 truncate whitespace-nowrap"
-                >
-                  Guía de Inicio
-                </motion.span>
-              )}
+              <span className={`relative z-10 truncate whitespace-nowrap transition-all duration-200 ${isExpanded ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2 w-0 overflow-hidden'}`}>
+                Guía de Inicio
+              </span>
             </button>
           </div>
         </nav>
@@ -3138,17 +3130,10 @@ export default function App() {
                <img src={user.photoURL || ''} className="w-8 h-8 rounded-full" referrerPolicy="no-referrer" />
                <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full" />
             </div>
-            {isExpanded && (
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.2 }}
-                className="flex-1 min-w-0"
-              >
-                <p className="text-[10px] font-bold truncate text-ink">{user.displayName || 'Corredor'}</p>
-                <p className="text-[8px] text-muted font-medium truncate">{user.email}</p>
-              </motion.div>
-            )}
+            <div className={`flex-1 min-w-0 transition-all duration-200 ${isExpanded ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2 w-0 overflow-hidden'}`}>
+              <p className="text-[10px] font-bold truncate text-ink">{user.displayName || 'Corredor'}</p>
+              <p className="text-[8px] text-muted font-medium truncate">{user.email}</p>
+            </div>
             {isExpanded && (
                <button onClick={() => auth.signOut()} className="text-muted hover:text-red-500 transition-colors ml-1 shrink-0" title="Cerrar Sesión">
                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
