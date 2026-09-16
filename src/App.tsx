@@ -68,6 +68,7 @@ import {
 } from 'lucide-react';
 import { ReportModal } from './components/ReportModal';
 import { AdminPanel } from './components/AdminPanel';
+import { NotificationCenter } from './components/NotificationCenter';
 import { AiProcessorView } from './features/ai-audit/AiProcessorView';
 import { ContractPreviewModal } from './features/ai-audit/ContractPreviewModal';
 import { OnboardingModal } from './components/OnboardingModal';
@@ -2941,6 +2942,14 @@ if (!isAuthReady) return null;
 
         <div className="flex items-center gap-2">
           {user && (
+            <NotificationCenter 
+              user={user} 
+              setActiveModule={setActiveModule} 
+              setReportsSubModule={setReportsSubModule} 
+              showToast={showToast} 
+            />
+          )}
+          {user && (
             <img src={user.photoURL || ''} className="w-7 h-7 rounded-full border border-border" referrerPolicy="no-referrer" alt="" />
           )}
           <button 
@@ -3022,13 +3031,23 @@ if (!isAuthReady) return null;
               </motion.div>
             )}
           </div>
-          <button 
-            onClick={() => setSidebarOpen(!sidebarOpen)} 
-            className={`text-muted hover:text-ink transition-all shrink-0 ${!isExpanded ? 'p-2 hover:bg-gray-50 rounded-lg' : ''}`}
-            title={sidebarOpen ? 'Fijar minimizado' : 'Fijar expandido'}
-          >
-             <Menu className={isExpanded ? 'w-5 h-5' : 'w-4 h-4'} />
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {user && (
+              <NotificationCenter 
+                user={user} 
+                setActiveModule={setActiveModule} 
+                setReportsSubModule={setReportsSubModule} 
+                showToast={showToast} 
+              />
+            )}
+            <button 
+              onClick={() => setSidebarOpen(!sidebarOpen)} 
+              className={`text-muted hover:text-ink transition-all shrink-0 ${!isExpanded ? 'p-2 hover:bg-gray-50 rounded-lg' : ''}`}
+              title={sidebarOpen ? 'Fijar minimizado' : 'Fijar expandido'}
+            >
+               <Menu className={isExpanded ? 'w-5 h-5' : 'w-4 h-4'} />
+            </button>
+          </div>
         </div>
 
         <nav className="flex-1 px-3 space-y-1.5 mt-4 overflow-x-hidden">
