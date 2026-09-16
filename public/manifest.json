@@ -1,0 +1,21 @@
+{
+  "short_name": "PuntoPropiedades",
+  "name": "Punto Propiedades - Gestión Inmobiliaria",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/?module=reports&sub=expiries",
+  "background_color": "#ffffff",
+  "theme_color": "#dc2626",
+  "display": "standalone",
+  "orientation": "portrait"
+}
